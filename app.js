@@ -222,7 +222,7 @@ function renderPreviews() {
     .map((src, i) => `
     <div class="preview-item">
       <img src="${src}" alt="预览 ${i + 1}">
-      <button class="remove-btn" onclick="removePreview(${i})">✕</button>
+      <button class="remove-btn" data-action="remove" data-index="${i}">✕</button>
       <span class="preview-badge">✓ 已就绪</span>
     </div>`)
     .join('');
@@ -672,16 +672,19 @@ function showResults(generatedResults) {
   appState.generatedImages = displayData;
 
   grid.innerHTML = displayData
-    .map((r, i) => `
+    .map((r, i) => {
+      const isGeneratedBadge = r.isGenerated ? '<span class="result-type-badge badge-scene" style="top:auto;bottom:8px;left:8px">✨ AI 生成</span>' : '';
+
+      return `
     <div class="result-card" style="animation: fadeInUp 0.5s ease ${i * 0.08}s both">
       <div class="result-image-container">
         <img src="${r.image}" alt="${r.type}" loading="lazy">
         <span class="result-type-badge ${r.badge}">${r.type}</span>
-        ${r.isGenerated ? '<span class="result-type-badge badge-scene" style="top:auto;bottom:8px;left:8px">✨ AI 生成</span>' : ''}
+        ${isGeneratedBadge}
         <div class="result-overlay">
           <div class="result-overlay-actions">
-            <button class="overlay-btn" onclick="previewImage(${i})" title="预览">🔍</button>
-            <button class="overlay-btn" onclick="downloadImage(${i})" title="下载">📥</button>
+            <button class="overlay-btn" data-action="preview" data-index="${i}" title="预览">🔍</button>
+            <button class="overlay-btn" data-action="download" data-index="${i}" title="下载">📥</button>
           </div>
         </div>
       </div>
@@ -689,10 +692,11 @@ function showResults(generatedResults) {
         <h4>${r.type}</h4>
         <div class="result-edit">
           <input type="text" placeholder="${r.editPlaceholder}" id="edit-${i}">
-          <button class="regen-btn" onclick="regenerateImage(${i})">🔄 重新生成</button>
+          <button class="regen-btn" data-action="regenerate" data-index="${i}">🔄 重新生成</button>
         </div>
       </div>
-    </div>`)
+    </div>`;
+    })
     .join('');
 
   results.style.display = 'block';
@@ -948,10 +952,101 @@ function showToast(message) {
   }, 3000);
 }
 
+// ===== Event Listeners Initialization =====
+function initEventListeners() {
+  // Navigation
+  document.getElementById('navSettingBtn')?.addEventListener('click', openApiSettings);
+  document.getElementById('navCtaBtn')?.addEventListener('click', scrollToApp);
+  document.getElementById('mobileToggle')?.addEventListener('click', toggleMobileNav);
+
+  // Hero
+  document.getElementById('heroBtnPrimary')?.addEventListener('click', scrollToApp);
+  document.getElementById('heroBtnSecondary')?.addEventListener('click', (e) => {
+    scrollToSection(e.currentTarget.dataset.section);
+  });
+
+  // Wizard Navigation
+  document.getElementById('btnStep1Next')?.addEventListener('click', (e) => {
+    goToStep(parseInt(e.currentTarget.dataset.step));
+  });
+  document.getElementById('btnStep2Back')?.addEventListener('click', (e) => {
+    goToStep(parseInt(e.currentTarget.dataset.step));
+  });
+  document.getElementById('btnStep2Next')?.addEventListener('click', (e) => {
+    goToStep(parseInt(e.currentTarget.dataset.step));
+  });
+  document.getElementById('btnStep3Back')?.addEventListener('click', (e) => {
+    goToStep(parseInt(e.currentTarget.dataset.step));
+  });
+  document.getElementById('btnStep3Done')?.addEventListener('click', (e) => {
+    scrollToSection(e.currentTarget.dataset.section);
+  });
+
+  // Platform Selection (Delegation)
+  document.querySelectorAll('.platform-grid').forEach(grid => {
+    grid.addEventListener('click', (e) => {
+      const card = e.target.closest('.platform-card');
+      if (card) togglePlatform(card);
+    });
+  });
+
+  // Global Edit
+  document.getElementById('applyGlobalEditBtn')?.addEventListener('click', applyGlobalEdit);
+  document.querySelectorAll('.example-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      setGlobalPrompt(e.currentTarget.dataset.prompt);
+    });
+  });
+
+  // Results Actions
+  document.getElementById('downloadAllBtn')?.addEventListener('click', downloadAll);
+  document.getElementById('detailPageBtn')?.addEventListener('click', (e) => {
+    showToast(e.currentTarget.dataset.toast);
+  });
+
+  // Dynamic Content Delegation (Upload Previews)
+  document.getElementById('uploadPreviews')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action="remove"]');
+    if (btn) {
+      removePreview(parseInt(btn.dataset.index));
+    }
+  });
+
+  // Dynamic Content Delegation (Results Grid)
+  document.getElementById('resultsGrid')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    const index = parseInt(btn.dataset.index);
+
+    if (action === 'preview') previewImage(index);
+    else if (action === 'download') downloadImage(index);
+    else if (action === 'regenerate') regenerateImage(index);
+  });
+
+  // Modals
+  document.getElementById('imageModal')?.addEventListener('click', closeModal);
+  document.querySelector('.modal-content')?.addEventListener('click', (e) => e.stopPropagation());
+  document.getElementById('modalCloseBtn')?.addEventListener('click', closeModal);
+
+  document.getElementById('settingsModal')?.addEventListener('click', closeApiSettings);
+  document.querySelector('.settings-panel')?.addEventListener('click', (e) => e.stopPropagation());
+  document.getElementById('settingsCloseBtn')?.addEventListener('click', closeApiSettings);
+
+  // Settings
+  document.getElementById('toggleApiKeyBtn')?.addEventListener('click', toggleApiKeyVisibility);
+  document.getElementById('testApiBtn')?.addEventListener('click', testApiConnection);
+  document.getElementById('saveApiBtn')?.addEventListener('click', saveApiSettings);
+}
+
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('btnStep1Next').disabled = true;
-  document.getElementById('btnStep2Next').disabled = true;
+  initEventListeners();
+  const step1Next = document.getElementById('btnStep1Next');
+  if (step1Next) step1Next.disabled = true;
+  const step2Next = document.getElementById('btnStep2Next');
+  if (step2Next) step2Next.disabled = true;
   updateApiStatusDot();
   const config = getApiConfig();
   if (config.apiKey) {

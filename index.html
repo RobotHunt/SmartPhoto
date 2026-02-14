@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.volces.com; connect-src 'self' https://*.volces.com; base-uri 'self'; form-action 'self';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="SmartPhoto AI电商做图平台 - 简单3步，让做图变简单。为中国智造一键出图，全平台适配。">
   <title>SmartPhoto - AI电商做图平台</title>
@@ -23,9 +24,9 @@
       <li><a href="#app-section">开始制作</a></li>
       <li><a href="#comparison">案例展示</a></li>
     </ul>
-    <button class="nav-setting-btn" onclick="openApiSettings()" title="API 设置">⚙️</button>
-    <button class="nav-cta" onclick="scrollToApp()">免费开始使用</button>
-    <div class="nav-mobile-toggle" id="mobileToggle" onclick="toggleMobileNav()">
+    <button class="nav-setting-btn" id="navSettingBtn" title="API 设置">⚙️</button>
+    <button class="nav-cta" id="navCtaBtn">免费开始使用</button>
+    <div class="nav-mobile-toggle" id="mobileToggle">
       <span></span><span></span><span></span>
     </div>
   </nav>
@@ -46,10 +47,10 @@
           助力中国智造，让中国智造走向世界。上传实拍图，AI自动生成白底主图、场景图、卖点图，适配淘宝、亚马逊、TikTok等全平台。
         </p>
         <div class="hero-actions">
-          <button class="btn-primary" onclick="scrollToApp()">
+          <button class="btn-primary" id="heroBtnPrimary">
             🚀 立即生成
           </button>
-          <button class="btn-secondary" onclick="scrollToSection('comparison')">
+          <button class="btn-secondary" id="heroBtnSecondary" data-section="comparison">
             📋 查看案例
           </button>
         </div>
@@ -217,7 +218,7 @@
         </div>
         <div class="step-actions">
           <div></div>
-          <button class="btn-next" id="btnStep1Next" disabled onclick="goToStep(2)">
+          <button class="btn-next" id="btnStep1Next" disabled data-step="2">
             下一步：选择平台 →
           </button>
         </div>
@@ -229,12 +230,12 @@
         <div class="platform-category">
           <div class="platform-category-title">🏭 B2B 批发平台</div>
           <div class="platform-grid">
-            <div class="platform-card" data-platform="1688" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="1688">
               <div class="platform-icon">🏪</div>
               <h4>1688</h4>
               <p>800×800px</p>
             </div>
-            <div class="platform-card" data-platform="alibaba" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="alibaba">
               <div class="platform-icon">🌍</div>
               <h4>阿里国际站</h4>
               <p>1000×1000px</p>
@@ -246,27 +247,27 @@
         <div class="platform-category">
           <div class="platform-category-title">🇨🇳 国内电商平台</div>
           <div class="platform-grid">
-            <div class="platform-card" data-platform="taobao" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="taobao">
               <div class="platform-icon">🛒</div>
               <h4>淘宝/天猫</h4>
               <p>800×800px</p>
             </div>
-            <div class="platform-card" data-platform="jd" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="jd">
               <div class="platform-icon">🔴</div>
               <h4>京东</h4>
               <p>800×800px</p>
             </div>
-            <div class="platform-card" data-platform="pdd" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="pdd">
               <div class="platform-icon">🍊</div>
               <h4>拼多多</h4>
               <p>750×352px</p>
             </div>
-            <div class="platform-card" data-platform="douyin" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="douyin">
               <div class="platform-icon">🎵</div>
               <h4>抖音</h4>
               <p>800×800px</p>
             </div>
-            <div class="platform-card" data-platform="xiaohongshu" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="xiaohongshu">
               <div class="platform-icon">📕</div>
               <h4>小红书</h4>
               <p>1000×1333px</p>
@@ -278,17 +279,17 @@
         <div class="platform-category">
           <div class="platform-category-title">🌏 跨境电商平台</div>
           <div class="platform-grid">
-            <div class="platform-card" data-platform="amazon" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="amazon">
               <div class="platform-icon">📦</div>
               <h4>亚马逊</h4>
               <p>1000×1000px</p>
             </div>
-            <div class="platform-card" data-platform="tiktok" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="tiktok">
               <div class="platform-icon">🎬</div>
               <h4>TikTok Shop</h4>
               <p>1000×1000px</p>
             </div>
-            <div class="platform-card" data-platform="temu" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="temu">
               <div class="platform-icon">🟠</div>
               <h4>Temu</h4>
               <p>1000×1000px</p>
@@ -300,7 +301,7 @@
         <div class="platform-category">
           <div class="platform-category-title">⚙️ 其他</div>
           <div class="platform-grid">
-            <div class="platform-card" data-platform="custom" onclick="togglePlatform(this)">
+            <div class="platform-card" data-platform="custom">
               <div class="platform-icon">🖥️</div>
               <h4>官网/自定义</h4>
               <p>自定义尺寸</p>
@@ -329,8 +330,8 @@
         </div>
 
         <div class="step-actions">
-          <button class="btn-back" onclick="goToStep(1)">← 返回上传</button>
-          <button class="btn-next" id="btnStep2Next" disabled onclick="goToStep(3)">
+          <button class="btn-back" id="btnStep2Back" data-step="1">← 返回上传</button>
+          <button class="btn-next" id="btnStep2Next" disabled data-step="3">
             下一步：智能生成 →
           </button>
         </div>
@@ -360,14 +361,14 @@
             <h3>🎨 全局修改</h3>
             <div class="global-edit-input">
               <textarea id="globalEditInput" placeholder="输入整体修改意见，例如：让画面更温馨一些、增加宠物元素、改成小红书风格..."></textarea>
-              <button class="apply-btn" onclick="applyGlobalEdit()">✨ 应用修改</button>
+              <button class="apply-btn" id="applyGlobalEditBtn">✨ 应用修改</button>
             </div>
             <div class="global-examples">
-              <span class="example-chip" onclick="setGlobalPrompt('让画面更温馨一些')">让画面更温馨一些</span>
-              <span class="example-chip" onclick="setGlobalPrompt('增加宠物元素')">增加宠物元素</span>
-              <span class="example-chip" onclick="setGlobalPrompt('改成小红书风格')">改成小红书风格</span>
-              <span class="example-chip" onclick="setGlobalPrompt('整体色调偏暖色')">整体色调偏暖色</span>
-              <span class="example-chip" onclick="setGlobalPrompt('增加科技感')">增加科技感</span>
+              <span class="example-chip" data-prompt="让画面更温馨一些">让画面更温馨一些</span>
+              <span class="example-chip" data-prompt="增加宠物元素">增加宠物元素</span>
+              <span class="example-chip" data-prompt="改成小红书风格">改成小红书风格</span>
+              <span class="example-chip" data-prompt="整体色调偏暖色">整体色调偏暖色</span>
+              <span class="example-chip" data-prompt="增加科技感">增加科技感</span>
             </div>
           </div>
 
@@ -378,10 +379,10 @@
               <p>张图片已生成完毕</p>
             </div>
             <div class="delivery-actions">
-              <button class="download-all-btn" onclick="downloadAll()">
+              <button class="download-all-btn" id="downloadAllBtn">
                 📥 批量下载全部
               </button>
-              <button class="detail-page-btn" onclick="showToast('详情页生成功能即将上线')">
+              <button class="detail-page-btn" id="detailPageBtn" data-toast="详情页生成功能即将上线">
                 📄 生成详情图 →
               </button>
             </div>
@@ -389,8 +390,8 @@
         </div>
 
         <div class="step-actions" id="step3Actions" style="display:none">
-          <button class="btn-back" onclick="goToStep(2)">← 返回配置</button>
-          <button class="btn-next" onclick="scrollToSection('hero')">✅ 完成制作</button>
+          <button class="btn-back" id="btnStep3Back" data-step="2">← 返回配置</button>
+          <button class="btn-next" id="btnStep3Done" data-section="hero">✅ 完成制作</button>
         </div>
       </div>
     </div>
@@ -438,26 +439,26 @@
   </footer>
 
   <!-- ===== Image Preview Modal ===== -->
-  <div class="modal-overlay" id="imageModal" onclick="closeModal()">
-    <div class="modal-content" onclick="event.stopPropagation()">
+  <div class="modal-overlay" id="imageModal">
+    <div class="modal-content">
       <img class="modal-image" id="modalImage" src="" alt="预览">
     </div>
-    <button class="modal-close" onclick="closeModal()">✕</button>
+    <button class="modal-close" id="modalCloseBtn">✕</button>
   </div>
 
   <!-- ===== API Settings Modal ===== -->
-  <div class="settings-overlay" id="settingsModal" onclick="closeApiSettings()">
-    <div class="settings-panel" onclick="event.stopPropagation()">
+  <div class="settings-overlay" id="settingsModal">
+    <div class="settings-panel">
       <div class="settings-header">
         <h3>⚙️ API 设置</h3>
-        <button class="settings-close" onclick="closeApiSettings()">✕</button>
+        <button class="settings-close" id="settingsCloseBtn">✕</button>
       </div>
       <div class="settings-body">
         <div class="settings-group">
           <label for="apiKeyInput">豆包 ARK API Key</label>
           <div class="api-key-field">
             <input type="password" id="apiKeyInput" placeholder="输入您的 ARK API Key" spellcheck="false">
-            <button class="toggle-key-btn" onclick="toggleApiKeyVisibility()" title="显示/隐藏">👁️</button>
+            <button class="toggle-key-btn" id="toggleApiKeyBtn" title="显示/隐藏">👁️</button>
           </div>
           <small class="settings-hint">在 <a href="https://console.volcengine.com/ark" target="_blank">火山引擎 ARK 控制台</a>
             获取 API Key</small>
@@ -489,8 +490,8 @@
         </div>
         <div class="settings-status" id="settingsStatus"></div>
         <div class="settings-actions">
-          <button class="settings-test-btn" onclick="testApiConnection()">🔗 测试连接</button>
-          <button class="settings-save-btn" onclick="saveApiSettings()">💾 保存设置</button>
+          <button class="settings-test-btn" id="testApiBtn">🔗 测试连接</button>
+          <button class="settings-save-btn" id="saveApiBtn">💾 保存设置</button>
         </div>
       </div>
     </div>
