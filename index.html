@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SmartPhoto AI电商做图平台 - 简单3步，让做图变简单。为中国智造一键出图，全平台适配。">
+  <title>SmartPhoto - AI电商做图平台</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-logo">
+      <div class="nav-logo-icon">📸</div>
+      <span class="nav-logo-text">SmartPhoto</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#hero" class="active">首页</a></li>
+      <li><a href="#steps-flow">功能介绍</a></li>
+      <li><a href="#app-section">开始制作</a></li>
+      <li><a href="#comparison">案例展示</a></li>
+    </ul>
+    <button class="nav-setting-btn" onclick="openApiSettings()" title="API 设置">⚙️</button>
+    <button class="nav-cta" onclick="scrollToApp()">免费开始使用</button>
+    <div class="nav-mobile-toggle" id="mobileToggle" onclick="toggleMobileNav()">
+      <span></span><span></span><span></span>
+    </div>
+  </nav>
+
+  <!-- ===== Hero Section ===== -->
+  <section class="hero" id="hero">
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="dot"></span>
+          AI 驱动 · 全平台适配
+        </div>
+        <h1>
+          简单3步<br>
+          让<span class="gradient-text">做图变简单</span>
+        </h1>
+        <p class="hero-subtitle">
+          助力中国智造，让中国智造走向世界。上传实拍图，AI自动生成白底主图、场景图、卖点图，适配淘宝、亚马逊、TikTok等全平台。
+        </p>
+        <div class="hero-actions">
+          <button class="btn-primary" onclick="scrollToApp()">
+            🚀 立即生成
+          </button>
+          <button class="btn-secondary" onclick="scrollToSection('comparison')">
+            📋 查看案例
+          </button>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="number">10x</div>
+            <div class="label">效率提升</div>
+          </div>
+          <div class="hero-stat">
+            <div class="number">12+</div>
+            <div class="label">平台适配</div>
+          </div>
+          <div class="hero-stat">
+            <div class="number">7张</div>
+            <div class="label">一键生成</div>
+          </div>
+          <div class="hero-stat">
+            <div class="number">90%</div>
+            <div class="label">成本节省</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 3-Step Flow ===== -->
+  <section class="steps-flow" id="steps-flow">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <div class="section-badge">✨ 极简三步流程</div>
+        <h2 class="section-title">上传 → 选平台 → <span class="gradient-text">一键出图</span></h2>
+        <p class="section-subtitle">3分钟完成过去3天的工作量，AI替你搞定一切</p>
+      </div>
+      <div class="steps-grid animate-on-scroll">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <div class="step-icon">📤</div>
+          <h3>上传实拍图</h3>
+          <p>拖拽或点击上传产品实拍图，建议3张多角度图片，AI自动检测图像质量</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <div class="step-icon">🎯</div>
+          <h3>选择目标平台</h3>
+          <p>选择发布平台，AI自动识别产品品类、提取卖点并生成适配该平台的营销文案</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <div class="step-icon">🖼️</div>
+          <h3>智能一键生成</h3>
+          <p>AI自动抠图、合成场景、匹配文案，30秒生成7张不同类型的电商图片</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Case Comparison ===== -->
+  <section class="comparison" id="comparison">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <div class="section-badge">🔄 真实案例对比</div>
+        <h2 class="section-title">原图 vs <span class="gradient-text">AI效果图</span></h2>
+        <p class="section-subtitle">以空气净化器为例，看看AI如何将普通实拍图变成专业电商图</p>
+      </div>
+      <div class="comparison-grid animate-on-scroll">
+        <div class="comparison-card">
+          <img src="images/product_original.png" alt="产品原图">
+          <div class="comparison-label">📷 产品实拍原图</div>
+        </div>
+        <div class="comparison-arrow">
+          <div class="arrow-icon">⚡</div>
+          <span>AI 智能处理</span>
+        </div>
+        <div class="comparison-card">
+          <img src="images/product_scene.png" alt="AI生成效果图">
+          <div class="comparison-label">🎨 AI生成场景图</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Value Props ===== -->
+  <section class="value-props" id="value-props">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <div class="section-badge">💡 为什么选择 SmartPhoto</div>
+        <h2 class="section-title">四大<span class="gradient-text">核心能力</span></h2>
+      </div>
+      <div class="value-grid animate-on-scroll">
+        <div class="value-card">
+          <div class="value-icon">✂️</div>
+          <h3>智能抠图</h3>
+          <p>AI精准抠图，边缘平滑无锯齿，复杂背景也能完美处理</p>
+        </div>
+        <div class="value-card">
+          <div class="value-icon">📝</div>
+          <h3>营销文案</h3>
+          <p>自动生成适配各平台调性的营销文案，卖点提炼，一键搞定</p>
+        </div>
+        <div class="value-card">
+          <div class="value-icon">🌐</div>
+          <h3>多平台适配</h3>
+          <p>支持12+电商平台，自动适配尺寸规格和视觉风格标准</p>
+        </div>
+        <div class="value-card">
+          <div class="value-icon">⚡</div>
+          <h3>批量处理</h3>
+          <p>一次上传批量生成，30秒生成7张图，效率提升10倍以上</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== APP Section (Wizard) ===== -->
+  <section class="app-section" id="app-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🎨 开始制作</div>
+        <h2 class="section-title">AI <span class="gradient-text">电商做图</span> 工作台</h2>
+      </div>
+
+      <!-- Wizard Progress -->
+      <div class="wizard-progress" id="wizardProgress">
+        <div class="wizard-step active" data-step="1">
+          <span class="step-dot">1</span>
+          上传图片
+        </div>
+        <div class="wizard-connector"></div>
+        <div class="wizard-step" data-step="2">
+          <span class="step-dot">2</span>
+          选择平台
+        </div>
+        <div class="wizard-connector"></div>
+        <div class="wizard-step" data-step="3">
+          <span class="step-dot">3</span>
+          智能生成
+        </div>
+      </div>
+
+      <!-- Step 1: Upload -->
+      <div class="wizard-panel active" id="panel-1">
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-icon">📤</div>
+          <h3>拖拽或点击上传产品实拍图</h3>
+          <p>支持 JPG / PNG / WebP 格式，单张最大 10MB</p>
+          <div class="upload-hint">
+            💡 建议上传3张，首张效果最明显。含多角度（正面、侧面、俯视）效果更佳。
+          </div>
+          <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+        </div>
+        <div class="upload-previews" id="uploadPreviews"></div>
+        <div class="upload-tips">
+          <div class="tip-card">
+            <div class="tip-emoji">📐</div>
+            <div>正面拍摄<br><small style="color:var(--text-muted)">展示产品整体外观</small></div>
+          </div>
+          <div class="tip-card">
+            <div class="tip-emoji">📏</div>
+            <div>侧面拍摄<br><small style="color:var(--text-muted)">展示产品细节</small></div>
+          </div>
+          <div class="tip-card">
+            <div class="tip-emoji">🔍</div>
+            <div>特写拍摄<br><small style="color:var(--text-muted)">突出产品卖点</small></div>
+          </div>
+        </div>
+        <div class="step-actions">
+          <div></div>
+          <button class="btn-next" id="btnStep1Next" disabled onclick="goToStep(2)">
+            下一步：选择平台 →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Platform Selection -->
+      <div class="wizard-panel" id="panel-2">
+        <!-- B2B -->
+        <div class="platform-category">
+          <div class="platform-category-title">🏭 B2B 批发平台</div>
+          <div class="platform-grid">
+            <div class="platform-card" data-platform="1688" onclick="togglePlatform(this)">
+              <div class="platform-icon">🏪</div>
+              <h4>1688</h4>
+              <p>800×800px</p>
+            </div>
+            <div class="platform-card" data-platform="alibaba" onclick="togglePlatform(this)">
+              <div class="platform-icon">🌍</div>
+              <h4>阿里国际站</h4>
+              <p>1000×1000px</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 国内电商 -->
+        <div class="platform-category">
+          <div class="platform-category-title">🇨🇳 国内电商平台</div>
+          <div class="platform-grid">
+            <div class="platform-card" data-platform="taobao" onclick="togglePlatform(this)">
+              <div class="platform-icon">🛒</div>
+              <h4>淘宝/天猫</h4>
+              <p>800×800px</p>
+            </div>
+            <div class="platform-card" data-platform="jd" onclick="togglePlatform(this)">
+              <div class="platform-icon">🔴</div>
+              <h4>京东</h4>
+              <p>800×800px</p>
+            </div>
+            <div class="platform-card" data-platform="pdd" onclick="togglePlatform(this)">
+              <div class="platform-icon">🍊</div>
+              <h4>拼多多</h4>
+              <p>750×352px</p>
+            </div>
+            <div class="platform-card" data-platform="douyin" onclick="togglePlatform(this)">
+              <div class="platform-icon">🎵</div>
+              <h4>抖音</h4>
+              <p>800×800px</p>
+            </div>
+            <div class="platform-card" data-platform="xiaohongshu" onclick="togglePlatform(this)">
+              <div class="platform-icon">📕</div>
+              <h4>小红书</h4>
+              <p>1000×1333px</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 跨境电商 -->
+        <div class="platform-category">
+          <div class="platform-category-title">🌏 跨境电商平台</div>
+          <div class="platform-grid">
+            <div class="platform-card" data-platform="amazon" onclick="togglePlatform(this)">
+              <div class="platform-icon">📦</div>
+              <h4>亚马逊</h4>
+              <p>1000×1000px</p>
+            </div>
+            <div class="platform-card" data-platform="tiktok" onclick="togglePlatform(this)">
+              <div class="platform-icon">🎬</div>
+              <h4>TikTok Shop</h4>
+              <p>1000×1000px</p>
+            </div>
+            <div class="platform-card" data-platform="temu" onclick="togglePlatform(this)">
+              <div class="platform-icon">🟠</div>
+              <h4>Temu</h4>
+              <p>1000×1000px</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 自定义 -->
+        <div class="platform-category">
+          <div class="platform-category-title">⚙️ 其他</div>
+          <div class="platform-grid">
+            <div class="platform-card" data-platform="custom" onclick="togglePlatform(this)">
+              <div class="platform-icon">🖥️</div>
+              <h4>官网/自定义</h4>
+              <p>自定义尺寸</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Analysis -->
+        <div class="ai-analysis-panel" id="aiAnalysisPanel" style="display:none">
+          <h3>🤖 AI 智能分析结果</h3>
+          <div class="analysis-items">
+            <div class="analysis-item">
+              <div class="label">产品品类</div>
+              <div class="value" id="analysisCategory">分析中...</div>
+            </div>
+            <div class="analysis-item">
+              <div class="label">提取卖点</div>
+              <div class="value" id="analysisFeatures">分析中...</div>
+              <div class="tags" id="analysisTags"></div>
+            </div>
+            <div class="analysis-item">
+              <div class="label">推荐文案</div>
+              <div class="value" id="analysisCopy">分析中...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-actions">
+          <button class="btn-back" onclick="goToStep(1)">← 返回上传</button>
+          <button class="btn-next" id="btnStep2Next" disabled onclick="goToStep(3)">
+            下一步：智能生成 →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Generation & Results -->
+      <div class="wizard-panel" id="panel-3">
+        <!-- Loading State -->
+        <div class="generation-loading" id="generationLoading">
+          <div class="loading-spinner"></div>
+          <h3>AI 正在为您生成电商图片...</h3>
+          <div class="loading-progress">
+            <div class="loading-progress-bar" id="progressBar"></div>
+          </div>
+          <div class="loading-text" id="loadingText">初始化中...</div>
+          <div class="loading-status" id="loadingStatus">预计耗时 30-60 秒</div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-section" id="resultsSection" style="display:none">
+          <div class="results-grid" id="resultsGrid">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Global Edit -->
+          <div class="global-edit">
+            <h3>🎨 全局修改</h3>
+            <div class="global-edit-input">
+              <textarea id="globalEditInput" placeholder="输入整体修改意见，例如：让画面更温馨一些、增加宠物元素、改成小红书风格..."></textarea>
+              <button class="apply-btn" onclick="applyGlobalEdit()">✨ 应用修改</button>
+            </div>
+            <div class="global-examples">
+              <span class="example-chip" onclick="setGlobalPrompt('让画面更温馨一些')">让画面更温馨一些</span>
+              <span class="example-chip" onclick="setGlobalPrompt('增加宠物元素')">增加宠物元素</span>
+              <span class="example-chip" onclick="setGlobalPrompt('改成小红书风格')">改成小红书风格</span>
+              <span class="example-chip" onclick="setGlobalPrompt('整体色调偏暖色')">整体色调偏暖色</span>
+              <span class="example-chip" onclick="setGlobalPrompt('增加科技感')">增加科技感</span>
+            </div>
+          </div>
+
+          <!-- Delivery Bar -->
+          <div class="delivery-bar">
+            <div class="delivery-info">
+              <span class="count" id="resultCount">7</span>
+              <p>张图片已生成完毕</p>
+            </div>
+            <div class="delivery-actions">
+              <button class="download-all-btn" onclick="downloadAll()">
+                📥 批量下载全部
+              </button>
+              <button class="detail-page-btn" onclick="showToast('详情页生成功能即将上线')">
+                📄 生成详情图 →
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-actions" id="step3Actions" style="display:none">
+          <button class="btn-back" onclick="goToStep(2)">← 返回配置</button>
+          <button class="btn-next" onclick="scrollToSection('hero')">✅ 完成制作</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <h3>📸 SmartPhoto</h3>
+          <p>AI 驱动的电商做图平台，为中国智造一键出图，全平台适配，降本增效。</p>
+        </div>
+        <div class="footer-col">
+          <h4>产品</h4>
+          <ul>
+            <li><a href="#steps-flow">功能介绍</a></li>
+            <li><a href="#comparison">案例展示</a></li>
+            <li><a href="#app-section">开始制作</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>支持平台</h4>
+          <ul>
+            <li><a href="#">淘宝/天猫</a></li>
+            <li><a href="#">亚马逊</a></li>
+            <li><a href="#">1688</a></li>
+            <li><a href="#">TikTok</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>帮助</h4>
+          <ul>
+            <li><a href="#">使用教程</a></li>
+            <li><a href="#">常见问题</a></li>
+            <li><a href="#">联系我们</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 SmartPhoto. All rights reserved.</span>
+        <span>助力中国智造，让中国智造走向世界 🚀</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ===== Image Preview Modal ===== -->
+  <div class="modal-overlay" id="imageModal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <img class="modal-image" id="modalImage" src="" alt="预览">
+    </div>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+
+  <!-- ===== API Settings Modal ===== -->
+  <div class="settings-overlay" id="settingsModal" onclick="closeApiSettings()">
+    <div class="settings-panel" onclick="event.stopPropagation()">
+      <div class="settings-header">
+        <h3>⚙️ API 设置</h3>
+        <button class="settings-close" onclick="closeApiSettings()">✕</button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-group">
+          <label for="apiKeyInput">豆包 ARK API Key</label>
+          <div class="api-key-field">
+            <input type="password" id="apiKeyInput" placeholder="输入您的 ARK API Key" spellcheck="false">
+            <button class="toggle-key-btn" onclick="toggleApiKeyVisibility()" title="显示/隐藏">👁️</button>
+          </div>
+          <small class="settings-hint">在 <a href="https://console.volcengine.com/ark" target="_blank">火山引擎 ARK 控制台</a>
+            获取 API Key</small>
+        </div>
+        <div class="settings-group">
+          <label for="modelSelect">生成模型</label>
+          <select id="modelSelect">
+            <option value="doubao-seedream-4-5-251128">Seedream 4.5（推荐·最新）</option>
+            <option value="doubao-seedream-4-0-250828">Seedream 4.0</option>
+          </select>
+        </div>
+        <div class="settings-group">
+          <label for="imageSizeSelect">图片尺寸</label>
+          <select id="imageSizeSelect">
+            <option value="1920x1920">1920×1920（标准方形）</option>
+            <option value="2K">2K（高清）</option>
+            <option value="1440x2560">1440×2560（竖版）</option>
+            <option value="2560x1440">2560×1440（横版）</option>
+          </select>
+        </div>
+        <div class="settings-group">
+          <label for="imageStyleSelect">图片风格</label>
+          <select id="imageStyleSelect">
+            <option value="photorealistic">写实摄影风格</option>
+            <option value="commercial">商业广告风格</option>
+            <option value="minimalist">极简现代风格</option>
+            <option value="lifestyle">生活方式风格</option>
+          </select>
+        </div>
+        <div class="settings-status" id="settingsStatus"></div>
+        <div class="settings-actions">
+          <button class="settings-test-btn" onclick="testApiConnection()">🔗 测试连接</button>
+          <button class="settings-save-btn" onclick="saveApiSettings()">💾 保存设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
