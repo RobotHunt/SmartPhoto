@@ -15,6 +15,8 @@ const appState = {
 };
 
 // ===== API Configuration =====
+const API_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
+
 function getApiConfig() {
   return {
     apiKey: localStorage.getItem('smartphoto_api_key') || '',
@@ -291,7 +293,7 @@ function togglePlatform(el) {
  */
 async function callVisionAPI(imageDataUrl, textPrompt) {
   const config = getApiConfig();
-  const apiUrl = 'https://ark.cn-beijing.volces.com/api/v3/responses';
+  const apiUrl = `${API_BASE_URL}/responses`;
 
   const requestBody = {
     model: 'doubao-seed-2-0-mini-260215',
@@ -503,7 +505,7 @@ function typeText(el, text, speed) {
  */
 async function callDoubaoImageAPI(prompt, imageDataUrls) {
   const config = getApiConfig();
-  const apiUrl = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
+  const apiUrl = `${API_BASE_URL}/images/generations`;
 
   const styleDesc = STYLE_MAP[config.style] || '';
   const fullPrompt = prompt + (styleDesc ? `，${styleDesc}` : '');
@@ -890,7 +892,7 @@ async function testApiConnection() {
   setSettingsStatus('🔄 正在测试连接（生成测试图片）...', 'loading');
 
   try {
-    const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations', {
+    const response = await fetch(`${API_BASE_URL}/images/generations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
