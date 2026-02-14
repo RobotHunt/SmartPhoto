@@ -131,18 +131,21 @@ function scrollToSection(id) {
   if (el) el.scrollIntoView({ behavior: 'smooth' });
 }
 
+// Cache DOM elements for scroll event
+const navbar = document.getElementById('navbar');
+const navLinks = document.querySelectorAll('.nav-links a');
+const sectionIds = ['hero', 'steps-flow', 'app-section', 'comparison'];
+const sections = sectionIds.map(id => document.getElementById(id)).filter(Boolean);
+
 window.addEventListener('scroll', () => {
-  const navbar = document.getElementById('navbar');
   if (window.scrollY > 50) navbar.classList.add('scrolled');
   else navbar.classList.remove('scrolled');
 
-  const sections = ['hero', 'steps-flow', 'app-section', 'comparison'];
   let current = '';
-  sections.forEach((id) => {
-    const section = document.getElementById(id);
-    if (section && section.getBoundingClientRect().top <= 200) current = id;
+  sections.forEach((section) => {
+    if (section.getBoundingClientRect().top <= 200) current = section.id;
   });
-  document.querySelectorAll('.nav-links a').forEach((a) => {
+  navLinks.forEach((a) => {
     a.classList.toggle('active', a.getAttribute('href') === '#' + current);
   });
 });
