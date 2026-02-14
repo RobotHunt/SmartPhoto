@@ -43,8 +43,9 @@ const STYLE_MAP = {
 // ===== Dynamic Result Type Builders =====
 // These build prompt templates using the AI analysis of the actual product
 function buildResultTypes(analysis) {
+  analysis = analysis || {};
   const product = analysis.productName || '产品';
-  const features = analysis.features || [];
+  const features = Array.isArray(analysis.features) ? analysis.features : [];
   const featureStr = features.slice(0, 3).join('、') || '优质设计';
   const category = analysis.category || '产品';
   const sceneKeyword = analysis.sceneKeyword || '家居';
@@ -950,8 +951,10 @@ function showToast(message) {
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('btnStep1Next').disabled = true;
-  document.getElementById('btnStep2Next').disabled = true;
+  const btn1 = document.getElementById('btnStep1Next');
+  const btn2 = document.getElementById('btnStep2Next');
+  if (btn1) btn1.disabled = true;
+  if (btn2) btn2.disabled = true;
   updateApiStatusDot();
   const config = getApiConfig();
   if (config.apiKey) {
@@ -962,3 +965,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('SmartPhoto: 未设置 API Key，演示模式');
   }
 });
+
+// ===== Exports for testing =====
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { buildResultTypes, DEMO_IMAGES };
+}
