@@ -6,8 +6,11 @@
 // ===== State Management =====
 const appState = {
   currentStep: 1,
+  fsCurrentStep: 1,
   uploadedFiles: [],
   uploadedPreviews: [],       // data URLs of uploaded images
+  fsSlotFiles: {},            // slot index -> File
+  fsSlotPreviews: {},         // slot index -> data URL
   selectedPlatforms: [],
   generatedImages: [],
   isGenerating: false,
@@ -125,8 +128,7 @@ const DEFAULT_RESULT_TYPES = [
 
 // ===== Navigation =====
 function scrollToApp() {
-  const el = document.getElementById('app-section');
-  if (el) el.scrollIntoView({ behavior: 'smooth' });
+  openFullscreenWizard();
 }
 
 function scrollToSection(id) {
@@ -134,10 +136,293 @@ function scrollToSection(id) {
   if (el) el.scrollIntoView({ behavior: 'smooth' });
 }
 
+// ===== Fullscreen Wizard =====
+function openFullscreenWizard() {
+  const wizard = document.getElementById('fsWizard');
+  wizard.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  fsGoToStep(1);
+}
+
+function closeFullscreenWizard() {
+  const wizard = document.getElementById('fsWizard');
+  wizard.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function fsGoToStep(step) {
+  appState.fsCurrentStep = step;
+
+  // Update progress bar
+  document.querySelectorAll('.fs-progress-step').forEach((ps) => {
+    const s = parseInt(ps.dataset.fsstep);
+    ps.classList.remove('active', 'completed');
+    if (s === step) ps.classList.add('active');
+    else if (s < step) ps.classList.add('completed');
+  });
+
+  document.querySelectorAll('.fs-progress-line').forEach((line, i) => {
+    line.classList.toggle('active', i < step - 1);
+  });
+
+  // Switch panels
+  document.querySelectorAll('.fs-panel').forEach((p) => p.classList.remove('active'));
+  const panel = document.getElementById(`fs-panel-${step}`);
+  if (panel) panel.classList.add('active');
+
+  // Step-specific logic
+  if (step === 2) fsRunAnalysis();
+  if (step === 5) fsRunCopyGeneration();
+  if (step === 6) fsShowConfirmation();
+  if (step === 7) fsStartGeneration();
+}
+
+// ===== FS Step 1: Upload with Slots =====
+function triggerFsUpload(slotIndex) {
+  // If slot already has image, don't re-upload (user can remove first)
+  if (appState.fsSlotPreviews[slotIndex]) return;
+
+  const input = document.getElementById('fileInput');
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('⚠️ 请上传图片文件'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('⚠️ 文件大小不能超过 10MB'); return; }
+
+    appState.fsSlotFiles[slotIndex] = file;
+    appState.uploadedFiles = Object.values(appState.fsSlotFiles);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      appState.fsSlotPreviews[slotIndex] = ev.target.result;
+      appState.uploadedPreviews = Object.values(appState.fsSlotPreviews);
+      renderFsSlot(slotIndex, ev.target.result);
+      updateFsUploadButton();
+      // Reset analysis
+      appState.productAnalysis = null;
+      triggerAutoAnalysis();
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+    input.onchange = null;
+  };
+  input.click();
+}
+
+function renderFsSlot(slotIndex, dataUrl) {
+  const slot = document.getElementById(`fsSlot${slotIndex}`);
+  if (!slot) return;
+  const parentSlot = slot.parentElement;
+  parentSlot.classList.add('has-image');
+  slot.innerHTML = `
+    <img src="${dataUrl}" class="fs-upload-slot-img" alt="预览">
+    <button class="fs-remove-btn" onclick="event.stopPropagation(); removeFsSlot(${slotIndex})">✕</button>
+  `;
+}
+
+function removeFsSlot(slotIndex) {
+  delete appState.fsSlotFiles[slotIndex];
+  delete appState.fsSlotPreviews[slotIndex];
+  appState.uploadedFiles = Object.values(appState.fsSlotFiles);
+  appState.uploadedPreviews = Object.values(appState.fsSlotPreviews);
+
+  const slot = document.getElementById(`fsSlot${slotIndex}`);
+  const parentSlot = slot.parentElement;
+  parentSlot.classList.remove('has-image');
+
+  const labels = ['正面图', '45°角', '侧面图', '', '上传产品片', '上传产品片'];
+  if (slotIndex === 3) {
+    slot.innerHTML = `<div class="fs-upload-add-icon">＋</div>`;
+  } else {
+    slot.innerHTML = `
+      <div class="fs-upload-icon">☁️</div>
+      <span class="fs-upload-slot-label">${labels[slotIndex] || '上传'}</span>
+    `;
+  }
+  updateFsUploadButton();
+  appState.productAnalysis = null;
+}
+
+function updateFsUploadButton() {
+  const btn = document.getElementById('btnFsUploadNext');
+  btn.disabled = Object.keys(appState.fsSlotFiles).length === 0;
+}
+
+// ===== FS Step 2: AI Analysis =====
+async function fsRunAnalysis() {
+  const thumb = document.getElementById('fsAnalysisThumb');
+  const productName = document.getElementById('fsAnalysisProductName');
+  const category = document.getElementById('fsAnalysisCategory');
+  const suggestions = document.getElementById('fsAnalysisSuggestions');
+
+  // Show first uploaded image as thumbnail
+  if (appState.uploadedPreviews.length > 0) {
+    thumb.innerHTML = `<img src="${appState.uploadedPreviews[0]}" alt="产品">`;
+  }
+
+  if (appState.productAnalysis) {
+    // Already analyzed
+    productName.textContent = appState.productAnalysis.productName || '产品';
+    category.textContent = appState.productAnalysis.category || '产品';
+    const features = appState.productAnalysis.features || [];
+    suggestions.innerHTML = [
+      `建议补充顶部图片`,
+      `识别为${appState.productAnalysis.productName || '产品'}，请以社会图像素材作为背景，可提供提效增效`,
+      ...features.slice(0, 2).map(f => `检测到卖点：${f}`)
+    ].map(s => `<li>${s}</li>`).join('');
+    return;
+  }
+
+  productName.textContent = '识别中...';
+  category.textContent = '分析中...';
+  suggestions.innerHTML = '<li>正在生成建议...</li>';
+
+  const config = getApiConfig();
+  if (config.apiKey && config.apiKey.length > 10 && appState.uploadedPreviews.length > 0) {
+    try {
+      showToast('🤖 正在通过 AI 分析产品图片...');
+      const analysis = await analyzeProductImage();
+      if (analysis) {
+        appState.productAnalysis = analysis;
+        productName.textContent = analysis.productName || '产品';
+        category.textContent = analysis.category || '产品';
+        const features = analysis.features || [];
+        suggestions.innerHTML = [
+          `建议补充顶部图片`,
+          `识别为${analysis.productName || '产品'}，请以社会图像素材作为背景，可提供提效增效`,
+          ...features.slice(0, 2).map(f => `检测到卖点：${f}`)
+        ].map(s => `<li>${s}</li>`).join('');
+
+        // Update step 4 selling points and specs
+        updateStrategyFromAnalysis(analysis);
+        showToast('✅ 产品分析完成');
+        return;
+      }
+    } catch (err) {
+      console.warn('AI analysis failed:', err.message);
+    }
+  }
+
+  // Fallback demo
+  setTimeout(() => {
+    productName.textContent = '产品（演示模式）';
+    category.textContent = '产品类型';
+    suggestions.innerHTML = [
+      '建议补充顶部图片',
+      '请设置 API Key 获取真实产品分析结果',
+    ].map(s => `<li>${s}</li>`).join('');
+  }, 800);
+}
+
+function updateStrategyFromAnalysis(analysis) {
+  // Update selling points
+  const spContainer = document.getElementById('fsSellingPoints');
+  if (analysis.features && analysis.features.length > 0) {
+    spContainer.innerHTML = analysis.features.slice(0, 5).map(f =>
+      `<div class="fs-sp-item"><span class="fs-check-green">✓</span> ${f}</div>`
+    ).join('');
+  }
+
+  // Update theme name
+  const themeName = document.getElementById('fsThemeName');
+  const themeDesc = document.getElementById('fsThemeDesc');
+  if (themeName) themeName.textContent = analysis.sceneKeyword || '家居美题';
+  if (themeDesc) themeDesc.textContent = analysis.productName || '';
+
+  // Update confirm card values
+  const confirmScene = document.getElementById('fsConfirmScene');
+  const confirmSpec = document.getElementById('fsConfirmSpec');
+  const confirmSP = document.getElementById('fsConfirmSP');
+  const confirmLayout = document.getElementById('fsConfirmLayout');
+  if (confirmScene) confirmScene.textContent = analysis.scene1 || '生活场景';
+  if (confirmSpec) confirmSpec.textContent = `CADR: ${document.getElementById('fsSpecCADR')?.value || '250 m³/h'}`;
+  if (confirmSP) confirmSP.textContent = analysis.features?.[0] || '核心卖点';
+  if (confirmLayout) confirmLayout.textContent = (analysis.scene1 || '温馨家庭') + ' + 萌宠元素';
+}
+
+// ===== FS Step 3: Platform Selection =====
+function fsTogglePlatform(el) {
+  const platform = el.dataset.platform;
+  const idx = appState.selectedPlatforms.indexOf(platform);
+  if (idx === -1) {
+    appState.selectedPlatforms.push(platform);
+    el.classList.add('selected');
+  } else {
+    appState.selectedPlatforms.splice(idx, 1);
+    el.classList.remove('selected');
+  }
+  document.getElementById('btnFsPlatformNext').disabled = appState.selectedPlatforms.length === 0;
+}
+
+// ===== FS Step 4: Theme Selection =====
+function selectTheme(el, themeName) {
+  document.querySelectorAll('.fs-theme-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// ===== FS Step 5: Generate Copy =====
+async function fsRunCopyGeneration() {
+  const panel = document.getElementById('aiAnalysisPanel');
+  panel.style.display = 'block';
+
+  if (appState.productAnalysis) {
+    displayAnalysis(appState.productAnalysis);
+  } else {
+    displayDemoAnalysis();
+  }
+}
+
+// ===== FS Step 6: Confirm Strategy =====
+function fsShowConfirmation() {
+  // Update confirm values from current state
+  const analysis = appState.productAnalysis;
+  if (analysis) {
+    updateStrategyFromAnalysis(analysis);
+  }
+
+  // Animate progress bar
+  const bar = document.getElementById('fsConfirmProgressBar');
+  const countdown = document.getElementById('fsConfirmCountdown');
+  bar.style.width = '0%';
+
+  let seconds = 3;
+  countdown.textContent = `${seconds}秒后自动开始生成主图...`;
+
+  const timer = setInterval(() => {
+    seconds--;
+    if (seconds <= 0) {
+      clearInterval(timer);
+      countdown.textContent = '即将开始生成...';
+      bar.style.width = '100%';
+    } else {
+      countdown.textContent = `${seconds}秒后自动开始生成主图...`;
+      bar.style.width = `${((3 - seconds) / 3) * 100}%`;
+    }
+  }, 1000);
+}
+
+// ===== FS Step 7: Generation =====
+async function fsStartGeneration() {
+  if (appState.isGenerating) return;
+  appState.isGenerating = true;
+
+  const loading = document.getElementById('generationLoading');
+  const results = document.getElementById('resultsSection');
+  const progressBar = document.getElementById('progressBar');
+  const loadingText = document.getElementById('loadingText');
+  const loadingStatus = document.getElementById('loadingStatus');
+
+  loading.style.display = 'block';
+  results.style.display = 'none';
+
+  // Call the shared generation logic
+  await startGeneration();
+}
+
 // Cache DOM elements for scroll event
 const navbar = document.getElementById('navbar');
 const navLinks = document.querySelectorAll('.nav-links a');
-const sectionIds = ['hero', 'steps-flow', 'app-section', 'comparison'];
+const sectionIds = ['hero', 'steps-flow', 'comparison'];
 const sections = sectionIds.map(id => document.getElementById(id)).filter(Boolean);
 
 window.addEventListener('scroll', () => {
@@ -167,49 +452,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.animate-on-scroll').forEach((el) => observer.observe(el));
 });
 
-// ===== Wizard Steps =====
+// ===== Wizard Steps (Legacy - kept for compatibility) =====
 function goToStep(step) {
-  if (step === 2 && appState.uploadedFiles.length === 0) {
-    showToast('⚠️ 请先上传至少一张产品图片');
-    return;
-  }
-  if (step === 3 && appState.selectedPlatforms.length === 0) {
-    showToast('⚠️ 请先选择至少一个目标平台');
-    return;
-  }
-
-  appState.currentStep = step;
-
-  document.querySelectorAll('.wizard-step').forEach((ws) => {
-    const s = parseInt(ws.dataset.step);
-    ws.classList.remove('active', 'completed');
-    if (s === step) ws.classList.add('active');
-    else if (s < step) ws.classList.add('completed');
-  });
-
-  document.querySelectorAll('.wizard-connector').forEach((c, i) => {
-    c.classList.toggle('active', i < step - 1);
-  });
-
-  document.querySelectorAll('.wizard-panel').forEach((p) => p.classList.remove('active'));
-  const panel = document.getElementById(`panel-${step}`);
-  if (panel) panel.classList.add('active');
-
-  if (step === 2) runAIAnalysis();
-  else if (step === 3) startGeneration();
-
-  document.getElementById('app-section').scrollIntoView({ behavior: 'smooth' });
+  // Redirect to fullscreen wizard
+  openFullscreenWizard();
+  fsGoToStep(step);
 }
 
 // ===== Step 1: Upload =====
-const uploadZone = document.getElementById('uploadZone');
-const fileInput = document.getElementById('fileInput');
-
-uploadZone.addEventListener('click', () => fileInput.click());
-uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-uploadZone.addEventListener('drop', (e) => { e.preventDefault(); uploadZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
-fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+// File input is now shared - handled by triggerFsUpload in fullscreen wizard
 
 function handleFiles(files) {
   Array.from(files).forEach((file) => {
@@ -217,33 +468,18 @@ function handleFiles(files) {
     if (file.size > 10 * 1024 * 1024) { showToast('⚠️ 文件大小不能超过 10MB'); return; }
     appState.uploadedFiles.push(file);
     const reader = new FileReader();
-    reader.onload = (e) => { appState.uploadedPreviews.push(e.target.result); renderPreviews(); };
+    reader.onload = (e) => { appState.uploadedPreviews.push(e.target.result); };
     reader.readAsDataURL(file);
   });
 }
 
 function renderPreviews() {
-  const container = document.getElementById('uploadPreviews');
-  container.innerHTML = appState.uploadedPreviews
-    .map((src, i) => `
-    <div class="preview-item">
-      <img src="${src}" alt="预览 ${i + 1}">
-      <button class="remove-btn" onclick="removePreview(${i})">✕</button>
-      <span class="preview-badge">✓ 已就绪</span>
-    </div>`)
-    .join('');
-  document.getElementById('btnStep1Next').disabled = appState.uploadedFiles.length === 0;
-  // Reset analysis and auto-trigger when images change
-  appState.productAnalysis = null;
-  if (appState.uploadedFiles.length > 0) {
-    triggerAutoAnalysis();
-  }
+  // No longer needed - handled by fullscreen wizard slots
 }
 
 function removePreview(index) {
   appState.uploadedFiles.splice(index, 1);
   appState.uploadedPreviews.splice(index, 1);
-  renderPreviews();
 }
 
 // ===== Auto-analyze after upload =====
@@ -278,15 +514,9 @@ function triggerAutoAnalysis() {
   }, 500);
 }
 
-// ===== Step 2: Platform Selection =====
+// ===== Step 2: Platform Selection (Legacy) =====
 function togglePlatform(el) {
-  const platform = el.dataset.platform;
-  const idx = appState.selectedPlatforms.indexOf(platform);
-  if (idx === -1) { appState.selectedPlatforms.push(platform); el.classList.add('selected'); }
-  else { appState.selectedPlatforms.splice(idx, 1); el.classList.remove('selected'); }
-
-  document.getElementById('btnStep2Next').disabled = appState.selectedPlatforms.length === 0;
-  if (appState.selectedPlatforms.length > 0) runAIAnalysis();
+  fsTogglePlatform(el);
 }
 
 // ===== 豆包 Vision API: Image Understanding =====
@@ -553,19 +783,17 @@ async function callDoubaoImageAPI(prompt, imageDataUrls) {
 
 // ===== Step 3: Generation =====
 async function startGeneration() {
-  if (appState.isGenerating) return;
+  if (appState.isGenerating && appState.fsCurrentStep !== 7) return;
   appState.isGenerating = true;
 
   const loading = document.getElementById('generationLoading');
   const results = document.getElementById('resultsSection');
-  const actions = document.getElementById('step3Actions');
   const progressBar = document.getElementById('progressBar');
   const loadingText = document.getElementById('loadingText');
   const loadingStatus = document.getElementById('loadingStatus');
 
-  loading.classList.add('active');
+  loading.style.display = 'block';
   results.style.display = 'none';
-  actions.style.display = 'none';
 
   const config = getApiConfig();
   const hasApiKey = config.apiKey && config.apiKey.length > 10;
@@ -632,7 +860,7 @@ async function startGeneration() {
     loadingStatus.textContent = '所有图片已就绪';
 
     setTimeout(() => {
-      loading.classList.remove('active');
+      loading.style.display = 'none';
       showResults(generatedResults);
     }, 600);
   } catch (err) {
@@ -658,7 +886,7 @@ function runDemoGeneration(progressBar, loadingText, loadingStatus, loading) {
   const stageTimer = setInterval(() => {
     if (stageIdx >= stages.length) {
       clearInterval(stageTimer);
-      setTimeout(() => { loading.classList.remove('active'); showResults(null); }, 600);
+      setTimeout(() => { loading.style.display = 'none'; showResults(null); }, 600);
       return;
     }
     const stage = stages[stageIdx];
@@ -671,7 +899,6 @@ function runDemoGeneration(progressBar, loadingText, loadingStatus, loading) {
 
 function showResults(generatedResults) {
   const results = document.getElementById('resultsSection');
-  const actions = document.getElementById('step3Actions');
   const grid = document.getElementById('resultsGrid');
 
   const displayData = generatedResults || DEFAULT_RESULT_TYPES.map((r) => ({ ...r, isGenerated: false }));
@@ -702,7 +929,6 @@ function showResults(generatedResults) {
     .join('');
 
   results.style.display = 'block';
-  actions.style.display = 'flex';
   document.getElementById('resultCount').textContent = displayData.length;
   appState.isGenerating = false;
 
@@ -810,7 +1036,7 @@ function closeModal() {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeModal(); closeApiSettings(); }
+  if (e.key === 'Escape') { closeModal(); closeApiSettings(); closeFullscreenWizard(); }
 });
 
 function downloadImage(index) {
@@ -956,10 +1182,6 @@ function showToast(message) {
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', () => {
-  const btn1 = document.getElementById('btnStep1Next');
-  const btn2 = document.getElementById('btnStep2Next');
-  if (btn1) btn1.disabled = true;
-  if (btn2) btn2.disabled = true;
   updateApiStatusDot();
   const config = getApiConfig();
   if (config.apiKey) {

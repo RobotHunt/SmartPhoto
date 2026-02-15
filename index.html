@@ -22,9 +22,9 @@
       <li><a href="#steps-flow">内容</a></li>
     </ul>
     <div class="nav-right">
-      <button class="nav-search-btn" onclick="scrollToSection('app-section')" title="搜索">🔍</button>
+      <button class="nav-search-btn" onclick="openFullscreenWizard()" title="开始制作">�</button>
       <button class="nav-setting-btn" onclick="openApiSettings()" title="API 设置">⚙️</button>
-      <button class="nav-avatar" onclick="scrollToApp()">U</button>
+      <button class="nav-avatar" onclick="openFullscreenWizard()">U</button>
     </div>
     <div class="nav-mobile-toggle" id="mobileToggle" onclick="toggleMobileNav()">
       <span></span><span></span><span></span>
@@ -44,8 +44,8 @@
             拍照上传一键生成·平台选图配文
           </p>
           <div class="hero-actions">
-            <button class="btn-primary-dark" onclick="scrollToApp()">
-              立即生成 ✦
+            <button class="btn-primary-dark" onclick="openFullscreenWizard()">
+              开始使用 ✦
             </button>
             <button class="btn-outline-select" onclick="scrollToSection('comparison')">
               请前往查看 <span class="chevron">∨</span>
@@ -182,152 +182,324 @@
     </div>
   </section>
 
-  <!-- ===== APP Section (Wizard) ===== -->
-  <section class="app-section" id="app-section">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-badge">🎨 开始制作</div>
-        <h2 class="section-title">AI <span class="gradient-text">电商做图</span> 工作台</h2>
-      </div>
-
-      <!-- Wizard Progress -->
-      <div class="wizard-progress" id="wizardProgress">
-        <div class="wizard-step active" data-step="1">
-          <span class="step-dot">1</span>
-          上传图片
+  <!-- ===== Fullscreen Wizard Overlay ===== -->
+  <div class="fs-wizard-overlay" id="fsWizard">
+    <!-- Top Progress Bar -->
+    <div class="fs-wizard-header">
+      <button class="fs-wizard-close" onclick="closeFullscreenWizard()" title="关闭">✕</button>
+      <div class="fs-progress-bar">
+        <div class="fs-progress-step active" data-fsstep="1">
+          <span class="fs-step-dot">1</span>
+          <span class="fs-step-label">上传图片</span>
+          <span class="fs-step-sublabel">上传产品实拍图</span>
         </div>
-        <div class="wizard-connector"></div>
-        <div class="wizard-step" data-step="2">
-          <span class="step-dot">2</span>
-          选择平台
+        <div class="fs-progress-line"></div>
+        <div class="fs-progress-step" data-fsstep="2">
+          <span class="fs-step-dot">2</span>
+          <span class="fs-step-label">AI分析</span>
+          <span class="fs-step-sublabel">智能识别产品</span>
         </div>
-        <div class="wizard-connector"></div>
-        <div class="wizard-step" data-step="3">
-          <span class="step-dot">3</span>
-          智能生成
+        <div class="fs-progress-line"></div>
+        <div class="fs-progress-step" data-fsstep="3">
+          <span class="fs-step-dot">3</span>
+          <span class="fs-step-label">选平台</span>
+          <span class="fs-step-sublabel">选择电商平台</span>
         </div>
-      </div>
-
-      <!-- Step 1: Upload -->
-      <div class="wizard-panel active" id="panel-1">
-        <div class="upload-zone" id="uploadZone">
-          <div class="upload-icon">📤</div>
-          <h3>拖拽或点击上传产品实拍图</h3>
-          <p>支持 JPG / PNG / WebP 格式，单张最大 10MB</p>
-          <div class="upload-hint">
-            💡 建议上传3张，首张效果最明显。含多角度（正面、侧面、俯视）效果更佳。
-          </div>
-          <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+        <div class="fs-progress-line"></div>
+        <div class="fs-progress-step" data-fsstep="4">
+          <span class="fs-step-dot">4</span>
+          <span class="fs-step-label">提取卖点</span>
+          <span class="fs-step-sublabel">AI识别特性</span>
         </div>
-        <div class="upload-previews" id="uploadPreviews"></div>
-        <div class="upload-tips">
-          <div class="tip-card">
-            <div class="tip-emoji">📐</div>
-            <div>正面拍摄<br><small style="color:var(--text-muted)">展示产品整体外观</small></div>
-          </div>
-          <div class="tip-card">
-            <div class="tip-emoji">📏</div>
-            <div>侧面拍摄<br><small style="color:var(--text-muted)">展示产品细节</small></div>
-          </div>
-          <div class="tip-card">
-            <div class="tip-emoji">🔍</div>
-            <div>特写拍摄<br><small style="color:var(--text-muted)">突出产品卖点</small></div>
-          </div>
+        <div class="fs-progress-line"></div>
+        <div class="fs-progress-step" data-fsstep="5">
+          <span class="fs-step-dot">5</span>
+          <span class="fs-step-label">生成文案</span>
+          <span class="fs-step-sublabel">营销文案</span>
         </div>
-        <div class="step-actions">
-          <div></div>
-          <button class="btn-next" id="btnStep1Next" disabled onclick="goToStep(2)">
-            下一步：选择平台 →
-          </button>
+        <div class="fs-progress-line"></div>
+        <div class="fs-progress-step" data-fsstep="6">
+          <span class="fs-step-dot">6</span>
+          <span class="fs-step-label">确认方案</span>
+          <span class="fs-step-sublabel">生成预览</span>
+        </div>
+        <div class="fs-progress-line"></div>
+        <div class="fs-progress-step" data-fsstep="7">
+          <span class="fs-step-dot">7</span>
+          <span class="fs-step-label">查看结果</span>
+          <span class="fs-step-sublabel">下载图片</span>
         </div>
       </div>
+    </div>
 
-      <!-- Step 2: Platform Selection -->
-      <div class="wizard-panel" id="panel-2">
-        <!-- B2B -->
-        <div class="platform-category">
-          <div class="platform-category-title">🏭 B2B 批发平台</div>
-          <div class="platform-grid">
-            <div class="platform-card" data-platform="1688" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/1688.png" alt="1688"></div>
-              <h4>1688</h4>
-              <p>800×800px</p>
+    <!-- Step 1: Upload Images -->
+    <div class="fs-panel active" id="fs-panel-1">
+      <div class="fs-panel-inner">
+        <h2 class="fs-panel-title">上传产品图片，AI助力一键生图</h2>
+        <div class="fs-upload-grid">
+          <div class="fs-upload-slot" data-angle="正面图" onclick="triggerFsUpload(0)">
+            <div class="fs-upload-slot-inner" id="fsSlot0">
+              <div class="fs-upload-icon">☁️</div>
+              <span class="fs-upload-slot-label">正面图</span>
             </div>
-            <div class="platform-card" data-platform="alibaba" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/alibaba-intl.jpg" alt="阿里国际站"></div>
-              <h4>阿里国际站</h4>
-              <p>1000×1000px</p>
+          </div>
+          <div class="fs-upload-slot highlighted" data-angle="45°角" onclick="triggerFsUpload(1)">
+            <div class="fs-upload-slot-inner" id="fsSlot1">
+              <div class="fs-upload-icon">☁️</div>
+              <span class="fs-upload-slot-label">45°角</span>
+            </div>
+          </div>
+          <div class="fs-upload-slot" data-angle="侧面图" onclick="triggerFsUpload(2)">
+            <div class="fs-upload-slot-inner" id="fsSlot2">
+              <div class="fs-upload-icon">☁️</div>
+              <span class="fs-upload-slot-label">侧面图</span>
+            </div>
+          </div>
+          <div class="fs-upload-slot add-slot" onclick="triggerFsUpload(3)">
+            <div class="fs-upload-slot-inner" id="fsSlot3">
+              <div class="fs-upload-add-icon">＋</div>
+            </div>
+          </div>
+          <div class="fs-upload-slot" onclick="triggerFsUpload(4)">
+            <div class="fs-upload-slot-inner" id="fsSlot4">
+              <div class="fs-upload-icon">☁️</div>
+              <span class="fs-upload-slot-label">上传产品片</span>
+            </div>
+          </div>
+          <div class="fs-upload-slot" onclick="triggerFsUpload(5)">
+            <div class="fs-upload-slot-inner" id="fsSlot5">
+              <div class="fs-upload-icon">☁️</div>
+              <span class="fs-upload-slot-label">上传产品片</span>
+            </div>
+          </div>
+        </div>
+        <p class="fs-upload-hint">支持 JPG / PNG，建议尺寸 1000x1000 以上</p>
+        <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+        <button class="fs-btn-primary" id="btnFsUploadNext" disabled onclick="fsGoToStep(2)">
+          开始AI生图 &gt;
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: AI Analysis -->
+    <div class="fs-panel" id="fs-panel-2">
+      <div class="fs-panel-inner">
+        <div class="fs-analysis-header">
+          <span class="fs-analysis-icon">📷</span>
+          <span>AI 正在分析的产品...</span>
+        </div>
+        <div class="fs-analysis-card">
+          <h3>产品识别状态</h3>
+          <div class="fs-analysis-row">
+            <span class="fs-check">✓</span>
+            <span class="fs-analysis-label">图片类型</span>
+          </div>
+          <div class="fs-analysis-detail">
+            <div class="fs-analysis-thumb" id="fsAnalysisThumb"></div>
+            <div>
+              <div class="fs-analysis-type">实物图</div>
+              <div class="fs-analysis-name" id="fsAnalysisProductName">识别中...</div>
+            </div>
+          </div>
+          <div class="fs-analysis-row">
+            <span class="fs-check">✓</span>
+            <span class="fs-analysis-label">产品类型</span>
+          </div>
+          <div class="fs-analysis-product-type" id="fsAnalysisCategory">分析中...</div>
+        </div>
+        <div class="fs-analysis-card">
+          <h3>分析建议</h3>
+          <ul class="fs-analysis-suggestions" id="fsAnalysisSuggestions">
+            <li>正在生成建议...</li>
+          </ul>
+        </div>
+        <div class="fs-upload-more-hint" onclick="fsGoToStep(1)">
+          → 上传补充图片（推荐）
+        </div>
+        <button class="fs-btn-primary" onclick="fsGoToStep(3)">
+          ✦ 开始AI生成图片
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 3: Platform Selection -->
+    <div class="fs-panel" id="fs-panel-3">
+      <div class="fs-panel-inner fs-panel-dark">
+        <div class="fs-step-badge">2</div>
+        <h2 class="fs-panel-title-dark">选择平台与类型</h2>
+        <div class="fs-platform-grid">
+          <div class="fs-platform-card" data-platform="1688" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/1688.png" alt="1688"></div>
+            <span>1688</span>
+            <span class="fs-platform-badge-key" style="display:none">重点</span>
+          </div>
+          <div class="fs-platform-card" data-platform="alibaba" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/alibaba-intl.jpg" alt="阿里国际站"></div>
+            <span>阿里国际站</span>
+            <span class="fs-platform-badge-key" style="display:none">重点</span>
+          </div>
+          <div class="fs-platform-card" data-platform="taobao" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/taobao.png" alt="淘宝"></div>
+            <span>淘宝</span>
+          </div>
+          <div class="fs-platform-card" data-platform="douyin" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/douyin.png" alt="抖音"></div>
+            <span>抖音</span>
+          </div>
+          <div class="fs-platform-card" data-platform="tiktok" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/tiktok.png" alt="TikTok"></div>
+            <span>TikTok</span>
+          </div>
+          <div class="fs-platform-card" data-platform="jd" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/jd.png" alt="京东"></div>
+            <span>京东</span>
+          </div>
+          <div class="fs-platform-card" data-platform="pdd" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/pdd.png" alt="拼多多"></div>
+            <span>拼多多</span>
+          </div>
+          <div class="fs-platform-card" data-platform="temu" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/temu.jpg" alt="Temu"></div>
+            <span>Temu</span>
+          </div>
+          <div class="fs-platform-card" data-platform="xiaohongshu" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/xiaohongshu.png" alt="小红书"></div>
+            <span>小红书</span>
+          </div>
+          <div class="fs-platform-card" data-platform="amazon" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><img src="images/logo/amazon.png" alt="亚马逊"></div>
+            <span>亚马逊</span>
+          </div>
+          <div class="fs-platform-card" data-platform="custom-official" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><span style="font-size:1.2rem;font-weight:700;color:#666">官</span></div>
+            <span>官网自定义</span>
+          </div>
+          <div class="fs-platform-card" data-platform="custom" onclick="fsTogglePlatform(this)">
+            <div class="fs-platform-icon"><span style="font-size:1.5rem;color:#888">＋</span></div>
+            <span>自定义</span>
+          </div>
+        </div>
+        <button class="fs-btn-primary" id="btnFsPlatformNext" disabled onclick="fsGoToStep(4)">
+          下一步 &gt;
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 4: AI Strategy Generation (Scene + Specs + Selling Points) -->
+    <div class="fs-panel" id="fs-panel-4">
+      <div class="fs-panel-inner">
+        <div class="fs-strategy-header">
+          <div class="fs-strategy-icon">💬</div>
+          <h2>AI正在生成主图方案</h2>
+          <p class="fs-strategy-subtitle">为了让生成的图片完全符合您的要求，请确认您的产品参数</p>
+        </div>
+
+        <!-- Upload Specs -->
+        <div class="fs-strategy-card">
+          <div class="fs-strategy-card-header">
+            <h3>增写核心性能</h3>
+            <button class="fs-upload-spec-btn" onclick="showToast('参数文件上传功能开发中')">📄 上传参数文件</button>
+          </div>
+          <div class="fs-spec-upload-hint">
+            <span>🖼️ 图片</span>
+            <span>📄 PDF</span>
+            <span style="color:var(--text-muted)">支持上传产品参数截图或说明书PDF</span>
+          </div>
+        </div>
+
+        <!-- Scene Selection -->
+        <div class="fs-strategy-section">
+          <div class="fs-strategy-section-title"><span class="fs-check-green">✓</span> 选择主要场景</div>
+          <div class="fs-strategy-card">
+            <div class="fs-substep-num">1</div>
+            <h4>选择主题（推荐）</h4>
+            <div class="fs-theme-options" id="fsThemeOptions">
+              <div class="fs-theme-option" onclick="selectTheme(this, '产品图')">
+                <div class="fs-theme-thumb"></div>
+                <span>产品图</span>
+              </div>
+              <div class="fs-theme-option selected" onclick="selectTheme(this, '家居美题')">
+                <span class="fs-theme-check">✓</span>
+                <span id="fsThemeName">家居美题</span>
+                <br><small id="fsThemeDesc" style="color:var(--text-muted)">空气净化器</small>
+              </div>
+            </div>
+          </div>
+          <div class="fs-strategy-card">
+            <div class="fs-substep-num">2</div>
+            <h4>增写核心性能</h4>
+            <div class="fs-spec-rows" id="fsSpecRows">
+              <div class="fs-spec-row">
+                <span class="fs-spec-label">CADR:</span>
+                <input type="text" class="fs-spec-input" value="250 m³/h" id="fsSpecCADR">
+              </div>
+              <div class="fs-spec-row">
+                <span class="fs-spec-label">噪音等级:</span>
+                <input type="text" class="fs-spec-input" value="33 dB" id="fsSpecNoise">
+              </div>
+              <div class="fs-spec-row">
+                <span class="fs-spec-label">尺寸:</span>
+                <input type="text" class="fs-spec-input" value="自定义滤芯，如需改变等（百度）" id="fsSpecSize">
+              </div>
+            </div>
+          </div>
+          <div class="fs-strategy-card">
+            <div class="fs-substep-num">3</div>
+            <h4>增写补充要求</h4>
+            <div class="fs-scene-preview" id="fsScenePreview">场景图片</div>
+            <div class="fs-title-suggestions">
+              <span class="fs-check-green">✓</span> 新颖标题建议<br>
+              <span class="fs-check-green">✓</span> 吸引l标题
+            </div>
+            <p class="fs-custom-scene-hint">自定义、编写其他场景</p>
+          </div>
+          <div class="fs-strategy-card">
+            <div class="fs-substep-num">4</div>
+            <h4>满足核心卖点</h4>
+            <div class="fs-selling-points" id="fsSellingPoints">
+              <div class="fs-sp-item"><span class="fs-check-green">✓</span> 宠物毛发专用吸附</div>
+              <div class="fs-sp-item"><span class="fs-check-green">✓</span> 四重过滤</div>
+              <div class="fs-sp-item"><span class="fs-check-green">✓</span> 静音设计</div>
             </div>
           </div>
         </div>
 
-        <!-- 国内电商 -->
-        <div class="platform-category">
-          <div class="platform-category-title">🇨🇳 国内电商平台</div>
-          <div class="platform-grid">
-            <div class="platform-card" data-platform="taobao" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/taobao.png" alt="淘宝"></div>
-              <h4>淘宝/天猫</h4>
-              <p>800×800px</p>
+        <!-- Reference Content -->
+        <div class="fs-strategy-card">
+          <h3>添加参考内容（可选）</h3>
+          <p class="fs-ref-desc">添加竞品链接或参考图片，AI会分析这些内容来优化生成策略</p>
+          <div class="fs-ref-link-row">
+            <label>参考链接</label>
+            <div class="fs-ref-link-input">
+              <input type="text" placeholder="输入竞品链接或参考页面URL" id="fsRefLink">
+              <button class="fs-ref-add-btn" onclick="showToast('链接已添加')">🔗 添加</button>
             </div>
-            <div class="platform-card" data-platform="jd" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/jd.png" alt="京东"></div>
-              <h4>京东</h4>
-              <p>800×800px</p>
-            </div>
-            <div class="platform-card" data-platform="pdd" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/pdd.png" alt="拼多多"></div>
-              <h4>拼多多</h4>
-              <p>750×352px</p>
-            </div>
-            <div class="platform-card" data-platform="douyin" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/douyin.png" alt="抖音"></div>
-              <h4>抖音</h4>
-              <p>800×800px</p>
-            </div>
-            <div class="platform-card" data-platform="xiaohongshu" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/xiaohongshu.png" alt="小红书"></div>
-              <h4>小红书</h4>
-              <p>1000×1333px</p>
+          </div>
+          <div class="fs-ref-image-row">
+            <label>参考图片</label>
+            <div class="fs-ref-image-upload" onclick="showToast('参考图片上传功能开发中')">
+              🖼️ 点击上传参考图片（支持多张）
             </div>
           </div>
         </div>
 
-        <!-- 跨境电商 -->
-        <div class="platform-category">
-          <div class="platform-category-title">🌏 跨境电商平台</div>
-          <div class="platform-grid">
-            <div class="platform-card" data-platform="amazon" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/amazon.png" alt="亚马逊"></div>
-              <h4>亚马逊</h4>
-              <p>1000×1000px</p>
-            </div>
-            <div class="platform-card" data-platform="tiktok" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/tiktok.png" alt="TikTok"></div>
-              <h4>TikTok Shop</h4>
-              <p>1000×1000px</p>
-            </div>
-            <div class="platform-card" data-platform="temu" onclick="togglePlatform(this)">
-              <div class="platform-icon"><img src="images/logo/temu.jpg" alt="Temu"></div>
-              <h4>Temu</h4>
-              <p>1000×1000px</p>
-            </div>
-          </div>
+        <div class="fs-step-actions-row">
+          <button class="fs-btn-back" onclick="fsGoToStep(3)">← 返回</button>
+          <button class="fs-btn-primary" onclick="fsGoToStep(5)">下一步 &gt;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Generate Copy / Preview Strategy -->
+    <div class="fs-panel" id="fs-panel-5">
+      <div class="fs-panel-inner">
+        <div class="fs-strategy-header">
+          <div class="fs-strategy-icon">💬</div>
+          <h2>AI正在生成主图方案</h2>
+          <p class="fs-strategy-subtitle">为了让生成的图片完全符合您的要求，请确认您的产品参数</p>
         </div>
 
-        <!-- 自定义 -->
-        <div class="platform-category">
-          <div class="platform-category-title">⚙️ 其他</div>
-          <div class="platform-grid">
-            <div class="platform-card" data-platform="custom" onclick="togglePlatform(this)">
-              <div class="platform-icon">🖥️</div>
-              <h4>官网/自定义</h4>
-              <p>自定义尺寸</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- AI Analysis -->
+        <!-- AI Analysis Panel -->
         <div class="ai-analysis-panel" id="aiAnalysisPanel" style="display:none">
           <h3>🤖 AI 智能分析结果</h3>
           <div class="analysis-items">
@@ -347,16 +519,66 @@
           </div>
         </div>
 
-        <div class="step-actions">
-          <button class="btn-back" onclick="goToStep(1)">← 返回上传</button>
-          <button class="btn-next" id="btnStep2Next" disabled onclick="goToStep(3)">
-            下一步：智能生成 →
-          </button>
+        <div class="fs-step-actions-row">
+          <button class="fs-btn-back" onclick="fsGoToStep(4)">← 返回</button>
+          <button class="fs-btn-primary" onclick="fsGoToStep(6)">下一步：确认方案 &gt;</button>
         </div>
       </div>
+    </div>
 
-      <!-- Step 3: Generation & Results -->
-      <div class="wizard-panel" id="panel-3">
+    <!-- Step 6: Confirm Strategy -->
+    <div class="fs-panel" id="fs-panel-6">
+      <div class="fs-panel-inner">
+        <div class="fs-strategy-header">
+          <div class="fs-strategy-icon">💬</div>
+          <h2>AI已生成主图策略</h2>
+          <p class="fs-strategy-subtitle">根据您的选择，AI已为您生成优化策略并成立了主图策略。请仔细审核以下内容，确保符合您的预期主图文案</p>
+        </div>
+        <div class="fs-confirm-card">
+          <div class="fs-confirm-title"><span class="fs-check-green">✓</span> AI已生成主图策略</div>
+          <div class="fs-confirm-item">
+            <span class="fs-check-green">✓</span>
+            <div>
+              <span class="fs-confirm-label">核心场景</span>
+              <div class="fs-confirm-value" id="fsConfirmScene">宠物家庭净化</div>
+            </div>
+          </div>
+          <div class="fs-confirm-item">
+            <span class="fs-check-green">✓</span>
+            <div>
+              <span class="fs-confirm-label">核心性能</span>
+              <div class="fs-confirm-value" id="fsConfirmSpec">CADR: 250 m³/h</div>
+            </div>
+          </div>
+          <div class="fs-confirm-item">
+            <span class="fs-check-green">✓</span>
+            <div>
+              <span class="fs-confirm-label">核心卖点</span>
+              <div class="fs-confirm-value" id="fsConfirmSP">专用吸毛技术</div>
+            </div>
+          </div>
+          <div class="fs-confirm-item">
+            <span class="fs-check-green">✓</span>
+            <div>
+              <span class="fs-confirm-label">主图构图建议</span>
+              <div class="fs-confirm-value" id="fsConfirmLayout">温馨家庭 + 萌宠元素</div>
+            </div>
+          </div>
+        </div>
+        <div class="fs-confirm-countdown" id="fsConfirmCountdown">1秒后自动开始生成主图...</div>
+        <div class="fs-confirm-progress">
+          <div class="fs-confirm-progress-bar" id="fsConfirmProgressBar"></div>
+        </div>
+        <div class="fs-step-actions-row">
+          <button class="fs-btn-back" onclick="fsGoToStep(5)">修改策略</button>
+          <button class="fs-btn-primary fs-btn-generate" onclick="fsGoToStep(7)">⚡ 立即生成</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 7: Results -->
+    <div class="fs-panel" id="fs-panel-7">
+      <div class="fs-panel-inner fs-panel-results">
         <!-- Loading State -->
         <div class="generation-loading" id="generationLoading">
           <div class="loading-spinner"></div>
@@ -370,6 +592,14 @@
 
         <!-- Results -->
         <div class="results-section" id="resultsSection" style="display:none">
+          <div class="fs-results-header">
+            <div class="fs-results-check">✓</div>
+            <span class="fs-results-done">生成完成</span>
+            <h2>生成结果页（最终生产）</h2>
+            <p>共生成 <span id="resultCount">7</span> 张图片，您可以编辑描述或重新生成</p>
+            <button class="fs-btn-download-all" onclick="downloadAll()">📥 批量下载全部图片</button>
+          </div>
+
           <div class="results-grid" id="resultsGrid">
             <!-- Dynamically populated -->
           </div>
@@ -390,37 +620,21 @@
             </div>
           </div>
 
-          <!-- Delivery Bar -->
-          <div class="delivery-bar">
-            <div class="delivery-info">
-              <span class="count" id="resultCount">7</span>
-              <p>张图片已生成完毕</p>
-            </div>
-            <div class="delivery-actions">
-              <button class="download-all-btn" onclick="downloadAll()">
-                📥 批量下载全部
-              </button>
-              <button class="detail-page-btn" onclick="showToast('详情页生成功能即将上线')">
-                📄 生成详情图 →
-              </button>
-            </div>
+          <div class="fs-step-actions-row">
+            <button class="fs-btn-back" onclick="fsGoToStep(6)">← 返回修改方案</button>
+            <button class="fs-btn-primary" onclick="closeFullscreenWizard()">✅ 完成制作</button>
           </div>
-        </div>
-
-        <div class="step-actions" id="step3Actions" style="display:none">
-          <button class="btn-back" onclick="goToStep(2)">← 返回配置</button>
-          <button class="btn-next" onclick="scrollToSection('hero')">✅ 完成制作</button>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
   <!-- ===== CTA Section ===== -->
   <section class="cta-section">
     <div class="container">
       <h2>立即开始，让AI为你的产品赋能</h2>
       <p>助力中国智造，让中国智造走向世界</p>
-      <button class="cta-btn" onclick="scrollToApp()">免费开始使用 ✦</button>
+      <button class="cta-btn" onclick="openFullscreenWizard()">免费开始使用 ✦</button>
     </div>
   </section>
 

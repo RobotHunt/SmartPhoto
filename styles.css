@@ -1514,3 +1514,877 @@ section { position: relative; z-index: 1; overflow: hidden; }
 .badge-selling { background: var(--color-primary-light); color: var(--color-primary); border: 1px solid var(--color-primary-ring); }
 .badge-structure { background: rgba(59, 130, 246, 0.1); color: #2563EB; border: 1px solid rgba(59, 130, 246, 0.2); }
 
+
+/* ===========================================
+   Fullscreen Wizard Overlay
+   =========================================== */
+.fs-wizard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: var(--bg-page);
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.fs-wizard-overlay.active {
+  display: flex;
+  animation: fadeIn 0.3s ease;
+}
+
+/* ---- Header / Progress Bar ---- */
+.fs-wizard-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+  background: #fff;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.fs-wizard-close {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  margin-right: 16px;
+}
+.fs-wizard-close:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+
+.fs-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.fs-progress-bar::-webkit-scrollbar { display: none; }
+
+.fs-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.fs-progress-step:hover { background: var(--bg-surface-hover); }
+
+.fs-step-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: #E5E7EB;
+  color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.fs-step-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.fs-step-sublabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  display: none;
+}
+
+.fs-progress-step.active .fs-step-dot {
+  background: #14B8A6;
+  color: #fff;
+}
+.fs-progress-step.active .fs-step-label {
+  color: #14B8A6;
+  font-weight: 700;
+}
+.fs-progress-step.completed .fs-step-dot {
+  background: #14B8A6;
+  color: #fff;
+}
+.fs-progress-step.completed .fs-step-dot::after {
+  content: '✓';
+  font-size: 0.7rem;
+}
+.fs-progress-step.completed .fs-step-label {
+  color: var(--text-secondary);
+}
+
+.fs-progress-line {
+  width: 24px;
+  height: 2px;
+  background: #E5E7EB;
+  flex-shrink: 0;
+}
+.fs-progress-line.active {
+  background: #14B8A6;
+}
+
+/* ---- Panels ---- */
+.fs-panel {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  animation: fadeInUp 0.35s ease both;
+}
+.fs-panel.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.fs-panel-inner {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+.fs-panel-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 32px;
+  color: var(--text-primary);
+}
+
+/* ---- Upload Grid (Step 1) ---- */
+.fs-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.fs-upload-slot {
+  aspect-ratio: 1;
+  border: 2px dashed #D1D5DB;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+}
+.fs-upload-slot:hover {
+  border-color: #14B8A6;
+  background: rgba(20, 184, 166, 0.02);
+}
+.fs-upload-slot.highlighted {
+  border-color: #14B8A6;
+  border-style: dashed;
+}
+.fs-upload-slot.add-slot {
+  border-color: #14B8A6;
+  border-style: dashed;
+}
+.fs-upload-slot.has-image {
+  border-style: solid;
+  border-color: #14B8A6;
+}
+
+.fs-upload-slot-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 12px;
+  position: relative;
+}
+
+.fs-upload-icon {
+  font-size: 2rem;
+  color: #9CA3AF;
+  margin-bottom: 8px;
+}
+.fs-upload-add-icon {
+  font-size: 2.5rem;
+  color: #14B8A6;
+  font-weight: 300;
+}
+.fs-upload-slot-label {
+  font-size: 0.8rem;
+  color: #14B8A6;
+  font-weight: 600;
+}
+.fs-upload-slot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 14px;
+}
+.fs-upload-slot .fs-remove-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.fs-upload-slot:hover .fs-remove-btn { opacity: 1; }
+.fs-remove-btn:hover { background: #DC2626; }
+
+.fs-upload-hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 32px;
+}
+
+.fs-btn-primary {
+  display: block;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 16px 32px;
+  background: linear-gradient(135deg, #14B8A6, #0D9488);
+  color: #fff;
+  border-radius: 50px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.3);
+}
+.fs-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0D9488, #0F766E);
+  box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+  transform: translateY(-1px);
+}
+.fs-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #D1D5DB;
+  box-shadow: none;
+}
+
+/* ---- Analysis Panel (Step 2) ---- */
+.fs-analysis-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+.fs-analysis-icon {
+  font-size: 1.3rem;
+}
+.fs-analysis-card {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.fs-analysis-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+.fs-analysis-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.fs-check {
+  width: 20px; height: 20px;
+  background: #D1FAE5;
+  color: #059669;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+}
+.fs-analysis-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.fs-analysis-detail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-page);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  margin-left: 28px;
+}
+.fs-analysis-thumb {
+  width: 48px; height: 48px;
+  background: #E5E7EB;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.fs-analysis-thumb img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.fs-analysis-type {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.fs-analysis-name {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.fs-analysis-product-type {
+  margin-left: 28px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.fs-analysis-suggestions {
+  list-style: none;
+  padding: 0;
+}
+.fs-analysis-suggestions li {
+  padding: 6px 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.fs-analysis-suggestions li::before {
+  content: '●';
+  color: #F59E0B;
+  font-size: 0.6rem;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.fs-upload-more-hint {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 16px 0 24px;
+  cursor: pointer;
+}
+.fs-upload-more-hint:hover {
+  color: #14B8A6;
+}
+
+/* ---- Platform Grid (Step 3 - Dark) ---- */
+.fs-panel-dark {
+  background: #0F172A;
+  border-radius: 0;
+  padding: 40px 24px 80px;
+  max-width: 100%;
+  min-height: 100%;
+}
+#fs-panel-3 {
+  background: #0F172A;
+}
+#fs-panel-3 .fs-btn-primary {
+  max-width: 500px;
+}
+
+.fs-step-badge {
+  width: 40px; height: 40px;
+  background: #14B8A6;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 auto 16px;
+}
+
+.fs-panel-title-dark {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 32px;
+  color: #fff;
+}
+
+.fs-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  max-width: 600px;
+  margin: 0 auto 32px;
+}
+
+.fs-platform-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+  position: relative;
+}
+.fs-platform-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+.fs-platform-card.selected {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+.fs-platform-card.selected .fs-platform-badge-key {
+  display: block !important;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #3B82F6;
+  color: #fff;
+  font-size: 0.6rem;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.fs-platform-icon {
+  width: 56px; height: 56px;
+  background: #F9FAFB;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.fs-platform-icon img {
+  width: 100%; height: 100%; object-fit: contain; padding: 6px;
+}
+.fs-platform-card span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ---- Strategy Cards (Step 4) ---- */
+.fs-strategy-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.fs-strategy-icon {
+  width: 48px; height: 48px;
+  background: #D1FAE5;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+  margin: 0 auto 12px;
+}
+.fs-strategy-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.fs-strategy-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.fs-strategy-card {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 16px;
+  position: relative;
+}
+.fs-strategy-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.fs-strategy-card h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.fs-strategy-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.fs-upload-spec-btn {
+  font-size: 0.8rem;
+  color: #14B8A6;
+  font-weight: 500;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+.fs-upload-spec-btn:hover { text-decoration: underline; }
+
+.fs-spec-upload-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-page);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.fs-strategy-section {
+  margin-bottom: 16px;
+}
+.fs-strategy-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.fs-substep-num {
+  width: 28px; height: 28px;
+  background: #D1FAE5;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #059669;
+  position: absolute;
+  top: 20px;
+  left: 20px;
+}
+
+.fs-strategy-card:has(.fs-substep-num) {
+  padding-left: 60px;
+}
+
+.fs-check-green {
+  color: #059669;
+  font-weight: 700;
+}
+
+.fs-theme-options {
+  display: flex;
+  gap: 16px;
+}
+.fs-theme-option {
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--bg-page);
+  min-width: 100px;
+}
+.fs-theme-option:hover { border-color: #14B8A6; }
+.fs-theme-option.selected {
+  border-color: #14B8A6;
+  background: rgba(20, 184, 166, 0.05);
+}
+.fs-theme-check {
+  color: #14B8A6;
+  font-weight: 700;
+  margin-right: 4px;
+}
+.fs-theme-thumb {
+  width: 60px; height: 40px;
+  background: #E5E7EB;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.fs-spec-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fs-spec-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fs-spec-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  min-width: 80px;
+  font-weight: 500;
+}
+.fs-spec-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  outline: none;
+  font-family: var(--font-body);
+}
+.fs-spec-input:focus { border-color: #14B8A6; box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.15); }
+
+.fs-scene-preview {
+  background: #F0FDF4;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+.fs-title-suggestions {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  line-height: 1.8;
+  margin-bottom: 8px;
+}
+.fs-custom-scene-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.fs-selling-points {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fs-sp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Reference Content */
+.fs-ref-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+.fs-ref-link-row, .fs-ref-image-row {
+  margin-bottom: 16px;
+}
+.fs-ref-link-row label, .fs-ref-image-row label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.fs-ref-link-input {
+  display: flex;
+  gap: 8px;
+}
+.fs-ref-link-input input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  outline: none;
+  font-family: var(--font-body);
+}
+.fs-ref-link-input input:focus { border-color: #14B8A6; }
+.fs-ref-add-btn {
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fs-ref-add-btn:hover { border-color: #14B8A6; color: #14B8A6; }
+.fs-ref-image-upload {
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.fs-ref-image-upload:hover {
+  border-color: #14B8A6;
+  color: #14B8A6;
+}
+
+/* ---- Step Actions Row ---- */
+.fs-step-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+  gap: 16px;
+}
+.fs-step-actions-row .fs-btn-primary {
+  max-width: 280px;
+  width: auto;
+  flex: 1;
+}
+.fs-btn-back {
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  background: #fff;
+  border: 1px solid var(--border-color);
+  transition: all 0.15s;
+}
+.fs-btn-back:hover { border-color: var(--border-hover); color: var(--text-primary); }
+
+/* ---- Confirm Strategy (Step 6) ---- */
+.fs-confirm-card {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 24px;
+}
+.fs-confirm-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fs-confirm-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.fs-confirm-item:last-child { border-bottom: none; }
+.fs-confirm-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.fs-confirm-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fs-confirm-countdown {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.fs-confirm-progress {
+  width: 100%;
+  max-width: 400px;
+  height: 6px;
+  background: #E5E7EB;
+  border-radius: 3px;
+  margin: 0 auto 24px;
+  overflow: hidden;
+}
+.fs-confirm-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #14B8A6, #059669);
+  width: 0%;
+  transition: width 0.5s ease;
+  border-radius: 3px;
+}
+
+.fs-btn-generate {
+  background: linear-gradient(135deg, #14B8A6, #0D9488) !important;
+}
+
+/* ---- Results (Step 7) ---- */
+.fs-panel-results {
+  max-width: 1100px;
+}
+.fs-results-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.fs-results-check {
+  width: 36px; height: 36px;
+  background: #14B8A6;
+  color: #fff;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 auto 8px;
+}
+.fs-results-done {
+  font-size: 0.85rem;
+  color: #14B8A6;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8px;
+}
+.fs-results-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.fs-results-header p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+.fs-btn-download-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: #14B8A6;
+  color: #fff;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.fs-btn-download-all:hover { background: #0D9488; box-shadow: 0 4px 14px rgba(20, 184, 166, 0.3); }
+
+/* ---- Responsive for Fullscreen Wizard ---- */
+@media (max-width: 768px) {
+  .fs-upload-grid { grid-template-columns: repeat(3, 1fr); }
+  .fs-platform-grid { grid-template-columns: repeat(3, 1fr); }
+  .fs-progress-step { padding: 4px 8px; }
+  .fs-step-label { font-size: 0.7rem; }
+  .fs-progress-line { width: 12px; }
+  .fs-panel-inner { padding: 24px 16px 60px; }
+  .fs-strategy-card:has(.fs-substep-num) { padding-left: 48px; }
+}
+
+@media (max-width: 480px) {
+  .fs-upload-grid { grid-template-columns: repeat(2, 1fr); }
+  .fs-platform-grid { grid-template-columns: repeat(2, 1fr); }
+  .fs-step-label { display: none; }
+}
+
