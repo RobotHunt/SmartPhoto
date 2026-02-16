@@ -2166,7 +2166,7 @@ section { position: relative; z-index: 1; overflow: hidden; }
 
 .fs-selling-points {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .fs-sp-item {
@@ -2176,6 +2176,115 @@ section { position: relative; z-index: 1; overflow: hidden; }
   font-size: 0.9rem;
   color: var(--text-primary);
   font-weight: 500;
+}
+
+/* Selectable selling point items */
+.fs-sp-selectable {
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-color, #E5E7EB);
+  background: var(--bg-surface, #fff);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.fs-sp-selectable:hover {
+  border-color: var(--color-primary, #A855F7);
+  background: var(--color-primary-light, rgba(168, 85, 247, 0.06));
+}
+.fs-sp-selectable.selected {
+  border-color: var(--color-primary, #A855F7);
+  background: var(--color-primary-light, rgba(168, 85, 247, 0.1));
+  color: var(--color-primary, #A855F7);
+  font-weight: 600;
+}
+.fs-sp-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid #D1D5DB;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: transparent;
+  flex-shrink: 0;
+}
+.fs-sp-selectable.selected .fs-sp-checkbox {
+  background: var(--color-primary, #A855F7);
+  border-color: var(--color-primary, #A855F7);
+}
+
+/* Category correction card */
+.fs-correction-card {
+  background: var(--bg-surface-hover, #F3F4F6);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-top: 12px;
+}
+.fs-correction-card h4 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+.fs-correction-hint {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+.fs-correction-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.fs-correction-row select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-color, #E5E7EB);
+  font-size: 0.9rem;
+  background: #fff;
+  min-width: 180px;
+  cursor: pointer;
+}
+.fs-correction-row select:focus {
+  outline: none;
+  border-color: var(--color-primary, #A855F7);
+  box-shadow: 0 0 0 3px var(--color-primary-ring, rgba(168, 85, 247, 0.2));
+}
+.fs-correction-input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-color, #E5E7EB);
+  font-size: 0.9rem;
+  flex: 1;
+  min-width: 160px;
+}
+.fs-correction-input:focus {
+  outline: none;
+  border-color: var(--color-primary, #A855F7);
+  box-shadow: 0 0 0 3px var(--color-primary-ring, rgba(168, 85, 247, 0.2));
+}
+
+/* KB hint text */
+.fs-kb-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #6B7280);
+  margin: 2px 0 12px;
+}
+
+/* Composition list */
+.fs-composition-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fs-composition-item {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--bg-surface-hover, #F3F4F6);
+  border: 1px solid var(--border-color, #E5E7EB);
 }
 
 /* Reference Content */
@@ -2231,6 +2340,67 @@ section { position: relative; z-index: 1; overflow: hidden; }
 .fs-ref-image-upload:hover {
   border-color: #14B8A6;
   color: #14B8A6;
+}
+
+/* ---- Step 5: Editable Copy Form ---- */
+.fs-copy-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+.fs-copy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fs-copy-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-wrap: wrap;
+}
+.fs-copy-label-icon {
+  font-size: 1rem;
+}
+.fs-copy-hint {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  margin-left: 4px;
+}
+.fs-copy-input,
+.fs-copy-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: #FAFBFC;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.fs-copy-input:focus,
+.fs-copy-textarea:focus {
+  outline: none;
+  border-color: #14B8A6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+  background: #fff;
+}
+.fs-copy-input::placeholder,
+.fs-copy-textarea::placeholder {
+  color: var(--text-tertiary);
+}
+.fs-copy-textarea {
+  resize: vertical;
+  min-height: 48px;
 }
 
 /* ---- Step Actions Row ---- */

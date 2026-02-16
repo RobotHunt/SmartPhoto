@@ -15,7 +15,136 @@ const appState = {
   generatedImages: [],
   isGenerating: false,
   productAnalysis: null,      // AI analysis result
+  confirmedCategory: null,    // 用户确认的品类 key (e.g. 'air_purifier')
+  selectedSellingPoints: [],  // 用户勾选的卖点
+  selectedScenes: [],         // 用户勾选的场景
+  userSpecs: {},              // 用户填写的核心参数 { label: value }
+  whiteBackgroundImage: null,  // 白底图 data URL
+  copyTexts: {                 // Step 5 可编辑文案
+    productName: '',
+    categoryName: '',
+    headline: '',
+    sellingPointsText: '',
+    scenesText: '',
+    specsText: '',
+  },
 };
+
+// ===== 品类知识库 =====
+// Jane: "先框定品类，比如空气净化器，除湿机"
+// 卖点来自市场趋势/电商热词，而非从图片提取
+const CATEGORY_KB = {
+  air_purifier: {
+    name: '空气净化器',
+    aliases: ['空气净化器', '净化器', '空气清新机', '空净', 'air purifier'],
+    // 市场热门卖点 —— 来自电商平台热搜词 & 竞品分析
+    sellingPoints: [
+      '除甲醛99.9%',
+      '宠物毛发专用吸附',
+      '四重过滤系统',
+      'H13级HEPA滤网',
+      '静音设计≤33dB',
+      '负离子净化',
+      '智能空气质量检测',
+      '儿童安全锁',
+      '除菌率99.99%',
+      '睡眠模式',
+      'APP远程操控',
+      '大CADR高效净化',
+      '滤网更换提醒',
+      '无耗材电离技术',
+    ],
+    // 推荐场景/背景 —— 合理的场景匹配
+    scenes: [
+      { id: 'living_room', name: '客厅', desc: '现代简约风格客厅，大面积落地窗，阳光透过窗帘洒入，浅色沙发和木质茶几旁' },
+      { id: 'bedroom', name: '卧室', desc: '温馨安静的卧室，靠近床头柜一侧，柔和的暖色灯光，整洁舒适的床品' },
+      { id: 'nursery', name: '母婴房', desc: '温馨的婴儿房，柔和的粉色或蓝色色调，婴儿床旁边，安全温馨的氛围' },
+      { id: 'pet_home', name: '宠物家庭', desc: '有宠物的温馨家庭环境，沙发旁有猫咪或小狗，体现宠物毛发净化需求' },
+      { id: 'office', name: '办公室', desc: '现代简洁的办公桌旁，电脑显示器一侧，体现办公环境空气质量关注' },
+      { id: 'new_house', name: '新装修房', desc: '新装修的现代房间，淡色墙壁和家具，窗户半开，体现除甲醛场景' },
+    ],
+    // 核心参数模板
+    specs: [
+      { key: 'cadr', label: 'CADR值', placeholder: '如: 450 m³/h', unit: 'm³/h' },
+      { key: 'noise', label: '噪音等级', placeholder: '如: 33 dB', unit: 'dB' },
+      { key: 'area', label: '适用面积', placeholder: '如: 30-60 m²', unit: 'm²' },
+      { key: 'filter', label: '滤网类型', placeholder: '如: H13 HEPA + 活性炭' },
+      { key: 'power', label: '额定功率', placeholder: '如: 55W', unit: 'W' },
+    ],
+    // 主图构图框架
+    compositions: [
+      { name: '产品居中 + 性能参数环绕', desc: '产品置于画面中心，周围用图标和文字标注核心参数' },
+      { name: '场景融合 + 功能可视化', desc: '产品在使用场景中，用粒子/气流动画展示净化效果' },
+      { name: '对比展示', desc: '左右分屏，展示使用前后空气质量对比' },
+    ],
+    // 背景色推荐
+    bgColors: ['纯白', '浅灰', '淡蓝渐变', '清新绿色渐变'],
+  },
+  dehumidifier: {
+    name: '除湿机',
+    aliases: ['除湿机', '除湿器', '抽湿机', '抽湿器', 'dehumidifier'],
+    sellingPoints: [
+      '日除湿量20L/天',
+      '大容量水箱免频繁倒水',
+      '一键智能除湿',
+      '静音运行≤38dB',
+      '干衣模式快速烘干',
+      '智能湿度显示',
+      '满水自动停机',
+      '360°万向轮移动',
+      '连续排水设计',
+      '除湿+净化二合一',
+      '防霉除菌',
+      '节能省电压缩机',
+      '地下室专用大功率',
+      '衣帽间小型静音',
+    ],
+    scenes: [
+      { id: 'bathroom', name: '卫生间', desc: '明亮整洁的卫生间，瓷砖墙面，洗手台旁边，体现防潮除湿需求' },
+      { id: 'basement', name: '地下室', desc: '地下室储物空间，略暗的环境光，周围有储物架，体现地下室除湿刚需' },
+      { id: 'closet', name: '衣帽间', desc: '整齐的衣帽间内，衣架上挂满衣物，体现衣物防潮保护' },
+      { id: 'laundry', name: '晾衣区', desc: '室内晾衣区域，晾衣架上有衣物，体现辅助干衣功能' },
+      { id: 'bedroom_humid', name: '卧室', desc: '南方潮湿季节的卧室环境，窗外有雨，营造除湿舒适感' },
+      { id: 'living_room', name: '客厅', desc: '梅雨季节的客厅，现代家居风格，体现全屋除湿场景' },
+    ],
+    specs: [
+      { key: 'capacity', label: '日除湿量', placeholder: '如: 20 L/天', unit: 'L/天' },
+      { key: 'tank', label: '水箱容量', placeholder: '如: 4.5 L', unit: 'L' },
+      { key: 'area', label: '适用面积', placeholder: '如: 20-40 m²', unit: 'm²' },
+      { key: 'noise', label: '噪音等级', placeholder: '如: 38 dB', unit: 'dB' },
+      { key: 'power', label: '额定功率', placeholder: '如: 240W', unit: 'W' },
+    ],
+    compositions: [
+      { name: '产品居中 + 除湿量标注', desc: '产品置于画面中心，突出显示日除湿量数据' },
+      { name: '使用场景 + 水珠可视化', desc: '产品在潮湿环境中，用水珠/湿度图标展示除湿效果' },
+      { name: '多功能展示', desc: '分区展示除湿、干衣、净化等多种模式' },
+    ],
+    bgColors: ['纯白', '浅灰', '淡蓝色', '清爽水蓝渐变'],
+  },
+};
+
+/**
+ * 根据 AI 识别结果匹配知识库品类
+ * @param {string} productName - AI 识别的产品名
+ * @param {string} category - AI 识别的品类
+ * @returns {string|null} 匹配到的品类 key
+ */
+function matchCategory(productName, category) {
+  const text = `${productName} ${category}`.toLowerCase();
+  for (const [key, kb] of Object.entries(CATEGORY_KB)) {
+    for (const alias of kb.aliases) {
+      if (text.includes(alias.toLowerCase())) return key;
+    }
+  }
+  return null;
+}
+
+/**
+ * 获取当前确认品类的知识库数据
+ */
+function getCurrentKB() {
+  return CATEGORY_KB[appState.confirmedCategory] || null;
+}
 
 // ===== API Configuration =====
 const API_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
@@ -46,73 +175,104 @@ const STYLE_MAP = {
 };
 
 // ===== Dynamic Result Type Builders =====
-// These build prompt templates using the AI analysis of the actual product
+// These build prompt templates using KB data + user selections + Step 5 editable copy
 function buildResultTypes(analysis) {
   analysis = analysis || {};
-  const product = analysis.productName || '产品';
-  const features = Array.isArray(analysis.features) ? analysis.features : [];
-  const featureStr = features.slice(0, 3).join('、') || '优质设计';
-  const category = analysis.category || '产品';
-  const sceneKeyword = analysis.sceneKeyword || '家居';
+  const ct = appState.copyTexts || {};
+  // 优先使用 Step 5 用户编辑的值
+  const product = ct.productName || analysis.productName || '产品';
+  const kb = getCurrentKB();
+  const category = ct.categoryName || (kb ? kb.name : (analysis.category || '产品'));
 
-  return [
+  // 卖点：优先用用户选中的，否则用 KB 默认
+  const sellingPoints = appState.selectedSellingPoints.length > 0
+    ? appState.selectedSellingPoints
+    : (kb ? kb.sellingPoints.slice(0, 3) : ['优质设计']);
+  // 用 Step 5 编辑过的卖点文案做 prompt 文字
+  const featureStr = ct.sellingPointsText || sellingPoints.slice(0, 3).join('、');
+
+  // 场景：从 KB 中按用户选择获取详细描述
+  const selectedSceneData = [];
+  if (kb && appState.selectedScenes.length > 0) {
+    for (const sid of appState.selectedScenes) {
+      const scene = kb.scenes.find(s => s.id === sid);
+      if (scene) selectedSceneData.push(scene);
+    }
+  }
+  // fallback
+  if (selectedSceneData.length === 0 && kb) {
+    selectedSceneData.push(kb.scenes[0], kb.scenes[1]);
+  }
+
+  // 参数字符串
+  const specStr = Object.entries(appState.userSpecs)
+    .filter(([_, v]) => v)
+    .map(([k, v]) => {
+      const spec = kb?.specs.find(s => s.key === k);
+      return spec ? `${spec.label}${v}` : v;
+    }).join('，') || '';
+  const specPromptPart = specStr ? `，核心参数：${specStr}` : '';
+
+  // 构图框架
+  const composition = kb ? kb.compositions[0]?.name : '';
+
+  const results = [
     {
       type: '白底主图',
       badge: 'badge-white',
       desc: `纯白背景${product}主图，突出产品整体`,
       image: DEMO_IMAGES.original,
       editPlaceholder: '修改描述：如"换成浅灰色背景"',
-      prompt: `一张专业电商${category}产品主图，纯白色背景，完整展示${product}的整体外观，光线均匀柔和，高清晰度正面角度拍摄，商业摄影品质，突出${featureStr}等特点`,
-    },
-    {
-      type: `场景主图 · ${analysis.scene1 || '生活场景'}`,
-      badge: 'badge-scene',
-      desc: `${analysis.scene1 || '生活场景'}中展示${product}`,
-      image: DEMO_IMAGES.scene,
-      editPlaceholder: '修改描述：如"换个使用环境"',
-      prompt: `${product}放在${analysis.scene1Desc || '现代温馨明亮的居家环境中'}，自然光线照射，展示${product}在实际${sceneKeyword}场景中的使用效果，专业室内摄影效果，突出${featureStr}`,
-    },
-    {
-      type: `场景主图 · ${analysis.scene2 || '使用场景'}`,
-      badge: 'badge-scene',
-      desc: `${analysis.scene2 || '使用场景'}中展示${product}`,
-      image: DEMO_IMAGES.scene,
-      editPlaceholder: '修改描述：如"换个使用场景"',
-      prompt: `${product}放在${analysis.scene2Desc || '另一个适合的使用环境中'}，柔和的光线，展示${product}的另一种使用场景和氛围，专业摄影效果`,
-    },
-    {
-      type: `卖点图 · ${features[0] || '核心卖点'}`,
-      badge: 'badge-selling',
-      desc: `突出展示${product}的${features[0] || '核心卖点'}`,
-      image: DEMO_IMAGES.sellingPoint,
-      editPlaceholder: '修改描述：如"突出其他卖点"',
-      prompt: `${product}的${features[0] || '核心功能'}特写展示图，用视觉标注突出${features[0] || '核心卖点'}这个卖点，配合简洁的说明文字，专业产品卖点图风格，白色简洁背景`,
-    },
-    {
-      type: `卖点图 · ${features[1] || '产品特性'}`,
-      badge: 'badge-selling',
-      desc: `突出展示${product}的${features[1] || '产品特性'}`,
-      image: DEMO_IMAGES.sellingPoint,
-      editPlaceholder: '修改描述：如"换个卖点展示"',
-      prompt: `${product}的${features[1] || '重要特性'}展示图，通过视觉标注和图解展示${features[1] || '产品特性'}，专业技术图解风格，配清晰文字标注，白色背景`,
-    },
-    {
-      type: '结构图 · 爆炸视图',
-      badge: 'badge-structure',
-      desc: `${product}内部结构爆炸图`,
-      image: DEMO_IMAGES.structure,
-      editPlaceholder: '修改描述：如"增加尺寸标注"',
-      prompt: `${product}的爆炸视图结构图，将各个组件分解展示，标注每个部件名称和功能，白色背景，技术图纸风格，工程制图效果，展示${featureStr}等核心技术`,
-    },
-    {
-      type: '白底主图 · 45°角',
-      badge: 'badge-white',
-      desc: `45度角度展示${product}的立体感和质感`,
-      image: DEMO_IMAGES.original,
-      editPlaceholder: '修改描述：如"换成黑色背景"',
-      prompt: `${product}以45度角展示在纯白背景上，展现产品的立体感和精致质感，专业电商${category}产品摄影，光影层次分明，高级商业摄影品质`,
+      prompt: `一张专业电商${category}产品主图，纯白色背景，完整展示${product}的整体外观，光线均匀柔和，高清晰度正面角度拍摄，商业摄影品质，突出${featureStr}等特点${specPromptPart}`,
     },
   ];
+
+  // 为每个选中的场景生成一张场景图
+  selectedSceneData.forEach((scene, i) => {
+    if (!scene) return;
+    results.push({
+      type: `场景主图 · ${scene.name}`,
+      badge: 'badge-scene',
+      desc: `${scene.name}中展示${product}`,
+      image: DEMO_IMAGES.scene,
+      editPlaceholder: '修改描述：如"换个使用环境"',
+      prompt: `${product}放在${scene.desc}，自然光线照射，展示${product}在实际${scene.name}场景中的使用效果，专业室内摄影效果，突出${featureStr}${specPromptPart}`,
+    });
+  });
+
+  // 为前两个卖点各生成一张卖点图
+  sellingPoints.slice(0, 2).forEach((sp, i) => {
+    results.push({
+      type: `卖点图 · ${sp}`,
+      badge: 'badge-selling',
+      desc: `突出展示${product}的${sp}`,
+      image: DEMO_IMAGES.sellingPoint,
+      editPlaceholder: '修改描述：如"突出其他卖点"',
+      prompt: `${product}的${sp}特写展示图，用视觉标注突出「${sp}」这个卖点，配合简洁的说明文字，专业产品卖点图风格，白色简洁背景${specPromptPart}`,
+    });
+  });
+
+  // 结构图
+  results.push({
+    type: '结构图 · 爆炸视图',
+    badge: 'badge-structure',
+    desc: `${product}内部结构爆炸图`,
+    image: DEMO_IMAGES.structure,
+    editPlaceholder: '修改描述：如"增加尺寸标注"',
+    prompt: `${product}的爆炸视图结构图，将各个组件分解展示，标注每个部件名称和功能，白色背景，技术图纸风格，工程制图效果，展示${featureStr}等核心技术`,
+  });
+
+  // 45度角白底
+  results.push({
+    type: '白底主图 · 45°角',
+    badge: 'badge-white',
+    desc: `45度角度展示${product}的立体感和质感`,
+    image: DEMO_IMAGES.original,
+    editPlaceholder: '修改描述：如"换成黑色背景"',
+    prompt: `${product}以45度角展示在纯白背景上，展现产品的立体感和精致质感，专业电商${category}产品摄影，光影层次分明，高级商业摄影品质`,
+  });
+
+  return results;
 }
 
 // Fallback result types when no analysis available
@@ -172,9 +332,9 @@ function fsGoToStep(step) {
 
   // Step-specific logic
   if (step === 2) fsRunAnalysis();
-  if (step === 5) fsRunCopyGeneration();
-  if (step === 6) fsShowConfirmation();
-  if (step === 7) fsStartGeneration();
+  if (step === 4) fsRunCopyGeneration();
+  if (step === 5) fsShowConfirmation();
+  if (step === 6) fsStartGeneration();
 }
 
 // ===== FS Step 1: Upload with Slots =====
@@ -198,8 +358,14 @@ function triggerFsUpload(slotIndex) {
       appState.uploadedPreviews = Object.values(appState.fsSlotPreviews);
       renderFsSlot(slotIndex, ev.target.result);
       updateFsUploadButton();
-      // Reset analysis
+      // Reset analysis & KB state
       appState.productAnalysis = null;
+      appState.confirmedCategory = null;
+      appState.whiteBackgroundImage = null;
+      appState.selectedSellingPoints = [];
+      appState.selectedScenes = [];
+      appState.userSpecs = {};
+      appState.copyTexts = { productName: '', categoryName: '', headline: '', sellingPointsText: '', scenesText: '', specsText: '' };
       triggerAutoAnalysis();
     };
     reader.readAsDataURL(file);
@@ -241,6 +407,12 @@ function removeFsSlot(slotIndex) {
   }
   updateFsUploadButton();
   appState.productAnalysis = null;
+  appState.confirmedCategory = null;
+  appState.whiteBackgroundImage = null;
+  appState.selectedSellingPoints = [];
+  appState.selectedScenes = [];
+  appState.userSpecs = {};
+  appState.copyTexts = { productName: '', categoryName: '', headline: '', sellingPointsText: '', scenesText: '', specsText: '' };
 }
 
 function updateFsUploadButton() {
@@ -254,6 +426,7 @@ async function fsRunAnalysis() {
   const productName = document.getElementById('fsAnalysisProductName');
   const category = document.getElementById('fsAnalysisCategory');
   const suggestions = document.getElementById('fsAnalysisSuggestions');
+  const correctionArea = document.getElementById('fsCategoryCorrection');
 
   // Show first uploaded image as thumbnail
   if (appState.uploadedPreviews.length > 0) {
@@ -261,41 +434,36 @@ async function fsRunAnalysis() {
   }
 
   if (appState.productAnalysis) {
-    // Already analyzed
-    productName.textContent = appState.productAnalysis.productName || '产品';
-    category.textContent = appState.productAnalysis.category || '产品';
-    const features = appState.productAnalysis.features || [];
-    suggestions.innerHTML = [
-      `建议补充顶部图片`,
-      `识别为${appState.productAnalysis.productName || '产品'}，请以社会图像素材作为背景，可提供提效增效`,
-      ...features.slice(0, 2).map(f => `检测到卖点：${f}`)
-    ].map(s => `<li>${s}</li>`).join('');
+    // Already analyzed — show cached
+    const analysis = appState.productAnalysis;
+    productName.textContent = analysis.productName || '产品';
+    const kb = getCurrentKB();
+    category.textContent = kb ? `✅ ${kb.name}` : (analysis.category || '产品');
+    renderAnalysisSuggestions(analysis, suggestions);
+    renderCategoryCorrection(correctionArea, analysis);
     return;
   }
 
   productName.textContent = '识别中...';
   category.textContent = '分析中...';
-  suggestions.innerHTML = '<li>正在生成建议...</li>';
+  suggestions.innerHTML = '<li>正在通过 AI 识别产品品类...</li>';
+  if (correctionArea) correctionArea.style.display = 'none';
 
   const config = getApiConfig();
   if (config.apiKey && config.apiKey.length > 10 && appState.uploadedPreviews.length > 0) {
     try {
-      showToast('🤖 正在通过 AI 分析产品图片...');
+      showToast('🤖 正在通过 AI 识别产品品类...');
       const analysis = await analyzeProductImage();
       if (analysis) {
         appState.productAnalysis = analysis;
         productName.textContent = analysis.productName || '产品';
-        category.textContent = analysis.category || '产品';
-        const features = analysis.features || [];
-        suggestions.innerHTML = [
-          `建议补充顶部图片`,
-          `识别为${analysis.productName || '产品'}，请以社会图像素材作为背景，可提供提效增效`,
-          ...features.slice(0, 2).map(f => `检测到卖点：${f}`)
-        ].map(s => `<li>${s}</li>`).join('');
+        const kb = getCurrentKB();
+        category.textContent = kb ? `✅ ${kb.name}` : (analysis.category || '产品');
 
-        // Update step 4 selling points and specs
-        updateStrategyFromAnalysis(analysis);
-        showToast('✅ 产品分析完成');
+        renderAnalysisSuggestions(analysis, suggestions);
+        renderCategoryCorrection(correctionArea, analysis);
+
+        showToast(kb ? `✅ 已识别为「${kb.name}」，知识库已匹配` : '✅ 产品识别完成');
         return;
       }
     } catch (err) {
@@ -311,33 +479,242 @@ async function fsRunAnalysis() {
       '建议补充顶部图片',
       '请设置 API Key 获取真实产品分析结果',
     ].map(s => `<li>${s}</li>`).join('');
+    // 演示模式也显示纠偏和知识库
+    renderCategoryCorrection(correctionArea, null);
   }, 800);
 }
 
-function updateStrategyFromAnalysis(analysis) {
-  // Update selling points
+function renderAnalysisSuggestions(analysis, suggestionsEl) {
+  const kb = getCurrentKB();
+  const items = [];
+
+  if (kb) {
+    items.push(`✅ 已匹配品类知识库：「${kb.name}」`);
+    items.push(`已加载 ${kb.sellingPoints.length} 个市场热门卖点`);
+    items.push(`已推荐 ${kb.scenes.length} 个适配场景`);
+    if (analysis.visualFeatures && analysis.visualFeatures.length > 0) {
+      items.push(`AI 识别外观特征：${analysis.visualFeatures.slice(0, 3).join('、')}`);
+    }
+  } else {
+    items.push(`识别为「${analysis.productName || '产品'}」，暂未匹配知识库`);
+    items.push('建议手动选择品类以获取更精准的卖点推荐');
+    if (analysis.visualFeatures) {
+      items.push(`AI 识别外观特征：${analysis.visualFeatures.join('、')}`);
+    }
+  }
+  items.push('如品类识别有误，请在下方手动修正');
+
+  suggestionsEl.innerHTML = items.map(s => `<li>${s}</li>`).join('');
+}
+
+function renderCategoryCorrection(container, analysis) {
+  if (!container) return;
+  container.style.display = 'block';
+
+  const currentKey = appState.confirmedCategory;
+  const options = Object.entries(CATEGORY_KB).map(([key, kb]) =>
+    `<option value="${key}" ${key === currentKey ? 'selected' : ''}>${kb.name}</option>`
+  ).join('');
+
+  container.innerHTML = `
+    <div class="fs-correction-card">
+      <h4>📋 品类确认</h4>
+      <p class="fs-correction-hint">如AI识别有误，请手动选择正确品类：</p>
+      <div class="fs-correction-row">
+        <select id="fsCategorySelect" onchange="onCategoryManualChange(this.value)">
+          <option value="">-- 手动选择品类 --</option>
+          ${options}
+        </select>
+        <input type="text" id="fsCategoryCustom" placeholder="或输入自定义品类名称" class="fs-correction-input">
+      </div>
+    </div>
+  `;
+}
+
+function onCategoryManualChange(categoryKey) {
+  if (!categoryKey) return;
+  appState.confirmedCategory = categoryKey;
+  const kb = CATEGORY_KB[categoryKey];
+  if (!kb) return;
+
+  // 更新显示
+  const categoryEl = document.getElementById('fsAnalysisCategory');
+  if (categoryEl) categoryEl.textContent = `✅ ${kb.name}（已手动确认）`;
+
+  // 重新加载默认卖点和场景
+  appState.selectedSellingPoints = kb.sellingPoints.slice(0, 5);
+  appState.selectedScenes = kb.scenes.slice(0, 2).map(s => s.id);
+  appState.userSpecs = {};
+
+  showToast(`✅ 已切换到「${kb.name}」品类知识库`);
+}
+
+/**
+ * 从知识库填充 Step 4 策略页 —— 卖点、场景、参数全部动态化
+ */
+function populateStrategyFromKB() {
+  const kb = getCurrentKB();
+  if (!kb) return;
+
+  // === 卖点区域 ===
   const spContainer = document.getElementById('fsSellingPoints');
-  if (analysis.features && analysis.features.length > 0) {
-    spContainer.innerHTML = analysis.features.slice(0, 5).map(f =>
-      `<div class="fs-sp-item"><span class="fs-check-green">✓</span> ${f}</div>`
-    ).join('');
+  if (spContainer) {
+    spContainer.innerHTML = kb.sellingPoints.map((sp, i) => {
+      const checked = appState.selectedSellingPoints.includes(sp);
+      return `<div class="fs-sp-item fs-sp-selectable ${checked ? 'selected' : ''}"
+                onclick="toggleSellingPoint(this, '${sp.replace(/'/g, "\\'")}')">
+        <span class="fs-sp-checkbox">${checked ? '✓' : ''}</span> ${sp}
+      </div>`;
+    }).join('');
   }
 
-  // Update theme name
+  // === 场景区域 ===
+  const themeOptions = document.getElementById('fsThemeOptions');
+  if (themeOptions) {
+    themeOptions.innerHTML = `
+      <div class="fs-theme-option ${appState.selectedScenes.length === 0 ? 'selected' : ''}"
+           onclick="selectTheme(this, '产品图')">
+        <div class="fs-theme-thumb"></div>
+        <span>纯产品图</span>
+      </div>
+    ` + kb.scenes.map(scene => {
+      const selected = appState.selectedScenes.includes(scene.id);
+      return `<div class="fs-theme-option ${selected ? 'selected' : ''}"
+                  onclick="toggleScene(this, '${scene.id}')"
+                  data-scene-id="${scene.id}">
+        ${selected ? '<span class="fs-theme-check">✓</span>' : ''}
+        <span>${scene.name}</span>
+        <br><small style="color:var(--text-muted)">${scene.desc.substring(0, 20)}...</small>
+      </div>`;
+    }).join('');
+  }
+
+  // === 参数区域 ===
+  const specRows = document.getElementById('fsSpecRows');
+  if (specRows) {
+    specRows.innerHTML = kb.specs.map(spec => {
+      const val = appState.userSpecs[spec.key] || '';
+      return `<div class="fs-spec-row">
+        <span class="fs-spec-label">${spec.label}:</span>
+        <input type="text" class="fs-spec-input" placeholder="${spec.placeholder}"
+               value="${val}" data-spec-key="${spec.key}"
+               onchange="onSpecChange('${spec.key}', this.value)">
+      </div>`;
+    }).join('');
+  }
+
+  // === 构图框架 ===
+  const scenePreview = document.getElementById('fsScenePreview');
+  if (scenePreview) {
+    scenePreview.innerHTML = `<div class="fs-composition-list">` +
+      kb.compositions.map((comp, i) =>
+        `<div class="fs-composition-item">
+          <strong>${comp.name}</strong>
+          <p style="color:var(--text-muted);font-size:0.85rem;margin:4px 0 0">${comp.desc}</p>
+        </div>`
+      ).join('') + `</div>`;
+  }
+
+  // === 主题名称 ===
   const themeName = document.getElementById('fsThemeName');
   const themeDesc = document.getElementById('fsThemeDesc');
-  if (themeName) themeName.textContent = analysis.sceneKeyword || '家居美题';
-  if (themeDesc) themeDesc.textContent = analysis.productName || '';
+  if (themeName) themeName.textContent = kb.scenes[0]?.name || '场景图';
+  if (themeDesc) themeDesc.textContent = kb.name;
 
-  // Update confirm card values
+  // === Step 6 确认页也同步更新 ===
+  updateConfirmFromSelections();
+}
+
+function toggleSellingPoint(el, sp) {
+  const idx = appState.selectedSellingPoints.indexOf(sp);
+  if (idx === -1) {
+    appState.selectedSellingPoints.push(sp);
+    el.classList.add('selected');
+    el.querySelector('.fs-sp-checkbox').textContent = '✓';
+  } else {
+    appState.selectedSellingPoints.splice(idx, 1);
+    el.classList.remove('selected');
+    el.querySelector('.fs-sp-checkbox').textContent = '';
+  }
+  updateConfirmFromSelections();
+}
+
+function toggleScene(el, sceneId) {
+  const idx = appState.selectedScenes.indexOf(sceneId);
+  if (idx === -1) {
+    appState.selectedScenes.push(sceneId);
+    el.classList.add('selected');
+    if (!el.querySelector('.fs-theme-check')) {
+      el.insertAdjacentHTML('afterbegin', '<span class="fs-theme-check">✓</span>');
+    }
+  } else {
+    appState.selectedScenes.splice(idx, 1);
+    el.classList.remove('selected');
+    const check = el.querySelector('.fs-theme-check');
+    if (check) check.remove();
+  }
+  updateConfirmFromSelections();
+}
+
+function onSpecChange(key, value) {
+  appState.userSpecs[key] = value;
+  updateConfirmFromSelections();
+}
+
+/**
+ * 从用户的实际选择 + Step 4 文案编辑 更新 Step 5 确认页
+ */
+function updateConfirmFromSelections() {
+  const kb = getCurrentKB();
+  const ct = appState.copyTexts || {};
+
   const confirmScene = document.getElementById('fsConfirmScene');
   const confirmSpec = document.getElementById('fsConfirmSpec');
   const confirmSP = document.getElementById('fsConfirmSP');
   const confirmLayout = document.getElementById('fsConfirmLayout');
-  if (confirmScene) confirmScene.textContent = analysis.scene1 || '生活场景';
-  if (confirmSpec) confirmSpec.textContent = `CADR: ${document.getElementById('fsSpecCADR')?.value || '250 m³/h'}`;
-  if (confirmSP) confirmSP.textContent = analysis.features?.[0] || '核心卖点';
-  if (confirmLayout) confirmLayout.textContent = (analysis.scene1 || '温馨家庭') + ' + 萌宠元素';
+  const confirmProduct = document.getElementById('fsConfirmProduct');
+
+  if (confirmProduct) {
+    const productLabel = ct.productName || (appState.productAnalysis?.productName) || '产品';
+    const categoryLabel = ct.categoryName || (kb ? kb.name : '');
+    confirmProduct.textContent = categoryLabel ? `${productLabel}（${categoryLabel}）` : productLabel;
+  }
+
+  if (confirmScene) {
+    if (ct.scenesText) {
+      confirmScene.textContent = ct.scenesText;
+    } else if (kb && appState.selectedScenes.length > 0) {
+      const sceneNames = appState.selectedScenes.map(sid => {
+        const s = kb.scenes.find(sc => sc.id === sid);
+        return s ? s.name : sid;
+      });
+      confirmScene.textContent = sceneNames.join('、');
+    } else {
+      confirmScene.textContent = '纯产品图';
+    }
+  }
+
+  if (confirmSpec) {
+    if (ct.specsText) {
+      confirmSpec.textContent = ct.specsText;
+    } else {
+      const specItems = Object.entries(appState.userSpecs)
+        .filter(([_, v]) => v)
+        .map(([k, v]) => {
+          const spec = kb?.specs?.find(s => s.key === k);
+          return spec ? `${spec.label}: ${v}` : `${k}: ${v}`;
+        });
+      confirmSpec.textContent = specItems.join(' | ') || '待填写';
+    }
+  }
+
+  if (confirmSP) {
+    confirmSP.textContent = ct.sellingPointsText || appState.selectedSellingPoints.slice(0, 3).join('、') || '未选择';
+  }
+
+  if (confirmLayout) {
+    confirmLayout.textContent = ct.headline || (kb ? kb.compositions[0]?.name : '') || '标准构图';
+  }
 }
 
 // ===== FS Step 3: Platform Selection =====
@@ -360,25 +737,73 @@ function selectTheme(el, themeName) {
   el.classList.add('selected');
 }
 
-// ===== FS Step 5: Generate Copy =====
+// ===== FS Step 4: Generate Copy (merged from old Step 4 + Step 5) =====
 async function fsRunCopyGeneration() {
-  const panel = document.getElementById('aiAnalysisPanel');
-  panel.style.display = 'block';
+  const kb = getCurrentKB();
+  const analysis = appState.productAnalysis || {};
 
-  if (appState.productAnalysis) {
-    displayAnalysis(appState.productAnalysis);
-  } else {
-    displayDemoAnalysis();
+  // 如果 KB 已匹配但还没有默认选中卖点/场景，自动填入 KB 默认值
+  if (kb) {
+    if (appState.selectedSellingPoints.length === 0) {
+      appState.selectedSellingPoints = kb.sellingPoints.slice(0, 5);
+    }
+    if (appState.selectedScenes.length === 0) {
+      appState.selectedScenes = kb.scenes.slice(0, 2).map(s => s.id);
+    }
   }
+
+  // 产品名称
+  const productName = analysis.productName || (kb ? kb.name : '产品');
+  // 品类名称
+  const categoryName = kb ? kb.name : (analysis.category || '');
+
+  // 主图标题文案：从选中的前3个卖点自动拼接
+  const topSP = appState.selectedSellingPoints.slice(0, 3);
+  const headline = topSP.length > 0 ? topSP.join(' | ') : '';
+
+  // 核心卖点文案
+  const sellingPointsText = appState.selectedSellingPoints.join('、');
+
+  // 使用场景描述
+  let scenesText = '';
+  if (kb && appState.selectedScenes.length > 0) {
+    const sceneDescs = appState.selectedScenes.map(sid => {
+      const s = kb.scenes.find(sc => sc.id === sid);
+      return s ? s.name : sid;
+    });
+    scenesText = sceneDescs.join('、');
+  }
+
+  // 产品规格参数
+  const specItems = Object.entries(appState.userSpecs)
+    .filter(([_, v]) => v)
+    .map(([k, v]) => {
+      const spec = kb?.specs?.find(s => s.key === k);
+      return spec ? `${spec.label}: ${v}` : `${k}: ${v}`;
+    });
+  const specsText = specItems.join(' | ');
+
+  // 写入 appState
+  appState.copyTexts = { productName, categoryName, headline, sellingPointsText, scenesText, specsText };
+
+  // 填充到表单
+  document.getElementById('copyProductName').value = productName;
+  document.getElementById('copyCategoryName').value = categoryName;
+  document.getElementById('copyHeadline').value = headline;
+  document.getElementById('copySellingPoints').value = sellingPointsText;
+  document.getElementById('copyScenes').value = scenesText;
+  document.getElementById('copySpecs').value = specsText;
 }
 
-// ===== FS Step 6: Confirm Strategy =====
+// Step 5 文案字段变更处理
+function onCopyFieldChange(field, value) {
+  appState.copyTexts[field] = value;
+}
+
+// ===== FS Step 5: Confirm Strategy =====
 function fsShowConfirmation() {
-  // Update confirm values from current state
-  const analysis = appState.productAnalysis;
-  if (analysis) {
-    updateStrategyFromAnalysis(analysis);
-  }
+  // 从用户实际选择更新确认页
+  updateConfirmFromSelections();
 
   // Animate progress bar
   const bar = document.getElementById('fsConfirmProgressBar');
@@ -401,7 +826,7 @@ function fsShowConfirmation() {
   }, 1000);
 }
 
-// ===== FS Step 7: Generation =====
+// ===== FS Step 6: Generation =====
 async function fsStartGeneration() {
   if (appState.isGenerating) return;
   appState.isGenerating = true;
@@ -501,11 +926,6 @@ function triggerAutoAnalysis() {
       if (analysis) {
         appState.productAnalysis = analysis;
         showToast('✅ 产品识别完成：' + (analysis.productName || '产品'));
-        // If analysis panel is visible, update it
-        const panel = document.getElementById('aiAnalysisPanel');
-        if (panel.style.display === 'block') {
-          displayAnalysis(analysis);
-        }
       }
     } catch (err) {
       console.warn('Auto-analysis failed:', err.message);
@@ -584,7 +1004,7 @@ async function callVisionAPI(imageDataUrl, textPrompt) {
 }
 
 /**
- * Analyze the product image and extract structured info
+ * Analyze the product image — first identify category, then enrich from KB
  */
 async function analyzeProductImage() {
   const config = getApiConfig();
@@ -593,38 +1013,48 @@ async function analyzeProductImage() {
 
   const imageDataUrl = appState.uploadedPreviews[0];
 
-  const analysisPrompt = `你是一个电商产品图片分析专家。请仔细观察这张产品图片，分析并返回以下JSON格式信息（请严格只返回JSON，不要其他文字）：
+  // Step 1: 品类识别 prompt —— 简化，专注识别
+  const categoryPrompt = `你是一个电商产品识别专家。请仔细观察这张产品图片，识别产品类型。
+请严格只返回JSON，不要其他文字：
 
 {
-  "productName": "产品名称，如：智能空气净化器",
-  "category": "产品大类，如：家用电器",
-  "features": ["卖点1", "卖点2", "卖点3", "卖点4", "卖点5"],
-  "scene1": "场景名称1，如：客厅",
-  "scene1Desc": "场景1详细描述，如：现代温馨明亮的客厅中，靠近沙发旁",
-  "scene2": "场景名称2，如：办公室",
-  "scene2Desc": "场景2详细描述",
-  "sceneKeyword": "使用场景关键词，如：家居",
-  "keywords": ["搜索关键词1", "关键词2", "关键词3"],
-  "copyTaobao": "淘宝风格营销文案（带emoji和卖点标签）",
-  "copyAmazon": "Amazon英文营销标题",
-  "copy1688": "1688批发风格文案",
-  "copyGeneral": "通用电商营销文案"
+  "productName": "产品名称，如：智能空气净化器 Pro",
+  "category": "产品大类，如：空气净化器",
+  "subCategory": "产品子类，如：家用除甲醛型",
+  "confidence": 0.95,
+  "visualFeatures": ["从图片中观察到的外观特征1", "特征2", "特征3"]
 }`;
 
   try {
-    const responseText = await callVisionAPI(imageDataUrl, analysisPrompt);
+    const responseText = await callVisionAPI(imageDataUrl, categoryPrompt);
 
-    // Try to parse JSON from the response (may be wrapped in markdown code block)
     let jsonStr = responseText;
     const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) jsonStr = jsonMatch[1].trim();
-
-    // Also try to find raw JSON
     const braceMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (braceMatch) jsonStr = braceMatch[0];
 
-    const analysis = JSON.parse(jsonStr);
-    return analysis;
+    const recognition = JSON.parse(jsonStr);
+
+    // Step 2: 匹配知识库品类
+    const matchedKey = matchCategory(recognition.productName, recognition.category);
+    if (matchedKey) {
+      appState.confirmedCategory = matchedKey;
+      const kb = CATEGORY_KB[matchedKey];
+      // 用知识库数据充实分析结果
+      recognition.matchedCategory = matchedKey;
+      recognition.matchedCategoryName = kb.name;
+      recognition.kbSellingPoints = kb.sellingPoints;
+      recognition.kbScenes = kb.scenes;
+      recognition.kbSpecs = kb.specs;
+      recognition.kbCompositions = kb.compositions;
+      // 默认选中前 5 个卖点
+      appState.selectedSellingPoints = kb.sellingPoints.slice(0, 5);
+      // 默认选中前 2 个场景
+      appState.selectedScenes = kb.scenes.slice(0, 2).map(s => s.id);
+    }
+
+    return recognition;
   } catch (err) {
     console.error('Product analysis parsing error:', err);
     return null;
@@ -687,24 +1117,28 @@ function displayAnalysis(analysis) {
   const copyEl = document.getElementById('analysisCopy');
   const tagsEl = document.getElementById('analysisTags');
 
-  typeText(categoryEl, `${analysis.productName} · ${analysis.category}`, 40);
+  const kb = getCurrentKB();
+  const categoryText = kb
+    ? `${analysis.productName} · ${kb.name}（知识库已匹配）`
+    : `${analysis.productName} · ${analysis.category}`;
+  typeText(categoryEl, categoryText, 40);
 
-  const allTags = [...(analysis.features || []), ...(analysis.keywords || [])];
+  // 展示知识库卖点 + AI 视觉特征
+  const kbTags = kb ? kb.sellingPoints.slice(0, 5) : [];
+  const visualTags = analysis.visualFeatures || [];
+  const allTags = [...kbTags, ...visualTags];
   setTimeout(() => {
-    tagsEl.innerHTML = allTags.map((f) => `<span class="tag">${f}</span>`).join('');
+    tagsEl.innerHTML = allTags.map((f, i) => {
+      const isKb = i < kbTags.length;
+      return `<span class="tag ${isKb ? 'tag-kb' : ''}">${isKb ? '🔥 ' : ''}${f}</span>`;
+    }).join('');
   }, 500);
 
   setTimeout(() => {
-    const platform = appState.selectedPlatforms[0];
-    let copy = analysis.copyGeneral || '';
-    if (platform === 'taobao' || platform === 'jd' || platform === 'pdd' || platform === 'douyin' || platform === 'xiaohongshu') {
-      copy = analysis.copyTaobao || copy;
-    } else if (platform === 'amazon' || platform === 'tiktok' || platform === 'temu') {
-      copy = analysis.copyAmazon || copy;
-    } else if (platform === '1688' || platform === 'alibaba') {
-      copy = analysis.copy1688 || copy;
-    }
-    typeText(copyEl, copy, 25);
+    const desc = kb
+      ? `已加载「${kb.name}」品类知识库，包含 ${kb.sellingPoints.length} 个热门卖点、${kb.scenes.length} 个推荐场景。`
+      : '未匹配到知识库，建议在上一步手动选择品类。';
+    typeText(copyEl, desc, 25);
   }, 800);
 }
 
@@ -729,6 +1163,33 @@ function typeText(el, text, speed) {
     i++;
     if (i >= text.length) clearInterval(timer);
   }, speed);
+}
+
+// ===== 白底图抠图 =====
+/**
+ * 将实物图抠成白底图 —— 调用 Seedream API
+ * Jane: "先将实物图抠成白底图"
+ */
+async function generateWhiteBackground() {
+  const config = getApiConfig();
+  if (!config.apiKey || config.apiKey.length < 10) return null;
+  if (appState.uploadedPreviews.length === 0) return null;
+
+  // 如果已经生成过，直接返回
+  if (appState.whiteBackgroundImage) return appState.whiteBackgroundImage;
+
+  const imageRefs = appState.uploadedPreviews.filter(p => p.startsWith('data:'));
+  const product = appState.productAnalysis?.productName || '产品';
+
+  try {
+    const prompt = `将这个${product}放在纯白色背景上，保持产品原始外观不变，移除所有背景元素，只保留产品本身，纯白色背景，专业产品摄影，均匀柔和的灯光`;
+    const result = await callDoubaoImageAPI(prompt, imageRefs);
+    appState.whiteBackgroundImage = result;
+    return result;
+  } catch (err) {
+    console.warn('White background generation failed:', err.message);
+    return null;
+  }
 }
 
 // ===== 豆包 Seedream API: Image Generation =====
@@ -783,7 +1244,7 @@ async function callDoubaoImageAPI(prompt, imageDataUrls) {
 
 // ===== Step 3: Generation =====
 async function startGeneration() {
-  if (appState.isGenerating && appState.fsCurrentStep !== 7) return;
+  if (appState.isGenerating && appState.fsCurrentStep !== 6) return;
   appState.isGenerating = true;
 
   const loading = document.getElementById('generationLoading');
@@ -818,13 +1279,26 @@ async function startGeneration() {
       }
     }
 
-    // Step B: Build dynamic result types based on analysis
+    // Step A2: 生成白底图（如果还没有）
+    if (!appState.whiteBackgroundImage) {
+      loadingText.textContent = '正在生成白底图...';
+      loadingStatus.textContent = '将实物图抠成白底图，作为生成基础';
+      progressBar.style.width = '5%';
+      await generateWhiteBackground();
+    }
+
+    // Step B: Build dynamic result types based on KB + user selections
     const resultTypes = appState.productAnalysis
       ? buildResultTypes(appState.productAnalysis)
       : DEFAULT_RESULT_TYPES;
 
-    // Step C: Collect uploaded image data URLs to send as references
-    const imageRefs = appState.uploadedPreviews.filter((p) => p.startsWith('data:'));
+    // Step C: Collect image refs — 优先用白底图，其次用原始上传图
+    const imageRefs = [];
+    if (appState.whiteBackgroundImage) {
+      imageRefs.push(appState.whiteBackgroundImage);
+    }
+    const uploadRefs = appState.uploadedPreviews.filter((p) => p.startsWith('data:'));
+    imageRefs.push(...uploadRefs);
 
     loadingText.textContent = '正在通过豆包 Seedream 并发生成图片...';
     loadingStatus.textContent = `模型: ${config.model} | 尺寸: ${config.size} | 并发 ${resultTypes.length} 张`;
@@ -1111,6 +1585,8 @@ function saveApiSettings() {
   showToast('💾 API 设置已保存');
   // Reset cached analysis so it re-runs with new settings
   appState.productAnalysis = null;
+  appState.confirmedCategory = null;
+  appState.whiteBackgroundImage = null;
   setTimeout(() => closeApiSettings(), 1200);
 }
 

@@ -208,24 +208,18 @@
         <div class="fs-progress-line"></div>
         <div class="fs-progress-step" data-fsstep="4">
           <span class="fs-step-dot">4</span>
-          <span class="fs-step-label">提取卖点</span>
-          <span class="fs-step-sublabel">AI识别特性</span>
+          <span class="fs-step-label">生成文案</span>
+          <span class="fs-step-sublabel">确认卖点文案</span>
         </div>
         <div class="fs-progress-line"></div>
         <div class="fs-progress-step" data-fsstep="5">
           <span class="fs-step-dot">5</span>
-          <span class="fs-step-label">生成文案</span>
-          <span class="fs-step-sublabel">营销文案</span>
-        </div>
-        <div class="fs-progress-line"></div>
-        <div class="fs-progress-step" data-fsstep="6">
-          <span class="fs-step-dot">6</span>
           <span class="fs-step-label">确认方案</span>
           <span class="fs-step-sublabel">生成预览</span>
         </div>
         <div class="fs-progress-line"></div>
-        <div class="fs-progress-step" data-fsstep="7">
-          <span class="fs-step-dot">7</span>
+        <div class="fs-progress-step" data-fsstep="6">
+          <span class="fs-step-dot">6</span>
           <span class="fs-step-label">查看结果</span>
           <span class="fs-step-sublabel">下载图片</span>
         </div>
@@ -313,6 +307,8 @@
             <li>正在生成建议...</li>
           </ul>
         </div>
+        <!-- 品类纠偏区域 -->
+        <div id="fsCategoryCorrection" style="display:none"></div>
         <div class="fs-upload-more-hint" onclick="fsGoToStep(1)">
           → 上传补充图片（推荐）
         </div>
@@ -385,149 +381,73 @@
       </div>
     </div>
 
-    <!-- Step 4: AI Strategy Generation (Scene + Specs + Selling Points) -->
+    <!-- Step 4: Generate Copy / Preview Strategy -->
     <div class="fs-panel" id="fs-panel-4">
       <div class="fs-panel-inner">
         <div class="fs-strategy-header">
-          <div class="fs-strategy-icon">💬</div>
-          <h2>AI正在生成主图方案</h2>
-          <p class="fs-strategy-subtitle">为了让生成的图片完全符合您的要求，请确认您的产品参数</p>
+          <div class="fs-strategy-icon">�</div>
+          <h2>确认主图文案方案</h2>
+          <p class="fs-strategy-subtitle">AI 已根据您的选择自动生成文案内容，您可以直接修改任意文字</p>
         </div>
 
-        <!-- Upload Specs -->
-        <div class="fs-strategy-card">
-          <div class="fs-strategy-card-header">
-            <h3>增写核心性能</h3>
-            <button class="fs-upload-spec-btn" onclick="showToast('参数文件上传功能开发中')">📄 上传参数文件</button>
+        <!-- Editable Copy Fields -->
+        <div class="fs-copy-form" id="fsCopyForm">
+          <div class="fs-copy-field">
+            <label class="fs-copy-label">
+              <span class="fs-copy-label-icon">📦</span> 产品名称
+            </label>
+            <input type="text" class="fs-copy-input" id="copyProductName" placeholder="如：家用空气净化器" oninput="onCopyFieldChange('productName', this.value)" />
           </div>
-          <div class="fs-spec-upload-hint">
-            <span>🖼️ 图片</span>
-            <span>📄 PDF</span>
-            <span style="color:var(--text-muted)">支持上传产品参数截图或说明书PDF</span>
-          </div>
-        </div>
 
-        <!-- Scene Selection -->
-        <div class="fs-strategy-section">
-          <div class="fs-strategy-section-title"><span class="fs-check-green">✓</span> 选择主要场景</div>
-          <div class="fs-strategy-card">
-            <div class="fs-substep-num">1</div>
-            <h4>选择主题（推荐）</h4>
-            <div class="fs-theme-options" id="fsThemeOptions">
-              <div class="fs-theme-option" onclick="selectTheme(this, '产品图')">
-                <div class="fs-theme-thumb"></div>
-                <span>产品图</span>
-              </div>
-              <div class="fs-theme-option selected" onclick="selectTheme(this, '家居美题')">
-                <span class="fs-theme-check">✓</span>
-                <span id="fsThemeName">家居美题</span>
-                <br><small id="fsThemeDesc" style="color:var(--text-muted)">空气净化器</small>
-              </div>
-            </div>
+          <div class="fs-copy-field">
+            <label class="fs-copy-label">
+              <span class="fs-copy-label-icon">🏷️</span> 产品品类
+            </label>
+            <input type="text" class="fs-copy-input" id="copyCategoryName" placeholder="如：空气净化器" oninput="onCopyFieldChange('categoryName', this.value)" />
           </div>
-          <div class="fs-strategy-card">
-            <div class="fs-substep-num">2</div>
-            <h4>增写核心性能</h4>
-            <div class="fs-spec-rows" id="fsSpecRows">
-              <div class="fs-spec-row">
-                <span class="fs-spec-label">CADR:</span>
-                <input type="text" class="fs-spec-input" value="250 m³/h" id="fsSpecCADR">
-              </div>
-              <div class="fs-spec-row">
-                <span class="fs-spec-label">噪音等级:</span>
-                <input type="text" class="fs-spec-input" value="33 dB" id="fsSpecNoise">
-              </div>
-              <div class="fs-spec-row">
-                <span class="fs-spec-label">尺寸:</span>
-                <input type="text" class="fs-spec-input" value="自定义滤芯，如需改变等（百度）" id="fsSpecSize">
-              </div>
-            </div>
-          </div>
-          <div class="fs-strategy-card">
-            <div class="fs-substep-num">3</div>
-            <h4>增写补充要求</h4>
-            <div class="fs-scene-preview" id="fsScenePreview">场景图片</div>
-            <div class="fs-title-suggestions">
-              <span class="fs-check-green">✓</span> 新颖标题建议<br>
-              <span class="fs-check-green">✓</span> 吸引l标题
-            </div>
-            <p class="fs-custom-scene-hint">自定义、编写其他场景</p>
-          </div>
-          <div class="fs-strategy-card">
-            <div class="fs-substep-num">4</div>
-            <h4>满足核心卖点</h4>
-            <div class="fs-selling-points" id="fsSellingPoints">
-              <div class="fs-sp-item"><span class="fs-check-green">✓</span> 宠物毛发专用吸附</div>
-              <div class="fs-sp-item"><span class="fs-check-green">✓</span> 四重过滤</div>
-              <div class="fs-sp-item"><span class="fs-check-green">✓</span> 静音设计</div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Reference Content -->
-        <div class="fs-strategy-card">
-          <h3>添加参考内容（可选）</h3>
-          <p class="fs-ref-desc">添加竞品链接或参考图片，AI会分析这些内容来优化生成策略</p>
-          <div class="fs-ref-link-row">
-            <label>参考链接</label>
-            <div class="fs-ref-link-input">
-              <input type="text" placeholder="输入竞品链接或参考页面URL" id="fsRefLink">
-              <button class="fs-ref-add-btn" onclick="showToast('链接已添加')">🔗 添加</button>
-            </div>
+          <div class="fs-copy-field">
+            <label class="fs-copy-label">
+              <span class="fs-copy-label-icon">🎯</span> 主图标题文案
+              <span class="fs-copy-hint">将展示在主图上的核心标题</span>
+            </label>
+            <textarea class="fs-copy-textarea" id="copyHeadline" rows="2" placeholder="如：除甲醛99.9% 四重过滤 静享呼吸" oninput="onCopyFieldChange('headline', this.value)"></textarea>
           </div>
-          <div class="fs-ref-image-row">
-            <label>参考图片</label>
-            <div class="fs-ref-image-upload" onclick="showToast('参考图片上传功能开发中')">
-              🖼️ 点击上传参考图片（支持多张）
-            </div>
+
+          <div class="fs-copy-field">
+            <label class="fs-copy-label">
+              <span class="fs-copy-label-icon">🔥</span> 核心卖点文案
+              <span class="fs-copy-hint">基于您选择的卖点自动生成</span>
+            </label>
+            <textarea class="fs-copy-textarea" id="copySellingPoints" rows="3" placeholder="如：除甲醛99.9%、H13级HEPA滤网、静音设计≤33dB" oninput="onCopyFieldChange('sellingPointsText', this.value)"></textarea>
+          </div>
+
+          <div class="fs-copy-field">
+            <label class="fs-copy-label">
+              <span class="fs-copy-label-icon">🏠</span> 使用场景描述
+              <span class="fs-copy-hint">基于您选择的场景自动生成</span>
+            </label>
+            <textarea class="fs-copy-textarea" id="copyScenes" rows="3" placeholder="如：温馨客厅、母婴卧室" oninput="onCopyFieldChange('scenesText', this.value)"></textarea>
+          </div>
+
+          <div class="fs-copy-field">
+            <label class="fs-copy-label">
+              <span class="fs-copy-label-icon">📐</span> 产品规格参数
+              <span class="fs-copy-hint">基于您填写的参数自动生成</span>
+            </label>
+            <textarea class="fs-copy-textarea" id="copySpecs" rows="2" placeholder="如：CADR 500m³/h | 噪音≤33dB | 适用面积60m²" oninput="onCopyFieldChange('specsText', this.value)"></textarea>
           </div>
         </div>
 
         <div class="fs-step-actions-row">
           <button class="fs-btn-back" onclick="fsGoToStep(3)">← 返回</button>
-          <button class="fs-btn-primary" onclick="fsGoToStep(5)">下一步 &gt;</button>
+          <button class="fs-btn-primary" onclick="fsGoToStep(5)">下一步：确认方案 &gt;</button>
         </div>
       </div>
     </div>
 
-    <!-- Step 5: Generate Copy / Preview Strategy -->
+    <!-- Step 5: Confirm Strategy -->
     <div class="fs-panel" id="fs-panel-5">
-      <div class="fs-panel-inner">
-        <div class="fs-strategy-header">
-          <div class="fs-strategy-icon">💬</div>
-          <h2>AI正在生成主图方案</h2>
-          <p class="fs-strategy-subtitle">为了让生成的图片完全符合您的要求，请确认您的产品参数</p>
-        </div>
-
-        <!-- AI Analysis Panel -->
-        <div class="ai-analysis-panel" id="aiAnalysisPanel" style="display:none">
-          <h3>🤖 AI 智能分析结果</h3>
-          <div class="analysis-items">
-            <div class="analysis-item">
-              <div class="label">产品品类</div>
-              <div class="value" id="analysisCategory">分析中...</div>
-            </div>
-            <div class="analysis-item">
-              <div class="label">提取卖点</div>
-              <div class="value" id="analysisFeatures">分析中...</div>
-              <div class="tags" id="analysisTags"></div>
-            </div>
-            <div class="analysis-item">
-              <div class="label">推荐文案</div>
-              <div class="value" id="analysisCopy">分析中...</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="fs-step-actions-row">
-          <button class="fs-btn-back" onclick="fsGoToStep(4)">← 返回</button>
-          <button class="fs-btn-primary" onclick="fsGoToStep(6)">下一步：确认方案 &gt;</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 6: Confirm Strategy -->
-    <div class="fs-panel" id="fs-panel-6">
       <div class="fs-panel-inner">
         <div class="fs-strategy-header">
           <div class="fs-strategy-icon">💬</div>
@@ -536,6 +456,20 @@
         </div>
         <div class="fs-confirm-card">
           <div class="fs-confirm-title"><span class="fs-check-green">✓</span> AI已生成主图策略</div>
+          <div class="fs-confirm-item">
+            <span class="fs-check-green">✓</span>
+            <div>
+              <span class="fs-confirm-label">产品名称</span>
+              <div class="fs-confirm-value" id="fsConfirmProduct">产品</div>
+            </div>
+          </div>
+          <div class="fs-confirm-item">
+            <span class="fs-check-green">✓</span>
+            <div>
+              <span class="fs-confirm-label">核心卖点</span>
+              <div class="fs-confirm-value" id="fsConfirmSP">专用吸毛技术</div>
+            </div>
+          </div>
           <div class="fs-confirm-item">
             <span class="fs-check-green">✓</span>
             <div>
@@ -553,14 +487,7 @@
           <div class="fs-confirm-item">
             <span class="fs-check-green">✓</span>
             <div>
-              <span class="fs-confirm-label">核心卖点</span>
-              <div class="fs-confirm-value" id="fsConfirmSP">专用吸毛技术</div>
-            </div>
-          </div>
-          <div class="fs-confirm-item">
-            <span class="fs-check-green">✓</span>
-            <div>
-              <span class="fs-confirm-label">主图构图建议</span>
+              <span class="fs-confirm-label">主图标题文案</span>
               <div class="fs-confirm-value" id="fsConfirmLayout">温馨家庭 + 萌宠元素</div>
             </div>
           </div>
@@ -570,14 +497,14 @@
           <div class="fs-confirm-progress-bar" id="fsConfirmProgressBar"></div>
         </div>
         <div class="fs-step-actions-row">
-          <button class="fs-btn-back" onclick="fsGoToStep(5)">修改策略</button>
-          <button class="fs-btn-primary fs-btn-generate" onclick="fsGoToStep(7)">⚡ 立即生成</button>
+          <button class="fs-btn-back" onclick="fsGoToStep(4)">修改策略</button>
+          <button class="fs-btn-primary fs-btn-generate" onclick="fsGoToStep(6)">⚡ 立即生成</button>
         </div>
       </div>
     </div>
 
-    <!-- Step 7: Results -->
-    <div class="fs-panel" id="fs-panel-7">
+    <!-- Step 6: Results -->
+    <div class="fs-panel" id="fs-panel-6">
       <div class="fs-panel-inner fs-panel-results">
         <!-- Loading State -->
         <div class="generation-loading" id="generationLoading">
@@ -621,7 +548,7 @@
           </div>
 
           <div class="fs-step-actions-row">
-            <button class="fs-btn-back" onclick="fsGoToStep(6)">← 返回修改方案</button>
+            <button class="fs-btn-back" onclick="fsGoToStep(5)">← 返回修改方案</button>
             <button class="fs-btn-primary" onclick="closeFullscreenWizard()">✅ 完成制作</button>
           </div>
         </div>
