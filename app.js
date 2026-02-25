@@ -174,6 +174,22 @@ const STYLE_MAP = {
   lifestyle: '自然生活方式摄影风格',
 };
 
+// ===== Platform Strategies =====
+const PLATFORM_STRATEGIES = {
+  '1688': { name: '1688 / 阿里巴巴', style: 'B2B批发风格，强调性价比与源头实力', promptAddon: '1688电商批发风格，明确标注核心参数，展现源头工厂实力，高性价比商业视觉' },
+  'alibaba': { name: '阿里国际站', style: '国际B2B风格，强调专业与认证', promptAddon: '国际站B2B风格，专业严谨的商业摄影，强调品质与国际化标准' },
+  'taobao': { name: '淘宝', style: 'C端零售风格，高视觉冲击力', promptAddon: '淘宝爆款电商风格，视觉冲击力强，精致修图，突出核心卖点的高清主图' },
+  'douyin': { name: '抖音', style: '兴趣电商风格，动态感强，吸引眼球', promptAddon: '抖音短视频电商风格，强烈的视觉吸引力，动态感，适合竖屏流展示' },
+  'tiktok': { name: 'TikTok', style: '海外潮流风格，高饱和视觉', promptAddon: 'TikTok潮流电商风格，欧美流行视觉，高饱和度，吸引眼球的创意展示' },
+  'jd': { name: '京东', style: '品质电商风格，强调正品与质感', promptAddon: '京东品质电商风格，高级灰底或纯净背景，强调产品质感与正品可靠性' },
+  'pdd': { name: '拼多多', style: '下沉市场风格，卖点醒目直接', promptAddon: '拼多多高转化风格，色彩鲜艳，卖点直白醒目，视觉直接明了' },
+  'temu': { name: 'Temu', style: '跨境性价比规范，白底直观', promptAddon: 'Temu跨境白底图风格，清晰展示产品全貌，无多余元素，直接突出核心产品' },
+  'xiaohongshu': { name: '小红书', style: '种草美学风格，注重氛围与生活感', promptAddon: '小红书种草美学风格，生活化场景，自然光影，高级氛围感，真实且具有高级审美' },
+  'amazon': { name: '亚马逊', style: '严格白底极简规范，纯净高级', promptAddon: '亚马逊标准白底图规范，纯白背景RGB 255,255,255，极简高级质感，无水印和复杂修饰' },
+  'custom-official': { name: '官网自定义', style: '品牌高级克制风格', promptAddon: '品牌官网高级视觉风格，设计克制，质感极佳，符合高端品牌调性' },
+  'custom': { name: '自定义', style: '通用电商标准', promptAddon: '通用电商高标准视觉表现' },
+};
+
 // ===== Dynamic Result Type Builders =====
 // These build prompt templates using KB data + user selections + Step 5 editable copy
 function buildResultTypes(analysis) {
@@ -216,60 +232,61 @@ function buildResultTypes(analysis) {
   // 构图框架
   const composition = kb ? kb.compositions[0]?.name : '';
 
-  const results = [
-    {
-      type: '白底主图',
+  const results = [];
+  const platforms = appState.selectedPlatforms && appState.selectedPlatforms.length > 0
+    ? appState.selectedPlatforms
+    : ['custom'];
+
+  platforms.forEach(platformKey => {
+    const pDef = PLATFORM_STRATEGIES[platformKey] || PLATFORM_STRATEGIES['custom'];
+    const pName = pDef.name;
+    const pPrompt = pDef.promptAddon;
+
+    // 1. 白底主图
+    results.push({
+      type: `${pName} · 白底主图`,
       badge: 'badge-white',
-      desc: `纯白背景${product}主图，突出产品整体`,
+      desc: `符合${pName}规范的${product}主图`,
       image: DEMO_IMAGES.original,
       editPlaceholder: '修改描述：如"换成浅灰色背景"',
-      prompt: `一张专业电商${category}产品主图，纯白色背景，完整展示${product}的整体外观，光线均匀柔和，高清晰度正面角度拍摄，商业摄影品质，突出${featureStr}等特点${specPromptPart}`,
-    },
-  ];
-
-  // 为每个选中的场景生成一张场景图
-  selectedSceneData.forEach((scene, i) => {
-    if (!scene) return;
-    results.push({
-      type: `场景主图 · ${scene.name}`,
-      badge: 'badge-scene',
-      desc: `${scene.name}中展示${product}`,
-      image: DEMO_IMAGES.scene,
-      editPlaceholder: '修改描述：如"换个使用环境"',
-      prompt: `${product}放在${scene.desc}，自然光线照射，展示${product}在实际${scene.name}场景中的使用效果，专业室内摄影效果，突出${featureStr}${specPromptPart}`,
+      prompt: `一张专业电商${category}产品主图，纯白色背景，完整展示${product}的整体外观，高清晰度正面角度拍摄，商业摄影品质，突出${featureStr}等特点${specPromptPart}。画面需满足【${pName}】平台风格要求：${pPrompt}`,
     });
+
+    // 2. 场景主图 (取第1个场景避免生成过多)
+    if (selectedSceneData.length > 0) {
+      const scene = selectedSceneData[0];
+      results.push({
+        type: `${pName} · 场景图 (${scene.name})`,
+        badge: 'badge-scene',
+        desc: `${pName}环境下的${scene.name}展示`,
+        image: DEMO_IMAGES.scene,
+        editPlaceholder: '修改描述：如"换个使用环境"',
+        prompt: `${product}放在${scene.desc}，自然光线照射，展示${product}在实际${scene.name}场景中的使用效果，专业室内摄影效果，突出${featureStr}${specPromptPart}。画面需满足【${pName}】平台风格要求：${pPrompt}`,
+      });
+    }
+
+    // 3. 卖点图 (取第1个卖点避免生成过多)
+    if (sellingPoints.length > 0) {
+      const sp = sellingPoints[0];
+      results.push({
+        type: `${pName} · 卖点图 (${sp.substring(0, 6)}...)`,
+        badge: 'badge-selling',
+        desc: `突出展示${product}的${sp}`,
+        image: DEMO_IMAGES.sellingPoint,
+        editPlaceholder: '修改描述：如"突出其他卖点"',
+        prompt: `${product}的特写展示图，视觉重点突出「${sp}」这个核心卖点，专业产品摄影风格，白色或简洁背景${specPromptPart}。视觉表现需满足【${pName}】平台风格要求：${pPrompt}`,
+      });
+    }
   });
 
-  // 为前两个卖点各生成一张卖点图
-  sellingPoints.slice(0, 2).forEach((sp, i) => {
-    results.push({
-      type: `卖点图 · ${sp}`,
-      badge: 'badge-selling',
-      desc: `突出展示${product}的${sp}`,
-      image: DEMO_IMAGES.sellingPoint,
-      editPlaceholder: '修改描述：如"突出其他卖点"',
-      prompt: `${product}的${sp}特写展示图，用视觉标注突出「${sp}」这个卖点，配合简洁的说明文字，专业产品卖点图风格，白色简洁背景${specPromptPart}`,
-    });
-  });
-
-  // 结构图
+  // 4. 通用结构图（爆炸视图），仅生成一张
   results.push({
-    type: '结构图 · 爆炸视图',
+    type: '通用策略 · 爆炸视图',
     badge: 'badge-structure',
     desc: `${product}内部结构爆炸图`,
     image: DEMO_IMAGES.structure,
     editPlaceholder: '修改描述：如"增加尺寸标注"',
     prompt: `${product}的爆炸视图结构图，将各个组件分解展示，标注每个部件名称和功能，白色背景，技术图纸风格，工程制图效果，展示${featureStr}等核心技术`,
-  });
-
-  // 45度角白底
-  results.push({
-    type: '白底主图 · 45°角',
-    badge: 'badge-white',
-    desc: `45度角度展示${product}的立体感和质感`,
-    image: DEMO_IMAGES.original,
-    editPlaceholder: '修改描述：如"换成黑色背景"',
-    prompt: `${product}以45度角展示在纯白背景上，展现产品的立体感和精致质感，专业电商${category}产品摄影，光影层次分明，高级商业摄影品质`,
   });
 
   return results;
@@ -714,6 +731,18 @@ function updateConfirmFromSelections() {
 
   if (confirmLayout) {
     confirmLayout.textContent = ct.headline || (kb ? kb.compositions[0]?.name : '') || '标准构图';
+  }
+
+  const confirmPlatformStrategy = document.getElementById('fsConfirmPlatformStrategy');
+  if (confirmPlatformStrategy) {
+    const platforms = appState.selectedPlatforms && appState.selectedPlatforms.length > 0
+      ? appState.selectedPlatforms
+      : ['custom'];
+    const pNames = platforms.map(p => {
+      const def = PLATFORM_STRATEGIES[p] || PLATFORM_STRATEGIES['custom'];
+      return `${def.name}策略 (${def.style})`;
+    });
+    confirmPlatformStrategy.textContent = pNames.join(' | ');
   }
 }
 
