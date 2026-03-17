@@ -1,0 +1,19 @@
+{
+  // 项目名称
+  "name": "smart-photo",
+
+  // 安装依赖命令（项目使用 pnpm 作为包管理器）
+  "installCommand": "pnpm install",
+
+  // 构建命令（执行 vite build，产物输出到 dist/public）
+  "buildCommand": "pnpm build",
+
+  // 静态资源配置
+  "assets": {
+    // 构建产物目录（对应 vite.config.ts 中 build.outDir: "dist/public"）
+    "directory": "./dist/public",
+
+    // SPA 单页应用路由策略：未匹配到静态文件时回退到 index.html
+    "notFoundStrategy": "singlePageApplication"
+  }
+}

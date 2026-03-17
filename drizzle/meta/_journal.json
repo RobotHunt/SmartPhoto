@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1770980571410,
+      "tag": "0000_supreme_siren",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1770980882545,
+      "tag": "0001_worried_toad",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773590272078,
+      "tag": "0002_swift_misty_knight",
+      "breakpoints": true
+    }
+  ]
+}
