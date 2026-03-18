@@ -328,14 +328,15 @@ export default function HDResultStep() {
   const productType = sessionStorage.getItem("selectedProductType") || "净化器";
   const platform = sessionStorage.getItem("selectedPlatform") || "天猫";
 
+  // [2026-03-18 修复] 原: 7张图片含重复，改为4张不重复的实际示例图
   const MOCK_IMAGES: PreviewImage[] = [
     { id: "1", type: "主图",   platform, product: productType, url: "/examples/air-purifier.jpg",       editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
     { id: "2", type: "主图",   platform, product: productType, url: "/examples/air-purifier-white.jpg", editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
     { id: "3", type: "场景图", platform, product: productType, url: "/examples/2.jpg",                   editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
     { id: "4", type: "场景图", platform, product: productType, url: "/examples/3.jpg",                   editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
-    { id: "5", type: "场景图", platform, product: productType, url: "/examples/air-purifier.jpg",        editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
-    { id: "6", type: "细节图", platform, product: productType, url: "/examples/air-purifier-white.jpg",  editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
-    { id: "7", type: "细节图", platform, product: productType, url: "/examples/2.jpg",                   editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
+    // { id: "5", type: "场景图", platform, product: productType, url: "/examples/air-purifier.jpg",        editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
+    // { id: "6", type: "细节图", platform, product: productType, url: "/examples/air-purifier-white.jpg",  editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
+    // { id: "7", type: "细节图", platform, product: productType, url: "/examples/2.jpg",                   editOpen: false, isRegenerating: false, texts: { ...DEFAULT_TEXTS } },
   ];
 
   // 初始加载：检测是否从付费页返回（已付费）

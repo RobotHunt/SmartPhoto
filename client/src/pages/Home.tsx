@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+// [2026-03-18 修复] 原: import { getLoginUrl } from "@/const" — 静态模式下环境变量缺失导致 Invalid URL 崩溃
+// import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -289,7 +290,7 @@ export default function Home() {
                 </div>
                 <div className="flex gap-2 text-xs text-slate-500">
                   <span className="flex items-center gap-1"><Check className="w-3 h-3 text-blue-500" />按平台标准出图</span>
-                  <span className="flex items-center gap-1"><Check className="w-3 h-3 text-blue-500" />支持11+平台</span>
+                  <span className="flex items-center gap-1"><Check className="w-3 h-3 text-blue-500" />支挆11+平台</span>
                 </div>
               </div>
             </Card>

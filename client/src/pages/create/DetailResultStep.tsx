@@ -6,7 +6,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { getLoginUrl } from "@/const";
+// [2026-03-18 修复] 原: import { getLoginUrl } from "@/const" — 静态模式下环境变量缺失导致 Invalid URL 崩溃
+// import { getLoginUrl } from "@/const";
 
 // ─── 详情图流程步骤指示器（3步，可点击跳转）────────────────────────────────
 const DETAIL_STEPS = [
@@ -64,13 +65,14 @@ export function DetailStepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 })
 }
 
 // ─── 模拟详情图数据 ───────────────────────────────────────────────────────────
+// [2026-03-18 修复] 原: 6张图片含不存在的4.jpg和重复图片，改为4张不重复的实际示例图
 const MOCK_DETAIL_IMAGES = [
   { id: "d1", label: "产品展示", url: "/examples/air-purifier.jpg" },
   { id: "d2", label: "核心卖点", url: "/examples/air-purifier-white.jpg" },
   { id: "d3", label: "功能说明", url: "/examples/2.jpg" },
   { id: "d4", label: "产品细节", url: "/examples/3.jpg" },
-  { id: "d5", label: "使用场景", url: "/examples/4.jpg" },
-  { id: "d6", label: "产品参数", url: "/examples/air-purifier.jpg" },
+  // { id: "d5", label: "使用场景", url: "/examples/4.jpg" },
+  // { id: "d6", label: "产品参数", url: "/examples/air-purifier.jpg" },
 ];
 
 interface DetailImage {
@@ -300,7 +302,8 @@ export default function DetailResultStep() {
                 <p className="text-xs text-slate-400">避免图片丢失</p>
               </div>
               <a
-                href={getLoginUrl()}
+                // [2026-03-18 修复] 原: href={getLoginUrl()} — 静态模式下无OAuth，改为占位链接
+                href="#"
                 className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
               >
                 登录 / 注册

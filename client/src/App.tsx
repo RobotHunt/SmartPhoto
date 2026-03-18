@@ -24,10 +24,14 @@ import HDResultStep from "./pages/create/HDResultStep";
 import HDPaymentStep from "./pages/create/HDPaymentStep";
 import DetailResultStep from "./pages/create/DetailResultStep";
 import DetailConfirmStep from "./pages/create/DetailConfirmStep";
+// [2026-03-18 新增] 详情图支付页面
+import DetailPaymentStep from "./pages/create/DetailPaymentStep";
 import StrategyStep from "./pages/create/StrategyStep";
 import RecommendStep from "./pages/create/RecommendStep";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
+// [2026-03-18 新增] 帮助中心页面
+import HelpCenter from "./pages/HelpCenter";
 
 function Router() {
   return (
@@ -52,9 +56,13 @@ function Router() {
       <Route path="/create/hd-result" component={HDResultStep} />
       <Route path="/create/hd-payment" component={HDPaymentStep} />
       <Route path="/create/detail-confirm" component={DetailConfirmStep} />
+      {/* [2026-03-18 新增] 详情图支付页面路由 */}
+      <Route path="/create/detail-payment" component={DetailPaymentStep} />
       <Route path="/create/detail-result" component={DetailResultStep} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
+      {/* [2026-03-18 新增] 帮助中心路由 */}
+      <Route path="/help" component={HelpCenter} />
       <Route path="/project/:id" component={ProjectDetail} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />

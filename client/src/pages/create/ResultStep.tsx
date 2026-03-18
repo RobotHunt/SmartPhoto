@@ -87,15 +87,15 @@ export default function ResultStep() {
               isRegenerating: false, selected, editOpen: false,
               texts: { ...DEFAULT_TEXTS },
             });
+            // [2026-03-18 修复] 原: 7张图片含重复和不存在的4.jpg，改为4张不重复的实际示例图
             setImages([
               makeImg("1", "/examples/air-purifier.jpg", true),
               makeImg("2", "/examples/air-purifier-white.jpg", true),
               makeImg("3", "/examples/2.jpg", false),
               makeImg("4", "/examples/3.jpg", false),
-              // [2026-03-17 修复] 原: makeImg("5", "/examples/4.jpg", false) — 4.jpg 不存在，注释掉避免空白图片
               // makeImg("5", "/examples/4.jpg", false),
-              makeImg("6", "/examples/air-purifier.jpg", false),
-              makeImg("7", "/examples/air-purifier-white.jpg", false),
+              // makeImg("6", "/examples/air-purifier.jpg", false),
+              // makeImg("7", "/examples/air-purifier-white.jpg", false),
             ]);
             setGenerating(false);
           }, 400);

@@ -5,15 +5,15 @@ import {
 } from "lucide-react";
 import { StepIndicator } from "@/components/StepIndicator";
 
-// 与 ResultStep 一致的真实图片路径
+// [2026-03-18 修复] 原: 7张图片含不存在的4.jpg和重复，改为4张不重复的实际示例图
 const ALL_IMAGES = [
   "/examples/air-purifier.jpg",
   "/examples/air-purifier-white.jpg",
   "/examples/2.jpg",
   "/examples/3.jpg",
-  "/examples/4.jpg",
-  "/examples/air-purifier.jpg",
-  "/examples/air-purifier-white.jpg",
+  // "/examples/4.jpg",
+  // "/examples/air-purifier.jpg",
+  // "/examples/air-purifier-white.jpg",
 ];
 
 const PERKS = [
@@ -27,7 +27,8 @@ export default function PaymentStep() {
   const [, setLocation] = useLocation();
   const [paying, setPaying] = useState(false);
 
-  const selectedCount = parseInt(sessionStorage.getItem("selectedImgCount") || "7");
+  // [2026-03-18 修复] 原: 默认值"7"，改为与实际图片数量一致的"4"
+  const selectedCount = parseInt(sessionStorage.getItem("selectedImgCount") || "4");
   // 显示前3张，其余用数字提示
   const PREVIEW_MAX = 3;
   const previewImages = ALL_IMAGES.slice(0, PREVIEW_MAX);

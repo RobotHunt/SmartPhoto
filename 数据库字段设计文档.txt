@@ -1,0 +1,148 @@
+=====================================
+  数据库字段设计文档 v1.1
+  项目：SmartPhoto AI电商做图平台
+  日期：2026-03-18（v1.1 更新退款和验证码字段）
+=====================================
+
+一、现有表（已建）
+
+1. users 用户表
+┌──────────────┬───────────────┬──────────────────────────┐
+│ 字段          │ 类型           │ 说明                      │
+├──────────────┼───────────────┼──────────────────────────┤
+│ id           │ INT 自增主键    │ 用户ID                    │
+│ openId       │ VARCHAR(64)   │ OAuth登录标识，唯一         │
+│ name         │ TEXT          │ 用户昵称                   │
+│ email        │ VARCHAR(320)  │ 邮箱                      │
+│ loginMethod  │ VARCHAR(64)   │ 登录方式                   │
+│ role         │ ENUM          │ 角色：user / admin         │
+│ createdAt    │ TIMESTAMP     │ 注册时间                   │
+│ updatedAt    │ TIMESTAMP     │ 更新时间（自动）            │
+│ lastSignedIn │ TIMESTAMP     │ 最后登录时间               │
+└──────────────┴───────────────┴──────────────────────────┘
+
+2. projects 项目表
+┌─────────────────────┬───────────────┬──────────────────────────┐
+│ 字段                 │ 类型           │ 说明                      │
+├─────────────────────┼───────────────┼──────────────────────────┤
+│ id                  │ INT 自增主键    │ 项目ID                    │
+│ userId              │ INT 外键       │ 所属用户 → users.id        │
+│ originalImageUrl    │ TEXT          │ 原始产品图片URL             │
+│ originalImageKey    │ TEXT          │ 原始图片存储Key             │
+│ processedImageUrl   │ TEXT          │ 处理后图片URL（去背景等）    │
+│ processedImageKey   │ TEXT          │ 处理后图片存储Key           │
+│ platforms           │ TEXT          │ 目标平台（逗号分隔）         │
+│ imageType           │ ENUM          │ main=主图 / detail=详情图   │
+│ productName         │ TEXT          │ 产品名称                   │
+│ productParams       │ TEXT(JSON)    │ 产品参数（JSON格式）        │
+│ productSellingPoints│ TEXT(JSON)    │ 核心卖点（JSON格式）        │
+│ marketingCopy       │ TEXT          │ AI生成的营销文案            │
+│ status              │ ENUM          │ draft/processing/completed/failed │
+│ createdAt           │ TIMESTAMP     │ 创建时间                   │
+│ updatedAt           │ TIMESTAMP     │ 更新时间（自动）            │
+└─────────────────────┴───────────────┴──────────────────────────┘
+
+3. generatedImages 生成图片表
+┌──────────────┬───────────────┬──────────────────────────┐
+│ 字段          │ 类型           │ 说明                      │
+├──────────────┼───────────────┼──────────────────────────┤
+│ id           │ INT 自增主键    │ 图片ID                    │
+│ projectId    │ INT 外键       │ 所属项目 → projects.id     │
+│ imageUrl     │ TEXT          │ 生成图片URL                │
+│ imageKey     │ TEXT          │ 图片存储Key                │
+│ prompt       │ TEXT          │ AI生成提示词               │
+│ orderIndex   │ INT           │ 排序序号                   │
+│ createdAt    │ TIMESTAMP     │ 生成时间                   │
+└──────────────┴───────────────┴──────────────────────────┘
+
+
+二、新增表（待建）
+
+4. orders 订单/支付表（新增）
+┌─────────────────┬───────────────┬──────────────────────────┐
+│ 字段              │ 类型           │ 说明                      │
+├─────────────────┼───────────────┼──────────────────────────┤
+│ id               │ INT 自增主键    │ 订单ID                    │
+│ userId           │ INT 外键       │ 用户 → users.id            │
+│ projectId        │ INT 外键       │ 关联项目 → projects.id      │
+│ orderNo          │ VARCHAR(64)   │ 订单号（唯一，如ORD-xxx）    │
+│ orderType        │ ENUM          │ main_hd=主图高清            │
+│                  │               │ detail_hd=详情图高清         │
+│ amount           │ DECIMAL(10,2) │ 支付金额（元）              │
+│ status           │ ENUM          │ pending=待支付              │
+│                  │               │ paid=已支付                 │
+│                  │               │ failed=支付失败             │
+│                  │               │ refunded=已退款             │
+│ paymentMethod    │ VARCHAR(32)   │ 支付方式：alipay/wechat     │
+│ paymentId        │ VARCHAR(128)  │ 第三方支付平台交易ID         │
+│ imageCount       │ INT           │ 本次生成图片数量            │
+│ createdAt        │ TIMESTAMP     │ 订单创建时间               │
+│ paidAt           │ TIMESTAMP     │ 实际支付时间（可为空）       │
+│ refundStatus     │ ENUM          │ none=无 / pending=退款中     │
+│                  │               │ approved=已退款              │
+│                  │               │ rejected=退款被拒             │
+│ refundReason     │ TEXT          │ 退款原因（用户选择）          │
+│ refundNote       │ TEXT          │ 退款补充说明（用户填写）       │
+│ refundAt         │ TIMESTAMP     │ 退款申请时间（可为空）        │
+└─────────────────┴───────────────┴──────────────────────────┘
+
+5. users 表需新增字段
+┌──────────────┬───────────────┬──────────────────────────┐
+│ 新增字段       │ 类型           │ 说明                      │
+├──────────────┼───────────────┼──────────────────────────┤
+│ phone        │ VARCHAR(20)   │ 手机号（加密存储）          │
+│ password     │ VARCHAR(255)  │ 登录密码（bcrypt加密）      │
+│ avatar       │ TEXT          │ 头像URL                    │
+└──────────────┴───────────────┴──────────────────────────┘
+
+6. verification_codes 验证码表（新增）
+┌──────────────┬───────────────┬──────────────────────────┐
+│ 字段          │ 类型           │ 说明                      │
+├──────────────┼───────────────┼──────────────────────────┤
+│ id           │ INT 自增主键    │ 记录ID                    │
+│ userId       │ INT 外键       │ 用户 → users.id            │
+│ type         │ ENUM          │ phone=手机验证              │
+│              │               │ email=邮箱验证              │
+│ target       │ VARCHAR(320)  │ 目标手机号或邮箱地址         │
+│ code         │ VARCHAR(6)    │ 6位数字验证码               │
+│ expireAt     │ TIMESTAMP     │ 过期时间（发送后60秒）       │
+│ used         │ BOOLEAN       │ 是否已使用（默认false）      │
+│ createdAt    │ TIMESTAMP     │ 发送时间                    │
+└──────────────┴───────────────┴──────────────────────────┘
+
+
+三、表关系
+
+users (1) ──── (N) projects ──── (N) generatedImages
+  │
+  ├──── (N) orders ──── (1) projects
+  │
+  └──── (N) verification_codes
+
+
+四、Account页面数据对应关系
+
+页面区域              │ 数据来源
+─────────────────────┼─────────────────────
+用户头像/昵称/邮箱     │ users表
+使用统计-生成图片      │ COUNT(generatedImages) WHERE userId
+使用统计-本月使用      │ COUNT(projects) WHERE userId AND 本月
+购买记录列表           │ orders表 JOIN projects JOIN generatedImages
+购买记录-查看图片      │ generatedImages WHERE projectId = order.projectId
+购买记录-申请退款      │ UPDATE orders SET refundStatus/refundReason/refundNote/refundAt
+购买记录-去支付        │ 跳转第三方支付，回调更新 orders.status/paidAt
+账户安全-手机号        │ users.phone
+账户安全-修改手机号    │ 发送验证码 → verification_codes表 → 验证后更新 users.phone
+账户安全-邮箱          │ users.email
+账户安全-修改邮箱      │ 发送验证码 → verification_codes表 → 验证后更新 users.email
+账户安全-密码状态      │ users.password IS NOT NULL
+账户安全-注册时间      │ users.createdAt
+账户安全-最近登录      │ users.lastSignedIn
+
+
+五、退款原因枚举（前端预设选项）
+
+1. 图片质量不满意
+2. 生成结果与预期不符
+3. 误操作购买
+4. 其他（用户在补充说明中填写详情）

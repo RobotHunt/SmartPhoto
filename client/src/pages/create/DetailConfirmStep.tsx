@@ -3,20 +3,24 @@ import { Sparkles, RefreshCw, Pencil } from "lucide-react";
 import { CheckCircle2 } from "lucide-react";
 import { DetailStepIndicator } from "./DetailResultStep";
 
-// 6个详情图模块（带水印预览）
+// [2026-03-18 修复] 原: 6张图片含不存在的4.jpg和重复图片，改为4张不重复的实际示例图
 const MOCK_THUMBNAILS = [
   { id: 1, label: "产品展示", url: "/examples/air-purifier.jpg" },
   { id: 2, label: "核心卖点", url: "/examples/air-purifier-white.jpg" },
   { id: 3, label: "功能说明", url: "/examples/2.jpg" },
   { id: 4, label: "产品细节", url: "/examples/3.jpg" },
-  { id: 5, label: "使用场景", url: "/examples/4.jpg" },
-  { id: 6, label: "产品参数", url: "/examples/air-purifier.jpg" },
+  // { id: 5, label: "使用场景", url: "/examples/4.jpg" },
+  // { id: 6, label: "产品参数", url: "/examples/air-purifier.jpg" },
 ];
 
 export default function DetailConfirmStep() {
   const [, setLocation] = useLocation();
 
   const handlePay = () => {
+    // [2026-03-18 修复] 原: setLocation("/create/detail-result") — 跳过了支付页，改为先跳转支付
+    // [2026-03-18 回退] 与原版保持一致，详情图流程不经过支付页，直接跳转到详情图结果
+    // sessionStorage.setItem("detailImgCount", String(MOCK_THUMBNAILS.length));
+    // setLocation("/create/detail-payment");
     setLocation("/create/detail-result");
   };
 

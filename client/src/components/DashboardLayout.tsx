@@ -19,7 +19,8 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
+// [2026-03-18 修复] 原: import { getLoginUrl } from "@/const" — 静态模式下环境变量缺失导致 Invalid URL 崩溃
+// import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -70,7 +71,8 @@ export default function DashboardLayout({
           </div>
           <Button
             onClick={() => {
-              window.location.href = getLoginUrl();
+              // [2026-03-18 修复] 原: window.location.href = getLoginUrl() — 静态模式下改为跳转首页
+              window.location.href = "/";
             }}
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"

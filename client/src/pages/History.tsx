@@ -5,7 +5,8 @@ import {
   Search, MoreHorizontal, ImageIcon,
   Home, FolderOpen, User
 } from "lucide-react";
-import { getLoginUrl } from "@/const";
+// [2026-03-18 修复] 原: import { getLoginUrl } from "@/const" — 静态模式下环境变量缺失导致 Invalid URL 崩溃
+// import { getLoginUrl } from "@/const";
 import { useToast } from "@/hooks/use-toast";
 import { createPortal } from "react-dom";
 
@@ -211,7 +212,8 @@ export default function History() {
         <h2 className="text-lg font-semibold text-slate-900">登录后查看资产</h2>
         <p className="text-sm text-slate-500 text-center">登录账号，自动保存你的设计资产，避免图片丢失</p>
         <a
-          href={getLoginUrl()}
+          // [2026-03-18 修复] 原: href={getLoginUrl()} — 静态模式下无OAuth，改为占位链接
+          href="#"
           className="mt-2 px-8 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-full transition-colors"
         >
           登录 / 注册
