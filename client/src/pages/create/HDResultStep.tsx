@@ -287,13 +287,13 @@ function HDDoneStep({
             <p className="text-xs font-medium text-slate-800">登录账号，自动保存你的设计资产</p>
             <p className="text-xs text-slate-400">避免图片丢失</p>
           </div>
-          <a
-            // [2026-03-17 修复] 原: href={getLoginUrl()} — 静态模式下无OAuth，改为占位链接
-            href="#"
+          {/* [2026-03-19 修复] 原: <a href="/auth"> — a标签会触发页面刷新，改为 button + setLocation */}
+          <button
+            onClick={() => setLocation("/auth")}
             className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
           >
             登录 / 注册
-          </a>
+          </button>
         </div>
         <div className="bg-white border-t border-slate-100 shadow-lg px-4 py-2.5 flex gap-2">
           <Button size="lg" variant="outline" className="flex-1 text-slate-600 gap-1.5 border-slate-200" onClick={onDownloadAll}>

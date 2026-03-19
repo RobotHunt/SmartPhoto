@@ -2,6 +2,10 @@
   // 项目名称
   "name": "smart-photo",
 
+  // [2026-03-18 新增] 边缘函数入口（ESA Edge Routine）
+  // 处理 /api/* 请求，静态资源请求由 Pages 直接返回
+  "entry": "./functions/api.js",
+
   // 安装依赖命令（项目使用 pnpm 作为包管理器）
   "installCommand": "pnpm install",
 

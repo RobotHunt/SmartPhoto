@@ -59,11 +59,10 @@ export default function Home() {
               <Link href="/history">
                 <span className="text-slate-500 hover:text-slate-800 transition-colors cursor-pointer">资产</span>
               </Link>
-              {user && (
-                <Link href="/history">
-                  <span className="text-slate-500 hover:text-slate-800 transition-colors cursor-pointer">账户</span>
-                </Link>
-              )}
+              {/* [2026-03-19 修复] 原: {user && (...)} — 去掉登录条件，未登录也显示账户按钮 */}
+              <Link href="/account">
+                <span className="text-slate-500 hover:text-slate-800 transition-colors cursor-pointer">账户</span>
+              </Link>
             </div>
 
             {/* 右侧操作区 */}
@@ -101,7 +100,8 @@ export default function Home() {
                   </div>
                 </Link>
               ) : (
-                <Link href="/create/upload">
+                // [2026-03-19 修改] 原: href="/create/upload" — 未登录时应跳转登录页
+                <Link href="/auth">
                   <Button size="sm" className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl">
                     登录
                   </Button>

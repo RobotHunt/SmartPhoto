@@ -1,4 +1,5 @@
 // [2026-03-18 改造] Account页面完整静态版
+// [2026-03-19 改造] 从直接引用假数据改为通过 api.ts 模拟层调用，为后续接入后端做准备
 // 包含：用户信息、购买记录（支付/退款流程）、消息通知、账户安全、设置
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
@@ -14,48 +15,21 @@ import {
 // import { getLoginUrl } from "@/const";
 // import { trpc } from "@/lib/trpc";
 import { useToast } from "@/hooks/use-toast";
+// [2026-03-19 新增] 导入 API 模拟层，替代直接引用假数据常量
+import {
+  type Order, type NotificationItem, type UserStats,
+  getOrders, getNotifications, getUserStats, payOrder, refundOrder
+} from "@/lib/api";
 
 // ═══════════════════════════════════════════════════════════════════
-//  假数据
+//  [2026-03-19 改造] 假数据和类型定义已迁移到 client/src/lib/api.ts
+//  以下为原始假数据（已注释），保留供参考
 // ═══════════════════════════════════════════════════════════════════
 
-interface Order {
-  id: string;
-  type: string;
-  productName: string;
-  amount: number;
-  status: "pending" | "paid" | "refund_pending" | "refunded" | "failed";
-  paymentMethod: string;
-  imageCount: number;
-  images: string[];
-  createdAt: string;
-}
-
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: "ORD-20260316001", type: "主图高清", productName: "便携式蓝牙音箱",
-    amount: 69, status: "pending", paymentMethod: "", imageCount: 4, images: [],
-    createdAt: "2026-03-16 18:20",
-  },
-  {
-    id: "ORD-20260315002", type: "主图高清", productName: "空气净化器",
-    amount: 69, status: "paid", paymentMethod: "支付宝", imageCount: 4,
-    images: ["/examples/air-purifier.jpg", "/examples/air-purifier-white.jpg", "/examples/2.jpg", "/examples/3.jpg"],
-    createdAt: "2026-03-15 14:30",
-  },
-  // [2026-03-18 注释] 详情图流程不经过支付，注释掉对应的假订单数据
-  // {
-  //   id: "ORD-20260314003", type: "详情图高清", productName: "空气净化器",
-  //   amount: 89, status: "paid", paymentMethod: "微信支付", imageCount: 4,
-  //   images: ["/examples/air-purifier.jpg", "/examples/air-purifier-white.jpg", "/examples/2.jpg", "/examples/3.jpg"],
-  //   createdAt: "2026-03-14 10:15",
-  // },
-  {
-    id: "ORD-20260312004", type: "主图高清", productName: "不锈钢面包机",
-    amount: 69, status: "refunded", paymentMethod: "支付宝", imageCount: 4, images: [],
-    createdAt: "2026-03-12 16:45",
-  },
-];
+// interface Order { ... }           → 已迁移到 api.ts
+// const INITIAL_ORDERS: Order[]     → 已迁移到 api.ts，通过 getOrders() 获取
+// interface NotificationItem { ... } → 已迁移到 api.ts
+// const MOCK_NOTIFICATIONS          → 已迁移到 api.ts，通过 getNotifications() 获取
 
 const MOCK_USER_DETAIL = {
   phone: "138****6789", registerDate: "2026-02-20",
@@ -63,21 +37,6 @@ const MOCK_USER_DETAIL = {
 };
 
 const REFUND_REASONS = ["图片质量不满意", "生成结果与预期不符", "误操作购买", "其他"];
-
-interface NotificationItem {
-  id: string; type: "payment" | "refund" | "security" | "system";
-  title: string; desc: string; time: string; read: boolean;
-}
-
-const MOCK_NOTIFICATIONS: NotificationItem[] = [
-  { id: "n1", type: "payment", title: "订单支付成功", desc: "订单 ORD-20260315002（主图高清·空气净化器）已支付 ¥69", time: "2026-03-15 14:30", read: true },
-  // [2026-03-18 注释] 详情图流程不经过支付，注释掉对应的通知
-  // { id: "n2", type: "payment", title: "订单支付成功", desc: "订单 ORD-20260314003（详情图高清·空气净化器）已支付 ¥89", time: "2026-03-14 10:15", read: true },
-  { id: "n3", type: "refund", title: "退款已完成", desc: "订单 ORD-20260312004（主图高清·不锈钢面包机）已退款 ¥69 至原支付账户", time: "2026-03-13 09:00", read: true },
-  { id: "n4", type: "security", title: "验证码发送成功", desc: "您的手机验证码已发送至 138****6789", time: "2026-03-10 16:20", read: false },
-  { id: "n5", type: "security", title: "邮箱修改成功", desc: "您的邮箱已修改为 demo@example.com", time: "2026-03-08 11:30", read: false },
-  { id: "n6", type: "system", title: "欢迎使用 SmartPhoto", desc: "您的账号已注册成功，快来体验 AI 电商做图吧！", time: "2026-02-20 10:00", read: true },
-];
 
 // ═══════════════════════════════════════════════════════════════════
 //  工具组件
@@ -132,7 +91,9 @@ function NotificationIcon({ type }: { type: string }) {
 
 function PurchaseHistory({ onBack }: { onBack: () => void }) {
   const { toast } = useToast();
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  // [2026-03-19 改造] 原: useState<Order[]>(INITIAL_ORDERS) — 改为从 API 加载
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [refundModalOrder, setRefundModalOrder] = useState<string | null>(null);
   const [refundReason, setRefundReason] = useState("");
@@ -144,42 +105,54 @@ function PurchaseHistory({ onBack }: { onBack: () => void }) {
   const [payingOrderData, setPayingOrderData] = useState<Order | null>(null);
   const [payProgress, setPayProgress] = useState(false);
 
+  // [2026-03-19 新增] 从 API 加载订单数据
+  useEffect(() => {
+    getOrders().then(data => {
+      setOrders(data);
+      setLoading(false);
+    });
+  }, []);
+
   // [2026-03-18 修复] 跳转到支付页面
   const handleGoToPay = (order: Order) => {
     setPayingOrderData(order);
   };
 
-  // [2026-03-18 修复] 在支付页面中确认支付
-  const handleConfirmPay = () => {
+  // [2026-03-19 改造] 原: setTimeout 直接修改本地状态 — 改为调用 api.payOrder()
+  const handleConfirmPay = async () => {
     if (!payingOrderData) return;
     setPayProgress(true);
-    setTimeout(() => {
-      const orderId = payingOrderData.id;
-      setOrders(prev => prev.map(o =>
-        o.id === orderId ? { ...o, status: "paid" as const, paymentMethod: "支付宝",
-          images: ["/examples/air-purifier.jpg", "/examples/air-purifier-white.jpg", "/examples/2.jpg", "/examples/3.jpg"]
-        } : o
-      ));
+    try {
+      const result = await payOrder(payingOrderData.id);
+      // 重新加载订单列表
+      const updatedOrders = await getOrders();
+      setOrders(updatedOrders);
       setPayProgress(false);
       setPayingOrderData(null);
-      toast({ title: "支付成功", description: `订单 ${orderId} 已完成支付` });
-    }, 2000);
+      toast({ title: "支付成功", description: `订单 ${payingOrderData.id} 已完成支付` });
+    } catch (err: any) {
+      setPayProgress(false);
+      toast({ title: "支付失败", description: err.message });
+    }
   };
 
-  // [2026-03-18 修复] 退款：提交后状态变为"退款处理中"
-  const handleRefund = () => {
-    if (!refundReason) { toast({ title: "请选择退款原因" }); return; }
+  // [2026-03-19 改造] 原: setTimeout 直接修改本地状态 — 改为调用 api.refundOrder()
+  const handleRefund = async () => {
+    if (!refundReason || !refundModalOrder) { toast({ title: "请选择退款原因" }); return; }
     setRefunding(true);
-    setTimeout(() => {
-      setOrders(prev => prev.map(o =>
-        o.id === refundModalOrder ? { ...o, status: "refund_pending" as const } : o
-      ));
+    try {
+      await refundOrder(refundModalOrder, refundReason, refundNote);
+      const updatedOrders = await getOrders();
+      setOrders(updatedOrders);
       setRefunding(false);
       setRefundModalOrder(null);
       setRefundReason("");
       setRefundNote("");
       toast({ title: "退款申请已提交", description: "商家将在 1-3 个工作日内处理，届时会通过消息通知您结果" });
-    }, 2000);
+    } catch (err: any) {
+      setRefunding(false);
+      toast({ title: "退款申请失败", description: err.message });
+    }
   };
 
   // [2026-03-18 新增] 内嵌支付页面：点击去支付后跳到此页面
@@ -368,7 +341,16 @@ function PurchaseHistory({ onBack }: { onBack: () => void }) {
 // ═══════════════════════════════════════════════════════════════════
 
 function Notifications({ onBack }: { onBack: () => void }) {
-  const [notifications] = useState(MOCK_NOTIFICATIONS);
+  // [2026-03-19 改造] 原: useState(MOCK_NOTIFICATIONS) — 改为从 API 加载
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getNotifications().then(data => {
+      setNotifications(data);
+      setLoading(false);
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -567,12 +549,34 @@ function AccountSecurity({ onBack }: { onBack: () => void }) {
 // ═══════════════════════════════════════════════════════════════════
 
 export default function Account() {
-  const { user, loading } = useAuth();
+  // [2026-03-19 改造] 原: const logout = { mutate: ... } 自定义跳转
+  // 改为使用 useAuth 提供的 logout，会清除 sessionStorage 并跳转 /auth
+  const { user, loading, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [subPage, setSubPage] = useState<"main" | "purchase" | "security" | "notifications" | "settings">("main");
 
-  const logout = { mutate: () => { window.location.href = "/"; }, isPending: false };
+  // [2026-03-19 新增] 从 API 加载统计数据
+  const [statsData, setStatsData] = useState<UserStats>({ totalImages: 0, monthlyUsage: 0 });
+  useEffect(() => {
+    if (user) getUserStats().then(setStatsData);
+  }, [user]);
+
+  // [2026-03-19 改造] 从 API 加载统计数据和通知未读数（所有 hooks 必须在条件判断之前）
+  const [menuStats, setMenuStats] = useState({ orderCount: 0, unreadCount: 0 });
+  useEffect(() => {
+    if (user && subPage === "main") {
+      Promise.all([getOrders(), getNotifications()]).then(([orders, notifications]) => {
+        setMenuStats({
+          orderCount: orders.length,
+          unreadCount: notifications.filter(n => !n.read).length,
+        });
+      });
+    }
+  }, [user, subPage]);
+
+  // [2026-03-19 改造] 原: const logout = { mutate: () => ... } — 已改为使用 useAuth 的 logout
+  // const logout = { mutate: () => { window.location.href = "/auth"; }, isPending: false };
 
   if (loading) {
     return (<div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -586,7 +590,7 @@ export default function Account() {
         <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-2"><User className="w-8 h-8 text-blue-400" /></div>
         <h2 className="text-lg font-semibold text-slate-900">登录后查看账户</h2>
         <p className="text-sm text-slate-500 text-center">登录账号，管理你的个人信息和使用记录</p>
-        <a href="#" className="mt-2 px-8 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-full transition-colors">登录 / 注册</a>
+        <button onClick={() => setLocation("/auth")} className="mt-2 px-8 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-full transition-colors">登录 / 注册</button>
       </div>
     );
   }
@@ -596,14 +600,13 @@ export default function Account() {
   if (subPage === "notifications") return <Notifications onBack={() => setSubPage("main")} />;
   if (subPage === "settings") return <SettingsPage onBack={() => setSubPage("main")} />;
 
-  const unreadCount = MOCK_NOTIFICATIONS.filter(n => !n.read).length;
-
+  // [2026-03-19 改造] menuStats 的 useState 和 useEffect 已移到组件顶部（hooks 规则）
   const menuGroups = [
     {
       title: "账户管理",
       items: [
-        { icon: <CreditCard className="w-4 h-4 text-blue-500" />, label: "我的购买记录", desc: `${INITIAL_ORDERS.length}笔订单`, onClick: () => setSubPage("purchase") },
-        { icon: <Bell className="w-4 h-4 text-amber-500" />, label: "消息通知", desc: unreadCount > 0 ? `${unreadCount}条未读` : undefined, onClick: () => setSubPage("notifications") },
+        { icon: <CreditCard className="w-4 h-4 text-blue-500" />, label: "我的购买记录", desc: `${menuStats.orderCount}笔订单`, onClick: () => setSubPage("purchase") },
+        { icon: <Bell className="w-4 h-4 text-amber-500" />, label: "消息通知", desc: menuStats.unreadCount > 0 ? `${menuStats.unreadCount}条未读` : undefined, onClick: () => setSubPage("notifications") },
         { icon: <Shield className="w-4 h-4 text-green-500" />, label: "账户安全", desc: "手机 · 密码", onClick: () => setSubPage("security") },
         { icon: <Settings className="w-4 h-4 text-slate-500" />, label: "设置", onClick: () => setSubPage("settings") },
       ],
@@ -630,8 +633,9 @@ export default function Account() {
             <p className="text-blue-100 text-xs mt-0.5">{user.email || "暂无邮箱"}</p>
           </div>
         </div>
+        {/* [2026-03-19 改造] 原: 硬编码 "12"/"5" — 改为从 API 加载 */}
         <div className="mt-5 grid grid-cols-2 gap-3">
-          {[{ label: "已生成图片", value: "12" }, { label: "本月使用", value: "5" }].map(stat => (
+          {[{ label: "已生成图片", value: String(statsData.totalImages) }, { label: "本月使用", value: String(statsData.monthlyUsage) }].map(stat => (
             <div key={stat.label} className="bg-white/15 rounded-xl py-2.5 text-center">
               <p className="text-white font-bold text-lg leading-none">{stat.value}</p>
               <p className="text-blue-100 text-xs mt-1">{stat.label}</p>
@@ -657,9 +661,10 @@ export default function Account() {
             </div>
           </div>
         ))}
-        <button onClick={() => logout.mutate()} disabled={logout.isPending}
+        {/* [2026-03-19 改造] 原: onClick={() => logout.mutate()} — 改为直接调用 logout() */}
+        <button onClick={() => logout()}
           className="w-full bg-white rounded-2xl py-3.5 text-sm text-red-500 font-medium hover:bg-red-50 active:bg-red-100 transition-colors shadow-sm">
-          {logout.isPending ? "退出中…" : "退出登录"}
+          退出登录
         </button>
       </div>
 

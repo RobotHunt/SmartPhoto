@@ -211,13 +211,13 @@ export default function History() {
         </div>
         <h2 className="text-lg font-semibold text-slate-900">登录后查看资产</h2>
         <p className="text-sm text-slate-500 text-center">登录账号，自动保存你的设计资产，避免图片丢失</p>
-        <a
-          // [2026-03-18 修复] 原: href={getLoginUrl()} — 静态模式下无OAuth，改为占位链接
-          href="#"
+        {/* [2026-03-19 修复] 原: <a href="/auth"> — a标签会触发页面刷新被边缘函数拦截，改为 button + setLocation */}
+        <button
+          onClick={() => setLocation("/auth")}
           className="mt-2 px-8 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-full transition-colors"
         >
           登录 / 注册
-        </a>
+        </button>
       </div>
     );
   }

@@ -7,6 +7,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import History from "./pages/History";
 import Account from "./pages/Account";
+// [2026-03-19 新增] 登录注册页面
+import AuthPage from "./pages/AuthPage";
 
 import ProjectDetail from "./pages/ProjectDetail";
 import UploadStep from "./pages/create/UploadStep";
@@ -39,6 +41,8 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path="/history" component={History} />
       <Route path="/account" component={Account} />
+      {/* [2026-03-19 新增] 登录注册路由 */}
+      <Route path="/auth" component={AuthPage} />
 
       <Route path="/create/upload" component={UploadStep} />
       <Route path="/create/analyze" component={AnalyzeStep} />
