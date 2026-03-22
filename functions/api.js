@@ -1,6 +1,6 @@
 // ESA Edge Routine 边缘函数入口
 // 将 /api/v2/* 请求代理到后端服务器
-const BACKEND = 'http://152.136.121.153:8000';
+const BACKEND = 'https://api.wppjkw.online';
 
 function corsHeaders() {
   return {
@@ -17,7 +17,7 @@ async function proxyToBackend(request) {
 
   // 转发请求头（去掉边缘节点相关头）
   const headers = new Headers(request.headers);
-  headers.set('Host', '152.136.121.153:8000');
+  headers.set('Host', 'api.wppjkw.online');
   headers.delete('cf-connecting-ip');
   headers.delete('cf-ray');
   headers.delete('x-forwarded-for');

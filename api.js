@@ -1,9 +1,9 @@
 // ============================================
 // SmartPhoto - Backend API Client
-// Backend: http://152.136.121.153:8000/api/v2
+// Backend: https://api.wppjkw.online/api/v2
 // ============================================
 
-const API_BASE = '/api/v2';
+const API_BASE = 'https://api.wppjkw.online/api/v2';
 
 /**
  * Core fetch wrapper with JWT auth and response unwrapping
