@@ -42,6 +42,9 @@ const appState = {
 async function handleStartCreate() {
   if (typeof requireAuth === 'function' && !requireAuth()) return;
 
+  // Clear previous session's upload state so stale images don't leak across sessions/users
+  resetUploadState();
+
   // Create backend session
   if (appState.backendMode) {
     try {
@@ -55,6 +58,44 @@ async function handleStartCreate() {
   }
 
   openFullscreenWizard();
+}
+
+// Reset all upload-related state and slot UI to blank
+function resetUploadState() {
+  appState.fsSlotFiles = {};
+  appState.fsSlotPreviews = {};
+  appState.fsSlotImageIds = {};
+  appState.uploadedFiles = [];
+  appState.uploadedPreviews = [];
+  appState.generatedImages = [];
+  appState.productAnalysis = null;
+  appState.confirmedCategory = null;
+  appState.whiteBackgroundImage = null;
+  appState.selectedSellingPoints = [];
+  appState.selectedScenes = [];
+  appState.userSpecs = {};
+  appState.copyTexts = { productName: '', categoryName: '', headline: '', sellingPointsText: '', scenesText: '', specsText: '' };
+  appState._resultVersions = [];
+  appState._resultCurrentVersion = 1;
+  appState.sessionId = null;
+  appState.currentJobId = null;
+  sessionStorage.removeItem('current_session_id');
+
+  // Reset slot UI if DOM is available
+  const labels = ['正面图', '45°角', '侧面图', '补充图1', '补充图2', '补充图3'];
+  for (let i = 0; i < 6; i++) {
+    const slot = document.getElementById(`fsSlot${i}`);
+    if (!slot) continue;
+    const parentSlot = slot.parentElement;
+    if (parentSlot) parentSlot.classList.remove('has-image');
+    slot.innerHTML = `
+      <div class="fs-upload-icon">☁️</div>
+      <span class="fs-upload-slot-label">${labels[i] || '上传'}</span>
+    `;
+  }
+  // Disable next button since no files
+  const btn = document.getElementById('btnFsUploadNext');
+  if (btn) btn.disabled = true;
 }
 
 // ===== 品类知识库 =====
@@ -541,15 +582,11 @@ function removeFsSlot(slotIndex) {
   const parentSlot = slot.parentElement;
   parentSlot.classList.remove('has-image');
 
-  const labels = ['正面图', '45°角', '侧面图', '', '上传产品片', '上传产品片'];
-  if (slotIndex === 3) {
-    slot.innerHTML = `<div class="fs-upload-add-icon">＋</div>`;
-  } else {
-    slot.innerHTML = `
-      <div class="fs-upload-icon">☁️</div>
-      <span class="fs-upload-slot-label">${labels[slotIndex] || '上传'}</span>
-    `;
-  }
+  const labels = ['正面图', '45°角', '侧面图', '补充图1', '补充图2', '补充图3'];
+  slot.innerHTML = `
+    <div class="fs-upload-icon">☁️</div>
+    <span class="fs-upload-slot-label">${labels[slotIndex] || '上传'}</span>
+  `;
   updateFsUploadButton();
   appState.productAnalysis = null;
   appState.confirmedCategory = null;

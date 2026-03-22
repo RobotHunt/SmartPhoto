@@ -126,6 +126,8 @@ async function authLogout() {
   closeAuthModal();
   closeAccountPage();
   closeHistoryPage();
+  // Clear upload/session state so next user doesn't see stale images
+  if (typeof resetUploadState === 'function') resetUploadState();
   showToast('已退出登录');
 }
 
@@ -356,17 +358,41 @@ async function loadAccountData() {
     userInfoEl.appendChild(editForm);
   }
 
-  // Load stats
+  // Load stats (use assets list to compute correct totals — the overview
+  // endpoint counts carry-forward copies from version history, inflating the number)
   try {
-    const stats = await accountAPI.getOverview();
+    const [stats, assetsData] = await Promise.all([
+      accountAPI.getOverview(),
+      accountAPI.getAssets({ page_size: 100 }),
+    ]);
+    const assetItems = (assetsData && assetsData.items) ? assetsData.items : [];
+    // For each session: latest version has N slots (including carry-forward copies).
+    // Each additional version beyond v1 represents a single-image regeneration that
+    // created 1 unique new image.  So: unique = N + (version_count - 1).
+    let correctedTotal = 0;
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    let correctedMonthly = 0;
+    for (const item of assetItems) {
+      const c = item.counts || {};
+      const latestSlotCount = (c.main || 0) + (c.white_bg || 0);
+      const mainVersions = item.latest_main_version || 1;
+      const regenExtra = Math.max(0, mainVersions - 1);
+      const sessionCount = latestSlotCount + regenExtra + (c.detail || 0);
+      correctedTotal += sessionCount;
+      if (item.last_generated_at && new Date(item.last_generated_at) >= monthStart) {
+        correctedMonthly += sessionCount;
+      }
+    }
     if (statsEl && stats) {
       statsEl.innerHTML = `
         <div class="stat-card">
-          <div class="stat-value">${stats.total_generated_assets || 0}</div>
+          <div class="stat-value">${correctedTotal}</div>
           <div class="stat-label">总生成图片</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">${stats.generated_assets_this_month || 0}</div>
+          <div class="stat-value">${correctedMonthly}</div>
           <div class="stat-label">本月生成</div>
         </div>
         <div class="stat-card">
@@ -752,13 +778,13 @@ async function openHistoryDetail(sessionId, productName, version) {
         ${versionHtml}
       </div>
       ${items.map((r, i) => {
-        const url = r.image_url || r.thumbnail_url || r.url || '';
-        const label = ROLE_LABELS[r.role] || ROLE_LABELS[r.slot_id] || r.role || '';
-        const desc = r.description || r.desc || r.slot_id || '';
+        const url = r.image_url || r.thumbnail_url || r.url || r.preview_url || '';
+        const label = ROLE_LABELS[r.role] || ROLE_LABELS[r.slot_id] || r.role || `图片 ${i + 1}`;
+        const desc = r.description || r.desc || '';
         const orderNum = r.display_order != null ? r.display_order : (i + 1);
         return `<div class="history-card">
-          <div class="history-thumb" style="cursor:pointer;" onclick="if(document.getElementById('imageModal')){document.getElementById('modalImage').src='${r.image_url || url}';document.getElementById('imageModal').classList.add('active');}">
-            ${url ? `<img src="${url}" alt="${label}" style="object-fit:cover;width:100%;height:100%;">` : '<div class="history-no-thumb">暂无预览</div>'}
+          <div class="history-thumb" style="cursor:pointer;" onclick="if(document.getElementById('imageModal')){document.getElementById('modalImage').src='${url}';document.getElementById('imageModal').classList.add('active');}">
+            ${url ? `<img src="${url}" alt="${label}" style="object-fit:cover;width:100%;height:100%;" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'history-no-thumb\\'>暂无预览</div>';">` : '<div class="history-no-thumb">暂无预览</div>'}
           </div>
           <div class="history-info">
             <h4>${label} #${orderNum}</h4>
@@ -800,6 +826,8 @@ async function downloadHistorySession(sessionId) {
 window.addEventListener('auth:logout', () => {
   clearAuthData();
   updateAuthUI();
+  // Clear upload/session state so next user doesn't see stale images
+  if (typeof resetUploadState === 'function') resetUploadState();
   openAuthModal();
 });
 
