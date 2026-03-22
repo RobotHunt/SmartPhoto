@@ -3,7 +3,7 @@
 // Backend: https://api.wppjkw.online/api/v2
 // ============================================
 
-const API_BASE = 'https://api.wppjkw.online/api/v2';
+const API_BASE = '/api/v2';
 
 /**
  * Core fetch wrapper with JWT auth and response unwrapping
