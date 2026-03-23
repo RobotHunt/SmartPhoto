@@ -60,8 +60,8 @@ export default {
       });
     }
 
-    // /api/v2/* 请求代理到后端
-    if (path.startsWith('/api/v2') || path === '/healthz') {
+    // /api/* 请求代理到后端
+    if (path.startsWith('/api/') || path === '/healthz') {
       return await proxyToBackend(request);
     }
 
