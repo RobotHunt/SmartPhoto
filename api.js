@@ -1,6 +1,6 @@
 // ============================================
 // SmartPhoto - Backend API Client
-// Backend: https://api.wppjkw.online/api/v2
+// Backend: https://smartphoto.ins.chat/api/v2
 // ============================================
 
 const API_BASE = '/api/v2';

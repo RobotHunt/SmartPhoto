@@ -215,14 +215,15 @@ function getCurrentKB() {
 }
 
 // ===== API Configuration =====
-const API_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
+// 豆包本地 AI 已禁用，全部走后端 API
+const API_BASE_URL = '';
 
 function getApiConfig() {
   return {
-    apiKey: localStorage.getItem('smartphoto_api_key') || '',
-    model: localStorage.getItem('smartphoto_model') || 'doubao-seedream-4-5-251128',
-    style: localStorage.getItem('smartphoto_style') || 'photorealistic',
-    size: localStorage.getItem('smartphoto_size') || '1920x1920',
+    apiKey: '',
+    model: '',
+    style: '',
+    size: '',
   };
 }
 

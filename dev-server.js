@@ -1,16 +1,18 @@
 // ============================================
 // SmartPhoto - Development Server with API Proxy
-// Proxies /api/v2 to http://152.136.121.153:8000
+// Proxies /api/v2 to https://smartphoto.ins.chat
 // ============================================
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
 const PORT = 3000;
-const BACKEND_HOST = '152.136.121.153';
-const BACKEND_PORT = 8000;
+const BACKEND_HOST = 'smartphoto.ins.chat';
+const BACKEND_PORT = 443;
+const BACKEND_PROTOCOL = https;
 const STATIC_DIR = __dirname;
 
 const MIME_TYPES = {
@@ -63,7 +65,7 @@ const server = http.createServer((req, res) => {
         if (['host', 'connection', 'keep-alive', 'transfer-encoding'].includes(key.toLowerCase())) continue;
         proxyHeaders[key] = val;
       }
-      proxyHeaders['host'] = `${BACKEND_HOST}:${BACKEND_PORT}`;
+      proxyHeaders['host'] = BACKEND_HOST;
       if (body.length > 0) {
         proxyHeaders['content-length'] = body.length;
       }
@@ -78,7 +80,7 @@ const server = http.createServer((req, res) => {
 
       console.log(`  → ${req.method} ${req.url}`);
 
-      const proxyReq = http.request(proxyOptions, (proxyRes) => {
+      const proxyReq = BACKEND_PROTOCOL.request(proxyOptions, (proxyRes) => {
         // Build response headers with CORS
         const responseHeaders = { ...CORS_HEADERS };
         for (const [key, val] of Object.entries(proxyRes.headers)) {
@@ -149,7 +151,7 @@ server.listen(PORT, () => {
   console.log('  SmartPhoto Dev Server');
   console.log('  ────────────────────────');
   console.log(`  Local:   http://localhost:${PORT}`);
-  console.log(`  Backend: http://${BACKEND_HOST}:${BACKEND_PORT}`);
+  console.log(`  Backend: https://${BACKEND_HOST}`);
   console.log('  Proxy:   /api/v2/* → backend');
   console.log('');
 });

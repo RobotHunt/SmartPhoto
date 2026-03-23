@@ -1,6 +1,6 @@
 // ESA Edge Routine 边缘函数入口
 // 将 /api/v2/* 请求代理到后端服务器
-const BACKEND = 'https://api.wppjkw.online';
+const BACKEND = 'https://smartphoto.ins.chat';
 
 function corsHeaders() {
   return {
