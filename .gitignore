@@ -1,6 +1,0 @@
-node_modules/
-server.log
-*.md
-!README.md
-.env
-.DS_Store
