@@ -167,15 +167,13 @@ const MODULE_ORDER = [
   "product_parameters",
 ];
 
-// ── All regeneration targets ─────────────────────────────────────────────────
+// ── All regeneration targets (must match backend COPY_TARGETS) ──────────────
 
 const ALL_TARGETS = [
   "headline",
   "selling_points",
-  "scenes",
+  "usage_scenes",
   "specs",
-  "product_name",
-  "category",
 ];
 
 // ── Component ────────────────────────────────────────────────────────────────
