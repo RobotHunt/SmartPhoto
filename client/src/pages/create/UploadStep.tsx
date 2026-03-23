@@ -31,12 +31,12 @@ const SESSION_KEY = "current_session_id";
 const SLOT_IDS_KEY = "upload_slot_image_ids"; // persisted map slotType -> imageId
 
 const SLOT_DEFS: SlotDef[] = [
-  { slotType: "front", label: "正面图", displayOrder: 0 },
-  { slotType: "angle45", label: "45°角", displayOrder: 1 },
-  { slotType: "side", label: "侧面图", displayOrder: 2 },
-  { slotType: "extra_1", label: "补充图1", displayOrder: 3 },
-  { slotType: "extra_2", label: "补充图2", displayOrder: 4 },
-  { slotType: "extra_3", label: "补充图3", displayOrder: 5 },
+  { slotType: "front", label: "正面图", displayOrder: 1 },
+  { slotType: "angle45", label: "45°角", displayOrder: 2 },
+  { slotType: "side", label: "侧面图", displayOrder: 3 },
+  { slotType: "extra_1", label: "补充图1", displayOrder: 4 },
+  { slotType: "extra_2", label: "补充图2", displayOrder: 5 },
+  { slotType: "extra_3", label: "补充图3", displayOrder: 6 },
 ];
 
 // ---------- helpers ----------

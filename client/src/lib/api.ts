@@ -3,7 +3,7 @@
 // Backend: /api/v2 → proxied to FastAPI backend
 // ============================================
 
-const API_BASE = '/api/v2';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api/v2').replace(/\/$/, '');
 
 // ===== Core fetch wrapper =====
 export async function apiFetch<T = any>(path: string, options: RequestInit & { _isRetry?: boolean } = {}): Promise<T> {
@@ -128,14 +128,59 @@ export const sessionAPI = {
     return apiFetch<any>(`/sessions/${sessionId}`);
   },
 
-  // Step 1: Upload images
-  uploadImage(sessionId: string, file: File, slotType?: string, displayOrder?: number) {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (slotType) formData.append('slot_type', slotType);
-    if (displayOrder !== undefined) formData.append('display_order', String(displayOrder));
-    return apiFetch<{ image_id: string; url: string }>(`/sessions/${sessionId}/images`, {
-      method: 'POST', body: formData,
+  // Step 1: Upload images (presign-based direct upload)
+  async uploadImage(sessionId: string, file: File, slotType?: string, displayOrder?: number) {
+    return this.uploadWithPresign(sessionId, file, 'session_image', {
+      slot_type: slotType || null,
+      display_order: displayOrder,
+    });
+  },
+
+  async uploadWithPresign(
+    sessionId: string,
+    file: File,
+    uploadKind: 'session_image' | 'detail_style_image' | 'parameter_attachment' | 'strategy_reference_image',
+    extra: { slot_type?: string | null; display_order?: number } = {},
+  ) {
+    // Ensure display_order is at least 1 (backend requirement)
+    const displayOrder = Math.max(1, Number(extra.display_order ?? 1));
+
+    // Step 1: Request presigned upload URL
+    const presign = await apiFetch<{
+      upload_id: string;
+      method: string;
+      upload_url: string;
+      headers: Record<string, string>;
+      form_fields: Record<string, string>;
+    }>('/uploads/presign', {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: sessionId,
+        upload_kind: uploadKind,
+        original_name: file.name,
+        content_type: file.type || 'application/octet-stream',
+        size_bytes: file.size,
+        display_order: displayOrder,
+        slot_type: extra.slot_type ?? null,
+      }),
+    });
+
+    // Step 2: Upload directly to storage (OSS/S3)
+    const uploadRes = await fetch(presign.upload_url, {
+      method: presign.method || 'PUT',
+      headers: presign.headers || {},
+      body: file,
+      credentials: 'omit',
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error(`Direct upload failed: HTTP ${uploadRes.status}`);
+    }
+
+    // Step 3: Complete the upload
+    return apiFetch<{ image_id: string; url: string }>('/uploads/complete', {
+      method: 'POST',
+      body: JSON.stringify({ upload_id: presign.upload_id }),
     });
   },
   deleteImage(sessionId: string, imageId: string) {

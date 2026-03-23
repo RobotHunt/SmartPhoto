@@ -152,6 +152,30 @@ function vitePluginManusDebugCollector(): Plugin {
 
 const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
+// Load proxy target from .env.local / .env.development
+// We parse these files manually because Vite's env loading hasn't happened yet at config time
+function loadEnvVar(varName: string): string | undefined {
+  const envFiles = ['.env.local', '.env.development', '.env'];
+  for (const file of envFiles) {
+    const filePath = path.resolve(import.meta.dirname, file);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('#') || !trimmed) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx === -1) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        const val = trimmed.slice(eqIdx + 1).trim();
+        if (key === varName) return val;
+      }
+    }
+  }
+  return process.env[varName];
+}
+
+const proxyTarget = loadEnvVar('VITE_LOCAL_PROXY_TARGET');
+
 export default defineConfig({
   plugins,
   resolve: {
@@ -169,18 +193,21 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    port: 8000,
     host: true,
     allowedHosts: "all",
     fs: {
       strict: true,
       deny: ["**/.*"],
     },
-    proxy: {
-      '/api/v2': {
-        target: 'https://smartphoto.ins.chat',
-        changeOrigin: true,
-        secure: true,
-      },
-    },
+    proxy: proxyTarget
+      ? {
+          '/api/v2': {
+            target: proxyTarget,
+            changeOrigin: true,
+            secure: false,
+          },
+        }
+      : undefined,
   },
 });
