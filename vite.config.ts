@@ -200,14 +200,23 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
-    proxy: proxyTarget
-      ? {
-          '/api/v2': {
-            target: proxyTarget,
-            changeOrigin: true,
-            secure: false,
-          },
-        }
-      : undefined,
+    proxy: {
+      ...(proxyTarget
+        ? {
+            '/api/v2': {
+              target: proxyTarget,
+              changeOrigin: true,
+              secure: false,
+            },
+          }
+        : {}),
+      // Proxy COS uploads through Vite dev server to avoid COS CORS issues
+      '/__cos_proxy__': {
+        target: 'https://smartphoto-1328781951.cos.ap-beijing.myqcloud.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p: string) => p.replace(/^\/__cos_proxy__/, ''),
+      },
+    },
   },
 });

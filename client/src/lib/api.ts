@@ -165,23 +165,38 @@ export const sessionAPI = {
       }),
     });
 
-    // Step 2: Upload directly to storage (OSS/S3)
-    const uploadRes = await fetch(presign.upload_url, {
+    // Step 2: Upload to COS via our Vite proxy to avoid CORS issues
+    // Rewrite: https://xxx.cos.ap-beijing.myqcloud.com/path -> /cos-proxy/path
+    const cosUrl = new URL(presign.upload_url);
+    const proxiedUrl = `/__cos_proxy__${cosUrl.pathname}${cosUrl.search}`;
+
+    const uploadRes = await fetch(proxiedUrl, {
       method: presign.method || 'PUT',
-      headers: presign.headers || {},
+      headers: {
+        ...(presign.headers || {}),
+        'Content-Type': file.type || 'application/octet-stream',
+      },
       body: file,
-      credentials: 'omit',
     });
 
     if (!uploadRes.ok) {
-      throw new Error(`Direct upload failed: HTTP ${uploadRes.status}`);
+      throw new Error(`Upload failed: HTTP ${uploadRes.status}`);
     }
 
     // Step 3: Complete the upload
-    return apiFetch<{ image_id: string; url: string }>('/uploads/complete', {
+    // Backend returns: { upload_id, session_id, upload_kind, object_key, completed, resource_id, resource: { resource_id, display_order, url, slot_type } }
+    // Map to the { image_id, url } format expected by UploadStep
+    const completeRes = await apiFetch<{
+      resource_id: string;
+      resource: { resource_id: string; display_order: number; url: string; slot_type?: string };
+    }>('/uploads/complete', {
       method: 'POST',
       body: JSON.stringify({ upload_id: presign.upload_id }),
     });
+    return {
+      image_id: completeRes.resource_id,
+      url: completeRes.resource?.url || '',
+    };
   },
   deleteImage(sessionId: string, imageId: string) {
     return apiFetch(`/sessions/${sessionId}/images/${imageId}`, { method: 'DELETE' });
