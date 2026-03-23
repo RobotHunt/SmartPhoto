@@ -32,6 +32,7 @@ const appState = {
   sessionId: null,            // current backend session ID
   currentJobId: null,         // current generation job ID
   backendMode: true,          // whether to use backend APIs
+  _pendingUploads: {},        // slot index -> upload Promise
   _backendKeyParameters: [],  // structured params from backend copy
   _backendProductAdvantages: [], // product advantages from backend copy
   _resultVersions: [],        // available result versions from backend
@@ -65,6 +66,7 @@ function resetUploadState() {
   appState.fsSlotFiles = {};
   appState.fsSlotPreviews = {};
   appState.fsSlotImageIds = {};
+  appState._pendingUploads = {};
   appState.uploadedFiles = [];
   appState.uploadedPreviews = [];
   appState.generatedImages = [];
@@ -542,11 +544,15 @@ function triggerFsUpload(slotIndex) {
       // Upload to backend
       if (appState.backendMode && appState.sessionId) {
         const slotLabels = ['front', 'angle45', 'side', 'extra', 'extra', 'extra'];
-        sessionAPI.uploadImage(appState.sessionId, file, slotLabels[slotIndex] || 'product', slotIndex)
+        const uploadPromise = sessionAPI.uploadImage(appState.sessionId, file, slotLabels[slotIndex] || 'product', slotIndex)
           .then(res => {
             appState.fsSlotImageIds[slotIndex] = res.image_id || res.id;
           })
-          .catch(err => console.warn('Backend upload failed:', err.message));
+          .catch(err => console.warn('Backend upload failed:', err.message))
+          .finally(() => {
+            delete appState._pendingUploads[slotIndex];
+          });
+        appState._pendingUploads[slotIndex] = uploadPromise;
       }
     };
     reader.readAsDataURL(file);
@@ -705,6 +711,12 @@ async function fsRunAnalysis() {
   // Try backend analysis first
   if (appState.backendMode && appState.sessionId) {
     try {
+      // Wait for any pending image uploads to complete before triggering analysis
+      const pending = Object.values(appState._pendingUploads);
+      if (pending.length > 0) {
+        await Promise.allSettled(pending);
+      }
+
       // Trigger analysis job
       const triggerResp = await sessionAPI.triggerAnalysis(appState.sessionId);
       const analysisJobId = triggerResp.job_id;
@@ -715,7 +727,7 @@ async function fsRunAnalysis() {
 
         await jobAPI.pollUntilDone(analysisJobId, (status) => {
           // Keep fake progress running, no text updates here
-        }, 3000, 120000);
+        }, 3000, 300000);
       }
 
       // Fetch analysis result from session
