@@ -13,10 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 // ───── Type Definitions ─────
 
 interface AccountOverview {
-  total_images: number;
-  monthly_images: number;
-  total_sessions: number;
-  balance: number;
+  total_generated_assets: number;
+  generated_assets_this_month: number;
+  session_count: number;
+  wallet_balance: number;
+  unread_notification_count: number;
 }
 
 interface Notification {
@@ -595,11 +596,16 @@ export default function Account() {
       if (results[0].status === "fulfilled") {
         const data = results[0].value;
         setOverview({
-          total_images: data.total_images ?? data.totalImages ?? 0,
-          monthly_images: data.monthly_images ?? data.monthlyImages ?? 0,
-          total_sessions: data.total_sessions ?? data.totalSessions ?? 0,
-          balance: data.balance ?? 0,
+          total_generated_assets: data.total_generated_assets ?? 0,
+          generated_assets_this_month: data.generated_assets_this_month ?? 0,
+          session_count: data.session_count ?? 0,
+          wallet_balance: data.wallet_balance ?? 0,
+          unread_notification_count: data.unread_notification_count ?? 0,
         });
+        // Use overview's unread_notification_count for the badge
+        if (typeof data.unread_notification_count === "number") {
+          setNotificationCount(data.unread_notification_count);
+        }
       }
 
       // Notification badge count (unread count)
@@ -736,11 +742,11 @@ export default function Account() {
   const stats = [
     {
       label: "已生成图片",
-      value: dataLoading ? "..." : String(overview?.total_images ?? 0),
+      value: dataLoading ? "..." : String(overview?.total_generated_assets ?? 0),
     },
     {
       label: "本月使用",
-      value: dataLoading ? "..." : String(overview?.monthly_images ?? 0),
+      value: dataLoading ? "..." : String(overview?.generated_assets_this_month ?? 0),
     },
   ];
 

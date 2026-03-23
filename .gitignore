@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.manus-logs/
+server/
+drizzle/
+shared/
+patches/
+*.log
+.DS_Store
+Thumbs.db

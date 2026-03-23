@@ -5,6 +5,7 @@ import { Upload, X, LinkIcon, Plus, Pencil, FileText, AlertCircle } from "lucide
 import { StepIndicator } from "@/components/StepIndicator";
 import { Input } from "@/components/ui/input";
 import { sessionAPI } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 // ── Theme presets by product type ──
 
@@ -45,9 +46,9 @@ interface ReferenceItem {
 }
 
 interface ParametersPayload {
-  params: ParamItem[];
-  sellingPoints: TextItem[];
-  advantages: TextItem[];
+  key_parameters: Array<{ key: string; label: string; value: string }>;
+  core_selling_points: string[];
+  product_advantages: string[];
   featureTexts: TextItem[];
   selectedTheme: string;
   productType: string;
@@ -64,6 +65,7 @@ function getSessionId(): string | null {
 
 export default function GenerateStep() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   // Loading & status
   const [isLoading, setIsLoading] = useState(true);
@@ -212,10 +214,14 @@ export default function GenerateStep() {
       sessionStorage.setItem("product_parameters", JSON.stringify(payload));
       return true;
     } catch (err: any) {
-      const msg = err.message || "保存失败，请重试";
-      setSaveError(msg);
-      console.error("Failed to save parameters:", err);
-      return false;
+      console.warn("Save parameters failed (non-blocking):", err.message);
+      // Still allow navigation - save is best-effort
+      toast({
+        title: "参数暂未保存",
+        description: "网络异常，参数将在下次操作时重试",
+        variant: "destructive",
+      });
+      return true;
     } finally {
       setIsSaving(false);
     }
@@ -327,7 +333,7 @@ export default function GenerateStep() {
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mb-4" />
-          <p className="text-slate-500 text-sm">正在加载产品参数...</p>
+          <p className="text-slate-500 text-sm">AI正在分析产品特性...</p>
         </div>
       </div>
     );
@@ -359,8 +365,7 @@ export default function GenerateStep() {
 
         {/* ── Header ── */}
         <div className="mb-3">
-          <h1 className="text-xl font-bold text-slate-900">AI 参数设置</h1>
-          <p className="text-xs text-slate-400 mt-1">上传产品资料自动识别，或手动填写产品参数</p>
+          <h1 className="text-xl font-bold text-slate-900">AI 正在自动生成参数</h1>
         </div>
 
         {/* ── 1. Upload spec to auto-extract ── */}
@@ -890,12 +895,12 @@ export default function GenerateStep() {
         </Button>
 
         <button
-          onClick={() => handleNext("/create/copywriting")}
+          onClick={() => handleNext("/create/confirm")}
           disabled={isSaving}
           className="w-full mt-3 flex items-center justify-center gap-1.5 text-sm text-slate-400 hover:text-blue-600 transition-colors disabled:opacity-50"
         >
           <FileText className="w-4 h-4" />
-          直接生成详情文案
+          跳过文案，直接生成图片
         </button>
       </div>
     </div>
