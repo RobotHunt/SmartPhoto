@@ -4,7 +4,7 @@ import {
   Loader2,
   Zap,
   Edit2,
-  Share2,
+  RefreshCw,
   ChevronRight,
   Monitor,
   Star,
@@ -292,6 +292,44 @@ export default function CopywritingStep() {
     }
   }, [getSessionId, loadAnalysisSnapshot, toast]);
 
+  // ── force regenerate copy (always re-generates, ignores existing) ─────
+
+  const forceRegenerateCopy = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const sessionId = getSessionId();
+
+      await loadAnalysisSnapshot(sessionId);
+
+      const { job_id } = await sessionAPI.regenerateCopy(
+        sessionId,
+        ALL_TARGETS
+      );
+      await jobAPI.pollUntilDone(job_id, undefined, 2000, 120000);
+
+      const result = await sessionAPI.getCopy(sessionId);
+      if (!result || isCopyEmpty(result)) {
+        throw new Error("生成结果为空，请重试");
+      }
+      if (mountedRef.current) {
+        setCopyData(result);
+        toast({ title: "文案已重新生成" });
+      }
+    } catch (err: any) {
+      if (mountedRef.current) {
+        setError(err.message || "重新生成失败");
+        toast({
+          title: "重新生成失败",
+          description: err.message || "未知错误",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
+  }, [getSessionId, loadAnalysisSnapshot, toast]);
+
   useEffect(() => {
     loadOrGenerateCopy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -343,12 +381,20 @@ export default function CopywritingStep() {
       {!loading && error && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
           <p className="text-sm text-slate-500">{error}</p>
-          <Button
-            onClick={loadOrGenerateCopy}
-            className="bg-blue-500 hover:bg-blue-600 text-white"
-          >
-            重新生成
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setLocation("/create/generate")}
+              variant="outline"
+            >
+              返回上一页
+            </Button>
+            <Button
+              onClick={forceRegenerateCopy}
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+            >
+              重新生成
+            </Button>
+          </div>
         </div>
       )}
 
@@ -475,23 +521,13 @@ export default function CopywritingStep() {
             生成全部详情图
           </Button>
 
-          {/* Share2 icon button */}
+          {/* "重新生成" button */}
           <button
-            onClick={() => {
-              if (navigator.share) {
-                navigator
-                  .share({
-                    title: "详情页方案",
-                    text: "查看AI生成的详情页执行方案",
-                  })
-                  .catch(() => {});
-              } else {
-                toast({ title: "链接已复制" });
-              }
-            }}
+            onClick={forceRegenerateCopy}
             className="w-11 h-11 flex items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors flex-shrink-0"
+            title="重新生成文案"
           >
-            <Share2 className="w-5 h-5" />
+            <RefreshCw className="w-5 h-5" />
           </button>
         </div>
       )}

@@ -22,12 +22,15 @@ interface AccountOverview {
 
 interface Notification {
   id: string;
+  notification_id?: string;
+  category?: string;
   title: string;
   content: string;
   created_at: string;
   time?: string;
   read?: boolean;
   is_read?: boolean;
+  payload?: Record<string, any>;
 }
 
 interface Purchase {
@@ -218,15 +221,23 @@ function NotificationsContent({
     setError(null);
     accountAPI
       .getNotifications()
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
+      .then((data: any) => {
+        // Backend returns { items: [...], total, unread_count }
+        const rawList = Array.isArray(data) ? data : (data?.items ?? []);
+        // Map notification_id → id for frontend consistency
+        const list: Notification[] = rawList.map((n: any) => ({
+          ...n,
+          id: n.id || n.notification_id || "",
+          payload: n.payload || {},
+        }));
         setNotifications(list);
-        const unread = list.filter(
-          (n: Notification) => !n.read && !n.is_read
-        ).length;
+        const unread =
+          typeof data?.unread_count === "number"
+            ? data.unread_count
+            : list.filter((n: Notification) => !n.read && !n.is_read).length;
         onCountChange(unread);
       })
-      .catch((err) => setError(err.message || "加载失败"))
+      .catch((err: any) => setError(err.message || "加载失败"))
       .finally(() => setLoading(false));
   }, [onCountChange]);
 
@@ -241,15 +252,17 @@ function NotificationsContent({
   async function handleMarkRead(id: string) {
     setMarkingIds((prev) => new Set(prev).add(id));
     try {
+      // Backend expects notification_id in the URL
       await accountAPI.markNotificationRead(id);
       setNotifications((prev) => {
         const updated = prev.map((n) =>
-          n.id === id ? { ...n, read: true, is_read: true } : n
+          (n.id === id || n.notification_id === id) ? { ...n, read: true, is_read: true } : n
         );
         const unread = updated.filter(isUnread).length;
         onCountChange(unread);
         return updated;
       });
+      toast({ title: "已标记为已读" });
     } catch (err: any) {
       toast({
         title: "操作失败",
@@ -335,9 +348,13 @@ function NotificationsContent({
       <div className="space-y-3">
         {notifications.map((n) => {
           const unread = isUnread(n);
+          const nid = n.id || n.notification_id || "";
+          // Extract credit info from payload if available
+          const creditsDelta = n.payload?.credits_delta ?? n.payload?.charged_credits ?? null;
+          const balanceAfter = n.payload?.balance_after ?? null;
           return (
             <div
-              key={n.id}
+              key={nid}
               className={`bg-white rounded-xl p-4 shadow-sm ${
                 unread ? "border-l-2 border-blue-500" : "opacity-70"
               }`}
@@ -357,11 +374,29 @@ function NotificationsContent({
                     >
                       {n.title}
                     </p>
+                    {n.category && (
+                      <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                        {n.category}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-1 line-clamp-2">
                     {n.content}
                   </p>
-                  <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                  {/* Credit consumption display */}
+                  {creditsDelta !== null && (
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <span className={`text-xs font-medium ${Number(creditsDelta) < 0 ? "text-red-500" : "text-green-600"}`}>
+                        {Number(creditsDelta) < 0 ? "" : "+"}{creditsDelta} 额度
+                      </span>
+                      {balanceAfter !== null && (
+                        <span className="text-xs text-slate-400">
+                          余额: {balanceAfter}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {formatTime(n.created_at || n.time)}
                   </p>
@@ -369,11 +404,11 @@ function NotificationsContent({
 
                 {unread && (
                   <button
-                    onClick={() => handleMarkRead(n.id)}
-                    disabled={markingIds.has(n.id)}
+                    onClick={() => handleMarkRead(nid)}
+                    disabled={markingIds.has(nid)}
                     className="flex-shrink-0 text-xs text-blue-500 hover:text-blue-600 disabled:opacity-50 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
                   >
-                    {markingIds.has(n.id) ? (
+                    {markingIds.has(nid) ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       "标记已读"
@@ -610,17 +645,14 @@ export default function Account() {
 
       // Notification badge count (unread count)
       if (results[1].status === "fulfilled") {
-        const notifications = results[1].value;
-        if (Array.isArray(notifications)) {
-          const unread = notifications.filter(
+        const notifData: any = results[1].value;
+        if (notifData && typeof notifData === "object" && !Array.isArray(notifData) && typeof notifData.unread_count === "number") {
+          setNotificationCount(notifData.unread_count);
+        } else if (Array.isArray(notifData)) {
+          const unread = notifData.filter(
             (n: any) => !n.read && !n.is_read
           ).length;
           setNotificationCount(unread);
-        } else if (
-          typeof notifications === "object" &&
-          notifications !== null
-        ) {
-          setNotificationCount(notifications.unread_count ?? 0);
         }
       }
 

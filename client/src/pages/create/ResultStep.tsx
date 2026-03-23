@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Loader2, RefreshCw, Check, X, Sparkles, RotateCcw, Pencil, Wand2 } from "lucide-react";
+import { Loader2, RefreshCw, Check, X, Sparkles, RotateCcw, Pencil, Wand2, ArrowLeft } from "lucide-react";
 import { StepIndicator } from "@/components/StepIndicator";
 import { useToast } from "@/hooks/use-toast";
 import { sessionAPI, jobAPI, assetAPI } from "@/lib/api";
@@ -127,7 +127,7 @@ export default function ResultStep() {
     [toast],
   );
 
-  // ─── On mount: generate → poll → fetch results ─────────────────────────
+  // ─── On mount: try loading existing results first, only generate if none ──
   useEffect(() => {
     if (!sessionId) {
       toast({
@@ -145,7 +145,36 @@ export default function ResultStep() {
 
     (async () => {
       try {
-        // Fake progress to 40%
+        // ── Step 1: Try to load existing results first ──
+        setStatusText("正在加载生成结果...");
+        try {
+          const existingData = await sessionAPI.getResults(sessionId);
+          const existingAssets: any[] =
+            existingData?.assets ?? existingData?.images ?? existingData?.results ?? (Array.isArray(existingData) ? existingData : []);
+
+          if (existingAssets.length > 0 && !cancelled) {
+            // Results already exist — display them directly, no need to regenerate
+            const mapped: ResultAsset[] = existingAssets.map((item: any, idx: number) => ({
+              asset_id: item.asset_id ?? item.id ?? String(idx + 1),
+              role: item.role ?? item.asset_role ?? "hero",
+              image_url: item.image_url ?? item.url ?? "",
+              display_order: item.display_order ?? idx,
+              slot_id: item.slot_id ?? "",
+              isRegenerating: false,
+            }));
+            setAssets(mapped);
+            setSelected(new Set(mapped.map((a) => a.asset_id)));
+            safeSetProgress(100);
+            setGenerating(false);
+            return; // ← Skip generation entirely
+          }
+        } catch {
+          // No existing results or endpoint error — proceed to generate
+        }
+
+        if (cancelled) return;
+
+        // ── Step 2: No existing results — run generation ──
         let fakeProgress = 0;
         fakeTimer = setInterval(() => {
           if (cancelled) return;
@@ -195,14 +224,16 @@ export default function ResultStep() {
         await loadResults(sessionId);
       } catch (err: any) {
         if (cancelled) return;
-        clearInterval(fakeTimer);
+        clearInterval(fakeTimer!);
         console.error("Generation failed:", err);
+        const msg = err.message || "生成失败，请重试";
+        const isCredits = msg.includes("insufficient") || msg.includes("credits") || msg.includes("余额");
         toast({
-          title: "生成失败",
-          description: err.message || "请重试",
+          title: isCredits ? "额度不足" : "生成失败",
+          description: isCredits ? "账户余额不足，请充值后重试" : msg,
           variant: "destructive",
         });
-        setError(err.message || "生成失败，请重试");
+        setError(isCredits ? "insufficient_credits" : msg);
         setGenerating(false);
       }
     })();
@@ -249,9 +280,11 @@ export default function ResultStep() {
           : "已重新生成",
       });
     } catch (err: any) {
+      const msg = err.message || "请重试";
+      const isCredits = msg.includes("insufficient") || msg.includes("credits") || msg.includes("余额");
       toast({
-        title: "重新生成失败",
-        description: err.message || "请重试",
+        title: isCredits ? "额度不足" : "重新生成失败",
+        description: isCredits ? "账户余额不足，请充值后重试" : msg,
         variant: "destructive",
       });
     } finally {
@@ -368,6 +401,8 @@ export default function ResultStep() {
 
   // ─── Render: error state ───────────────────────────────────────────────
   if (error && assets.length === 0) {
+    const isCreditsError = error === "insufficient_credits";
+
     return (
       <div className="min-h-screen bg-[#f5f6f8]">
         <StepIndicator currentStep={5} step5Label="生成图片" />
@@ -376,14 +411,39 @@ export default function ResultStep() {
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
             <X className="w-10 h-10 text-red-400" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900 mb-2">生成失败</h2>
-          <p className="text-sm text-slate-500 mb-6 text-center max-w-xs">{error}</p>
-          <button
-            onClick={() => setLocation("/create/copywriting")}
-            className="flex items-center gap-2 text-sm text-blue-600 border border-blue-200 rounded-xl px-5 py-2.5 bg-white hover:bg-blue-50 transition"
-          >
-            返回修改方案
-          </button>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">
+            {isCreditsError ? "额度不足" : "生成失败"}
+          </h2>
+          <p className="text-sm text-slate-500 mb-6 text-center max-w-xs">
+            {isCreditsError
+              ? "您的账户余额不足以完成本次生成，请充值后重试。"
+              : error}
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setLocation("/create/confirm")}
+              className="flex items-center gap-2 text-sm text-slate-600 border border-slate-300 rounded-xl px-5 py-2.5 bg-white hover:bg-slate-50 transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              返回上一页
+            </button>
+            {isCreditsError && (
+              <button
+                onClick={() => setLocation("/create/payment")}
+                className="flex items-center gap-2 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-xl px-5 py-2.5 transition"
+              >
+                去充值
+              </button>
+            )}
+            {!isCreditsError && (
+              <button
+                onClick={() => window.location.reload()}
+                className="flex items-center gap-2 text-sm text-blue-600 border border-blue-200 rounded-xl px-5 py-2.5 bg-white hover:bg-blue-50 transition"
+              >
+                重试
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

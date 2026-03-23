@@ -199,12 +199,20 @@ export default function ConfirmStep() {
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
             <p className="text-sm text-red-600 font-medium">{error}</p>
-            <button
-              onClick={handleRetry}
-              className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              重新加载
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setLocation("/create/copywriting")}
+                className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                返回上一页
+              </button>
+              <button
+                onClick={handleRetry}
+                className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                重新加载
+              </button>
+            </div>
           </div>
         )}
 
