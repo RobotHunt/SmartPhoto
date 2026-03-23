@@ -4,13 +4,12 @@
 // ============================================
 
 const API_BASE = '/api/v2';
-const AUTH_BASE = '/api/v1';
 
 /**
  * Core fetch wrapper with JWT auth and response unwrapping
  * Backend returns { code: 0, message: "success", data: {...} }
  */
-async function apiFetch(path, options = {}, base = API_BASE) {
+async function apiFetch(path, options = {}) {
   const token = sessionStorage.getItem('auth_token');
   const headers = {
     ...(options.headers || {}),
@@ -25,7 +24,7 @@ async function apiFetch(path, options = {}, base = API_BASE) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json';
   }
 
-  const res = await fetch(`${base}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
     credentials: 'include', // for refresh_token cookie
@@ -78,26 +77,26 @@ const authAPI = {
     return apiFetch('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, display_name: displayName }),
-    }, AUTH_BASE);
+    });
   },
 
   async login(email, password) {
     return apiFetch('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
-    }, AUTH_BASE);
+    });
   },
 
   async logout() {
-    return apiFetch('/auth/logout', { method: 'POST' }, AUTH_BASE);
+    return apiFetch('/auth/logout', { method: 'POST' });
   },
 
   async me() {
-    return apiFetch('/auth/me', {}, AUTH_BASE);
+    return apiFetch('/auth/me');
   },
 
   async refresh() {
-    return apiFetch('/auth/refresh', { method: 'POST' }, AUTH_BASE);
+    return apiFetch('/auth/refresh', { method: 'POST' });
   },
 };
 
