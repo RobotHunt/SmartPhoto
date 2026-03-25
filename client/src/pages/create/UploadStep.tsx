@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { CloudUpload, X, ChevronLeft } from "lucide-react";
+import { ChevronLeft, CloudUpload, X } from "lucide-react";
+
 import { StepIndicator } from "@/components/StepIndicator";
 import { Button } from "@/components/ui/button";
 import { sessionAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-
-// ---------- types ----------
 
 type SlotType = "front" | "angle45" | "side" | "extra_1" | "extra_2" | "extra_3";
 
@@ -17,18 +16,13 @@ interface SlotDef {
 }
 
 interface SlotState {
-  /** backend image id – set after upload completes */
   imageId: string | null;
-  /** object-URL or backend URL used for the <img> preview */
   previewUrl: string | null;
-  /** true while the upload request is in-flight */
   uploading: boolean;
 }
 
-// ---------- constants ----------
-
 const SESSION_KEY = "current_session_id";
-const SLOT_IDS_KEY = "upload_slot_image_ids"; // persisted map slotType -> imageId
+const SLOT_IDS_KEY = "upload_slot_image_ids";
 const ANALYSIS_DIRTY_KEY = "analysis_dirty";
 const ANALYZE_SUPPLEMENT_KEY = "from_analyze_supplement";
 
@@ -41,9 +35,6 @@ const SLOT_DEFS: SlotDef[] = [
   { slotType: "extra_3", label: "补充图3", displayOrder: 6 },
 ];
 
-// ---------- helpers ----------
-
-/** Load the persisted slotType->imageId map from sessionStorage. */
 function loadPersistedSlotIds(): Record<string, string> {
   try {
     const raw = sessionStorage.getItem(SLOT_IDS_KEY);
@@ -53,7 +44,6 @@ function loadPersistedSlotIds(): Record<string, string> {
   }
 }
 
-/** Persist the slotType->imageId map to sessionStorage. */
 function persistSlotIds(map: Record<string, string>) {
   sessionStorage.setItem(SLOT_IDS_KEY, JSON.stringify(map));
 }
@@ -64,53 +54,43 @@ function markAnalysisDirty() {
   sessionStorage.removeItem("analysisResult");
 }
 
-// ---------- component ----------
-
 export default function UploadStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  // Session id – initialised on mount
-  const [sessionId, setSessionId] = useState<string | null>(
-    () => sessionStorage.getItem(SESSION_KEY),
+  const [sessionId, setSessionId] = useState<string | null>(() =>
+    sessionStorage.getItem(SESSION_KEY),
   );
-
-  // Per-slot upload state
   const [slots, setSlots] = useState<Record<SlotType, SlotState>>(() => {
     const persisted = loadPersistedSlotIds();
-    const initial: Record<string, SlotState> = {};
+    const initial = {} as Record<SlotType, SlotState>;
     for (const def of SLOT_DEFS) {
       initial[def.slotType] = {
         imageId: persisted[def.slotType] ?? null,
-        // If we have a persisted imageId we cannot recover the preview URL
-        // without a network call; we will hydrate previews in an effect below.
         previewUrl: null,
         uploading: false,
       };
     }
-    return initial as Record<SlotType, SlotState>;
+    return initial;
   });
-
-  // Track whether we are navigating away (to disable button)
   const [navigating, setNavigating] = useState(false);
-
-  // ---- hydrate preview URLs for images that were persisted (page refresh) ----
 
   useEffect(() => {
     if (!sessionId) return;
 
     const needsHydration = SLOT_DEFS.some((def) => {
       const slot = slots[def.slotType];
-      return !slot.previewUrl || !slot.imageId;
+      return !!slot.imageId && !slot.previewUrl;
     });
     if (!needsHydration) return;
 
+    let cancelled = false;
     const slotOrder = new Map(SLOT_DEFS.map((def) => [def.displayOrder, def.slotType]));
 
     (async () => {
       try {
         const images = await sessionAPI.listImages(sessionId);
-        if (!images.length) return;
+        if (cancelled || !images.length) return;
 
         setSlots((prev) => {
           const next = { ...prev };
@@ -133,50 +113,45 @@ export default function UploadStep() {
           }
           return next;
         });
-      } catch (err) {
-        console.error("Failed to list images for preview hydration:", err);
+      } catch (error) {
+        console.error("Failed to hydrate uploaded images:", error);
       }
     })();
-  }, [sessionId, slots]);
 
-  // ---- persist slot image ids whenever they change ----
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, slots]);
 
   useEffect(() => {
     const map: Record<string, string> = {};
     for (const def of SLOT_DEFS) {
-      const id = slots[def.slotType].imageId;
-      if (id) map[def.slotType] = id;
+      const imageId = slots[def.slotType].imageId;
+      if (imageId) map[def.slotType] = imageId;
     }
     persistSlotIds(map);
   }, [slots]);
 
-  // ---- file selection & upload ----
-
   const uploadFile = useCallback(
     async (file: File, slotType: SlotType, displayOrder: number) => {
-      // Wait for session if still creating
-      let sid = sessionId;
+      let sid = sessionId || sessionStorage.getItem(SESSION_KEY);
+
       if (!sid) {
-        // Try to read from sessionStorage (may have been set by concurrent creation)
-        sid = sessionStorage.getItem(SESSION_KEY);
-        if (sid) {
-          setSessionId(sid);
-        }
-      }
-      if (!sid) {
-        // Still no session - create one synchronously
         try {
-          const res = await sessionAPI.create();
-          sid = res.session_id;
+          const created = await sessionAPI.create();
+          sid = created.session_id;
           sessionStorage.setItem(SESSION_KEY, sid);
           setSessionId(sid);
-        } catch {
-          toast({ title: "创建会话失败", description: "请刷新页面重试", variant: "destructive" });
+        } catch (error: any) {
+          toast({
+            title: "创建会话失败",
+            description: error?.message || "请刷新页面后重试。",
+            variant: "destructive",
+          });
           return;
         }
       }
 
-      // Immediately show a local preview
       const localPreview = URL.createObjectURL(file);
       setSlots((prev) => ({
         ...prev,
@@ -185,27 +160,26 @@ export default function UploadStep() {
 
       try {
         const backendSlotType = slotType.startsWith("extra") ? "extra" : slotType;
-        const res = await sessionAPI.uploadImage(sid, file, backendSlotType, displayOrder);
+        const uploaded = await sessionAPI.uploadImage(sid, file, backendSlotType, displayOrder);
         markAnalysisDirty();
+
         setSlots((prev) => ({
           ...prev,
           [slotType]: {
-            imageId: res.image_id,
-            previewUrl: res.url || localPreview,
+            imageId: uploaded.image_id,
+            previewUrl: uploaded.url || localPreview,
             uploading: false,
           },
         }));
-      } catch (err: any) {
-        console.error(`Upload failed for slot ${slotType}:`, err);
-        // Revoke the object URL and reset
+      } catch (error: any) {
         URL.revokeObjectURL(localPreview);
         setSlots((prev) => ({
           ...prev,
           [slotType]: { imageId: null, previewUrl: null, uploading: false },
         }));
         toast({
-          title: "\u4e0a\u4f20\u5931\u8d25",
-          description: err.message || "\u8bf7\u7a0d\u540e\u91cd\u8bd5",
+          title: "上传失败",
+          description: error?.message || "请稍后重试。",
           variant: "destructive",
         });
       }
@@ -226,8 +200,8 @@ export default function UploadStep() {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = "image/*";
-      input.onchange = (e) => {
-        const target = e.target as HTMLInputElement;
+      input.onchange = (event) => {
+        const target = event.target as HTMLInputElement;
         handleFileSelect(target.files, slotType, displayOrder);
       };
       input.click();
@@ -235,63 +209,51 @@ export default function UploadStep() {
     [handleFileSelect],
   );
 
-  // ---- remove image ----
-
   const removeImage = useCallback(
     async (slotType: SlotType) => {
-      const imageId = slots[slotType].imageId;
-      const prevPreview = slots[slotType].previewUrl;
+      const current = slots[slotType];
+      if (!current.imageId) return;
 
-      // Optimistically clear the slot
       setSlots((prev) => ({
         ...prev,
         [slotType]: { imageId: null, previewUrl: null, uploading: false },
       }));
 
-      if (sessionId && imageId) {
-        try {
-          await sessionAPI.deleteImage(sessionId, imageId);
+      try {
+        if (sessionId) {
+          await sessionAPI.deleteImage(sessionId, current.imageId);
           markAnalysisDirty();
-        } catch (err) {
-          console.error(`Delete failed for ${slotType}:`, err);
-          // Restore slot on failure
-          setSlots((prev) => ({
-            ...prev,
-            [slotType]: { imageId, previewUrl: prevPreview, uploading: false },
-          }));
-          toast({
-            title: "\u5220\u9664\u5931\u8d25",
-            description: "\u8bf7\u7a0d\u540e\u91cd\u8bd5",
-            variant: "destructive",
-          });
         }
+      } catch (error) {
+        console.error("Delete image failed:", error);
+        setSlots((prev) => ({
+          ...prev,
+          [slotType]: current,
+        }));
+        toast({
+          title: "删除失败",
+          description: "请稍后重试。",
+          variant: "destructive",
+        });
       }
     },
     [sessionId, slots, toast],
   );
 
-  // ---- drag & drop ----
-
   const handleDrop = useCallback(
-    (e: React.DragEvent, slotType: SlotType, displayOrder: number) => {
-      e.preventDefault();
-      handleFileSelect(e.dataTransfer.files, slotType, displayOrder);
+    (event: React.DragEvent, slotType: SlotType, displayOrder: number) => {
+      event.preventDefault();
+      handleFileSelect(event.dataTransfer.files, slotType, displayOrder);
     },
     [handleFileSelect],
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  // ---- navigate to analysis ----
-
   const handleStartAnalysis = useCallback(() => {
-    const hasImage = SLOT_DEFS.some((d) => slots[d.slotType].imageId);
+    const hasImage = SLOT_DEFS.some((def) => !!slots[def.slotType].imageId);
     if (!hasImage) {
       toast({
-        title: "\u8bf7\u5148\u4e0a\u4f20\u56fe\u7247",
-        description: "\u81f3\u5c11\u4e0a\u4f20 1 \u5f20\u56fe\u7247\u624d\u80fd\u5f00\u59cb",
+        title: "请先上传图片",
+        description: "至少上传 1 张图片后才能进入 AI 识别。",
         variant: "destructive",
       });
       return;
@@ -299,33 +261,33 @@ export default function UploadStep() {
 
     setNavigating(true);
     setLocation("/create/analyze");
-  }, [slots, toast, setLocation]);
+  }, [setLocation, slots, toast]);
 
-  // ---- derived state ----
-
-  const hasAnyImage = SLOT_DEFS.some((d) => slots[d.slotType].imageId);
-  const anyUploading = SLOT_DEFS.some((d) => slots[d.slotType].uploading);
-
-  // ---- render ----
+  const hasAnyImage = useMemo(
+    () => SLOT_DEFS.some((def) => !!slots[def.slotType].imageId),
+    [slots],
+  );
+  const anyUploading = useMemo(
+    () => SLOT_DEFS.some((def) => slots[def.slotType].uploading),
+    [slots],
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       <StepIndicator currentStep={1} />
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
-        {/* 标题区域 */}
-        <div className="text-center mb-8">
-          <h1 className="text-xl md:text-4xl font-bold text-slate-900 leading-snug">
-            上传产品图片，AI助力一键生图
+
+      <div className="mx-auto max-w-5xl px-4 py-12">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
+            上传产品图片，AI 助力一键生图
           </h1>
-          <p className="mt-4 text-xs text-slate-400 whitespace-nowrap">
-            ✨ 温馨提示：上传素材越多，生成越精准；手机实拍即可
+          <p className="mt-4 text-sm text-slate-400 md:text-base">
+            温馨提示：素材越丰富，结果越稳定；手机实拍图即可直接开始。
           </p>
         </div>
 
-        {/* 主卡片区域 */}
-        <div className="bg-white rounded-3xl shadow-lg p-8 md:p-12">
-          {/* 上传框网格 */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="rounded-[32px] bg-white p-8 shadow-lg shadow-slate-100 md:p-10">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {SLOT_DEFS.map((def) => {
               const slot = slots[def.slotType];
               const hasPreview = !!slot.previewUrl;
@@ -333,43 +295,41 @@ export default function UploadStep() {
               return (
                 <div key={def.slotType} className="relative">
                   {hasPreview ? (
-                    /* 显示图片预览 */
-                    <div className="relative group aspect-square">
-                      <div className="w-full h-full rounded-xl overflow-hidden bg-slate-100 border-2 border-slate-200">
+                    <div className="relative aspect-square">
+                      <div className="h-full w-full overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-100">
                         <img
                           src={slot.previewUrl!}
                           alt={def.label}
-                          className="w-full h-full object-cover"
+                          className="h-full w-full object-cover"
                         />
                         {slot.uploading && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/80 border-t-transparent" />
                           </div>
                         )}
                       </div>
-                      {/* 删除按钮 */}
+
                       <button
                         onClick={() => removeImage(def.slotType)}
                         disabled={slot.uploading}
-                        className="absolute -top-2 -right-2 w-7 h-7 bg-slate-800 text-white rounded-full flex items-center justify-center hover:bg-slate-900 transition-colors z-10 shadow-lg disabled:opacity-50"
+                        className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg transition hover:bg-slate-900 disabled:opacity-50"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="h-4 w-4" />
                       </button>
-                      {/* 标签 */}
-                      <div className="absolute bottom-2 left-2 right-2 bg-black/60 text-white text-xs py-1 px-2 rounded text-center">
+
+                      <div className="absolute bottom-2 left-2 right-2 rounded-lg bg-black/60 px-2 py-1 text-center text-xs text-white">
                         {def.label}
                       </div>
                     </div>
                   ) : (
-                    /* 显示上传占位框 */
                     <div
                       onClick={() => triggerFileInput(def.slotType, def.displayOrder)}
-                      onDrop={(e) => handleDrop(e, def.slotType, def.displayOrder)}
-                      onDragOver={handleDragOver}
-                      className="aspect-square rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-slate-50 flex flex-col items-center justify-center cursor-pointer transition-all"
+                      onDrop={(event) => handleDrop(event, def.slotType, def.displayOrder)}
+                      onDragOver={(event) => event.preventDefault()}
+                      className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 text-slate-500 transition hover:border-blue-400 hover:bg-slate-50"
                     >
-                      <CloudUpload className="w-12 h-12 text-slate-400 mb-2" strokeWidth={1.5} />
-                      <div className="text-sm text-slate-700 font-medium px-2 text-center">
+                      <CloudUpload className="mb-3 h-12 w-12 text-slate-400" strokeWidth={1.5} />
+                      <div className="px-2 text-center text-sm font-medium text-slate-700">
                         {def.label}
                       </div>
                     </div>
@@ -379,51 +339,25 @@ export default function UploadStep() {
             })}
           </div>
 
-          {/* 格式提示 */}
-          <div className="text-center text-sm text-slate-500 mb-8 whitespace-nowrap">
-            支持 JPG / PNG，至少上传1张图片即可开始
+          <div className="mt-8 text-center text-sm text-slate-500">
+            支持 JPG / PNG，至少上传 1 张图片即可开始
           </div>
 
           <Button
             onClick={handleStartAnalysis}
             size="lg"
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white text-lg py-6 rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!hasAnyImage || anyUploading || navigating}
+            className="mt-8 h-14 w-full rounded-2xl bg-blue-500 text-base font-semibold text-white shadow-lg shadow-blue-100 hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {anyUploading ? "上传中..." : navigating ? "跳转中..." : "开始AI生图"}
+            {anyUploading ? "图片上传中..." : navigating ? "正在进入识别..." : "开始 AI 识别"}
           </Button>
 
-          {/* 返回主页 */}
           <button
-            onClick={() => {
-              const keys = [
-                SLOT_IDS_KEY,
-                "uploadedImageUrls",
-                "uploadedCount",
-                "uploadedImages",
-                "selectedProductType",
-                "selectedPlatform",
-                "selectedTheme",
-                "analysisResult",
-                "analysis_snapshot_full",
-                ANALYSIS_DIRTY_KEY,
-                ANALYZE_SUPPLEMENT_KEY,
-                "productParams",
-                "copywritings",
-                "selectedImgCount",
-                "selectedPlans",
-                "paymentSuccess",
-                "generatedImages",
-                "hdImages",
-                SESSION_KEY,
-              ];
-              keys.forEach((k) => sessionStorage.removeItem(k));
-              setLocation("/");
-            }}
-            className="mt-3 w-full flex items-center justify-center gap-1 text-slate-400 hover:text-slate-600 text-sm transition-colors"
+            onClick={() => setLocation("/")}
+            className="mt-4 flex w-full items-center justify-center gap-1 text-sm text-slate-400 transition hover:text-slate-600"
           >
-            <ChevronLeft className="w-4 h-4" />
-            返回主页
+            <ChevronLeft className="h-4 w-4" />
+            返回首页
           </button>
         </div>
       </div>

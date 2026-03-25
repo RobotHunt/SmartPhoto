@@ -49,7 +49,7 @@ export default function LoginPage() {
     } catch (err: any) {
       toast({
         title: "登录失败",
-        description: err?.message || "请检查邮箱和密码后重试",
+        description: err?.message || "请检查邮箱和密码后重试。",
         variant: "destructive",
       });
     } finally {
@@ -79,7 +79,7 @@ export default function LoginPage() {
     } catch (err: any) {
       toast({
         title: "注册失败",
-        description: err?.message || "请稍后重试",
+        description: err?.message || "请稍后重试。",
         variant: "destructive",
       });
     } finally {
@@ -97,7 +97,7 @@ export default function LoginPage() {
             </div>
             <div>
               <p className="text-lg font-bold text-slate-900">AI 电商做图</p>
-              <p className="text-xs text-slate-400">登录后可继续当前页面流程</p>
+              <p className="text-xs text-slate-400">登录后可返回刚才的页面继续操作</p>
             </div>
           </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+
 import { StepIndicator } from "@/components/StepIndicator";
 import { accountAPI, pricingAPI, sessionAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -33,10 +34,10 @@ const PERKS = [
   "可继续进入详情图流程",
 ];
 
-function resolveSelectedIds(raw: string | null) {
+function resolveSelectedIds(raw: string | null): string[] {
   try {
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
   } catch {
     return [];
   }
@@ -56,25 +57,20 @@ export default function PaymentStep() {
 
   const sessionId = sessionStorage.getItem("current_session_id") || "";
   const currentVersion = Number(sessionStorage.getItem("current_result_version") || "0");
-  const selectedAssetIdsRaw = sessionStorage.getItem("selected_asset_ids");
   const selectedAssetIds = useMemo(
-    () => resolveSelectedIds(selectedAssetIdsRaw),
-    [selectedAssetIdsRaw],
+    () => resolveSelectedIds(sessionStorage.getItem("selected_asset_ids")),
+    [],
   );
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadPageData = async () => {
+    async function loadPageData() {
       if (authLoading) return;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
       if (!sessionId) {
         toast({
           title: "缺少会话",
-          description: "请先返回生成结果页选择图片",
+          description: "请先返回结果页选择图片。",
           variant: "destructive",
         });
         setLocation("/create/result");
@@ -84,8 +80,8 @@ export default function PaymentStep() {
       setLoading(true);
       try {
         const [walletData, pricingRules, results] = await Promise.all([
-          accountAPI.getWallet().catch(() => null),
-          pricingAPI.getRules().catch(() => []),
+          user ? accountAPI.getWallet().catch(() => null) : Promise.resolve(null),
+          user ? pricingAPI.getRules().catch(() => []) : Promise.resolve([]),
           sessionAPI.getResults(sessionId, currentVersion || undefined),
         ]);
 
@@ -94,10 +90,11 @@ export default function PaymentStep() {
         setWallet(walletData);
 
         const rules = Array.isArray(pricingRules) ? pricingRules : [];
-        const hdRule = rules.find((rule: PricingRule) =>
-          ["generate_gallery", "generate_hd", "unlock_hd"].includes(rule.action || "") ||
-          ["generate_gallery", "hd_generation", "unlock_hd"].includes(rule.type || "") ||
-          /高清|无水印|主图/.test(rule.name || ""),
+        const hdRule = rules.find(
+          (rule: PricingRule) =>
+            ["generate_gallery", "generate_hd", "unlock_hd"].includes(rule.action || "") ||
+            ["generate_gallery", "hd_generation", "unlock_hd"].includes(rule.type || "") ||
+            /高清|无水印|主图/.test(rule.name || ""),
         );
 
         if (hdRule) {
@@ -124,35 +121,33 @@ export default function PaymentStep() {
             role: asset.role,
           })),
         );
-      } catch (err: any) {
+      } catch (error: any) {
         if (!cancelled) {
           toast({
             title: "支付页加载失败",
-            description: err.message || "请返回结果页后重试",
+            description: error?.message || "请稍后重试。",
             variant: "destructive",
           });
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
-    };
+    }
 
     loadPageData();
     return () => {
       cancelled = true;
     };
-  }, [authLoading, currentVersion, selectedAssetIdsRaw, sessionId, setLocation, toast, user]);
+  }, [authLoading, currentVersion, selectedAssetIds, sessionId, setLocation, toast, user]);
 
   const selectedCount = previewAssets.length;
   const previewImages = previewAssets.slice(0, 3);
   const remaining = Math.max(0, selectedCount - 3);
   const balance = wallet?.credits ?? wallet?.balance ?? 0;
   const sufficient = balance >= cost;
-  const priceText = useMemo(() => `￥${cost}`, [cost]);
-  const originalPriceText = useMemo(() => `￥${originalPrice}`, [originalPrice]);
 
   const handlePay = async () => {
-    if (selectedCount === 0) return;
+    if (selectedCount === 0 || paying) return;
 
     setPaying(true);
     try {
@@ -161,10 +156,10 @@ export default function PaymentStep() {
       sessionStorage.setItem("selectedImgCount", String(selectedCount));
 
       toast({
-        title: sufficient ? "支付成功" : "已进入高清测试流程",
+        title: sufficient ? "已进入高清结果页" : "已进入联调高清流程",
         description: sufficient
-          ? "正在进入高清无水印结果页"
-          : "当前主图高清仍为前端模拟流程，已直接进入高清结果页",
+          ? "当前按已接入逻辑继续进入高清无水印结果页。"
+          : "当前余额不足时，仍按联调阶段逻辑继续验证高清流程。",
       });
 
       setLocation("/create/hd-result");
@@ -180,34 +175,6 @@ export default function PaymentStep() {
         <div className="flex min-h-[60vh] flex-col items-center justify-center">
           <Loader2 className="mb-3 h-8 w-8 animate-spin text-blue-500" />
           <span className="text-sm text-slate-500">正在加载支付信息...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!authLoading && !user) {
-    return (
-      <div className="min-h-screen bg-white">
-        <StepIndicator currentStep={5} step5Label="确认支付" />
-        <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-          <div className="mb-3 text-lg font-bold text-slate-900">请先登录后继续支付</div>
-          <p className="mb-6 max-w-sm text-sm text-slate-500">
-            当前前端已将登录门禁后移到高清支付前。登录成功后会回到结果页，你可以继续点击“生成无水印高清图”进入支付。
-          </p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setLocation("/create/result")}
-              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
-            >
-              返回结果页
-            </button>
-            <button
-              onClick={() => setLocation(`/login?redirect=${encodeURIComponent("/create/result")}`)}
-              className="rounded-xl bg-blue-500 px-5 py-2.5 text-sm text-white transition hover:bg-blue-600"
-            >
-              登录 / 注册
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -257,14 +224,12 @@ export default function PaymentStep() {
           )}
         </div>
 
-        <div className="mb-5 flex items-center justify-between">
-          <span className="text-sm font-semibold text-slate-800">天猫主图 · AI生成</span>
-        </div>
+        <div className="mb-4 text-sm font-semibold text-slate-800">主图高清版 · AI 生成</div>
 
         <div className="mb-5 flex items-center gap-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-sm text-slate-400 line-through">{originalPriceText}</span>
-            <span className="text-4xl font-black tracking-tight text-slate-900">{priceText}</span>
+            <span className="text-sm text-slate-400 line-through">¥{originalPrice}</span>
+            <span className="text-4xl font-black tracking-tight text-slate-900">¥{cost}</span>
           </div>
           <div className="rounded-lg bg-orange-500 px-2.5 py-1.5 text-center leading-snug text-white">
             <div className="text-[11px] font-semibold">高清解锁</div>
@@ -275,56 +240,42 @@ export default function PaymentStep() {
         <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <div className="mb-1 text-sm font-semibold text-slate-800">钱包额度</div>
           <div className="text-2xl font-bold text-slate-900">{balance}</div>
-          {!sufficient && (
+          {!user && (
+            <p className="mt-2 text-xs text-slate-500">
+              当前未登录，本页仍按当前联调逻辑继续验证高清流程，不阻断页面跳转。
+            </p>
+          )}
+          {user && !sufficient && (
             <p className="mt-2 text-xs text-red-500">
-              当前余额不足，但这一轮仍按前端假流程放行，方便继续联调页面。
+              当前账户额度不足，但这一轮仍按联调阶段逻辑继续放行，便于验证结果页流程。
             </p>
           )}
           <p className="mt-2 text-xs text-slate-500">
-            当前主图高清无水印仍是前端模拟流程，后续会替换成真实后端订单与交付能力。
+            当前主图高清无水印仍按现阶段联调逻辑处理，后续再接入真实支付与高清解锁接口。
           </p>
         </div>
 
         <button
           onClick={handlePay}
-          disabled={paying || selectedCount === 0}
-          className="mb-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-400 to-emerald-500 py-4 text-base font-bold text-white transition active:scale-95 disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-400"
-          style={{ boxShadow: "0 8px 24px rgba(20,184,166,0.35)" }}
+          disabled={selectedCount === 0 || paying}
+          className="mb-5 flex h-16 w-full items-center justify-center gap-2 rounded-[24px] bg-gradient-to-r from-blue-500 to-emerald-500 text-xl font-bold text-white shadow-[0_16px_40px_rgba(59,130,246,0.25)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {paying ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>支付中...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-5 w-5" />
-              <span>立即生成高清图 {priceText}</span>
-            </>
-          )}
+          {paying ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+          立即生成高清图 ¥{cost}
         </button>
 
-        <div className="space-y-3">
+        <ul className="space-y-4">
           {PERKS.map((perk) => (
-            <div key={perk} className="flex items-center gap-2.5">
-              <span className="shrink-0 text-base font-bold text-blue-500">✓</span>
-              <span className="text-sm text-slate-700">{perk}</span>
-            </div>
+            <li key={perk} className="flex items-center gap-3 text-lg text-slate-700">
+              <CheckCircle2 className="h-5 w-5 text-blue-500" />
+              <span>{perk}</span>
+            </li>
           ))}
-        </div>
-      </div>
+        </ul>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
-        <p className="text-center text-[10px] text-slate-400">
-          支付即代表同意
-          <Link href="/terms" className="mx-0.5 text-blue-500 hover:text-blue-600 hover:underline">
-            《用户协议》
-          </Link>
-          和
-          <Link href="/privacy" className="mx-0.5 text-blue-500 hover:text-blue-600 hover:underline">
-            《隐私政策》
-          </Link>
-        </p>
+        <div className="mt-10 text-center text-xs text-slate-400">
+          支付即代表同意《用户协议》和《隐私政策》
+        </div>
       </div>
     </div>
   );

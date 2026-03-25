@@ -74,6 +74,11 @@ export interface SessionSnapshot {
   latest_result_version: number;
   detail_generation_round: number;
   detail_latest_result_version: number;
+  auth_mode?: 'guest' | 'user' | string;
+  guest_quota_remaining?: number | null;
+  login_required_actions?: string[];
+  can_download?: boolean;
+  can_continue_editing?: boolean;
 }
 
 export interface VersionSummary {
@@ -173,6 +178,16 @@ function normalizeSessionSnapshot(data: any): SessionSnapshot {
     latest_result_version: Number(data?.latest_result_version || 0),
     detail_generation_round: Number(data?.detail_generation_round || 0),
     detail_latest_result_version: Number(data?.detail_latest_result_version || 0),
+    auth_mode: data?.auth_mode ?? undefined,
+    guest_quota_remaining:
+      typeof data?.guest_quota_remaining === 'number' ? data.guest_quota_remaining : null,
+    login_required_actions: asArray<string>(data?.login_required_actions),
+    can_download:
+      typeof data?.can_download === 'boolean' ? data.can_download : undefined,
+    can_continue_editing:
+      typeof data?.can_continue_editing === 'boolean'
+        ? data.can_continue_editing
+        : undefined,
   };
 }
 
@@ -507,7 +522,8 @@ export const sessionAPI = {
     const token = sessionStorage.getItem('auth_token');
     const qs = version ? `?version=${version}` : '';
     const res = await fetch(`${API_BASE}/sessions/${sessionId}/download${qs}`, {
-      headers: { 'Authorization': `Bearer ${token || ''}` },
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      credentials: 'include',
     });
     if (!res.ok) throw new Error('Download failed');
     return res.blob();
@@ -535,10 +551,16 @@ export const sessionAPI = {
     const token = sessionStorage.getItem('auth_token');
     const qs = version ? `?version=${version}` : '';
     const res = await fetch(`${API_BASE}/sessions/${sessionId}/detail-pages/download${qs}`, {
-      headers: { 'Authorization': `Bearer ${token || ''}` },
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      credentials: 'include',
     });
     if (!res.ok) throw new Error('Detail download failed');
     return res.blob();
+  },
+  claimGuestSession(sessionId: string) {
+    return apiFetch<any>(`/guest/sessions/${sessionId}/claim`, {
+      method: 'POST',
+    }).then(normalizeSessionSnapshot);
   },
 
   // Global edit
