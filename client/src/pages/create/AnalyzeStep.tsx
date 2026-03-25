@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { CheckCircle2, Cpu, Pencil, Check, X } from "lucide-react";
+import { Check, CheckCircle2, Cpu, Pencil, X } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
 import {
@@ -10,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { sessionAPI, jobAPI } from "@/lib/api";
+import { jobAPI, sessionAPI } from "@/lib/api";
 
 interface AnalysisResult {
   product_name: string;
@@ -21,12 +22,26 @@ interface AnalysisResult {
 }
 
 const PRODUCT_CATEGORIES = [
-  "空气净化器", "加湿器", "除湿机", "厨房小家电", "服装",
-  "电子产品", "家居用品", "美妆护肤", "食品饮料", "运动户外",
-  "母婴用品", "图书文具", "其它",
+  "空气净化器",
+  "加湿器",
+  "除湿机",
+  "厨房小家电",
+  "服装",
+  "电子产品",
+  "家居用品",
+  "美妆护肤",
+  "食品饮料",
+  "运动户外",
+  "母婴用品",
+  "图书文具",
+  "其他",
 ];
 
-const getMockCandidates = (category: string) => {
+const RECOGNITION_STEPS = ["产品类别识别", "产品结构识别", "应用场景识别"];
+const ANALYSIS_DIRTY_KEY = "analysis_dirty";
+const ANALYZE_SUPPLEMENT_KEY = "from_analyze_supplement";
+
+function getMockCandidates(category: string) {
   if (category === "空气净化器") {
     return [
       { type: "空气净化器", confidence: 98 },
@@ -34,132 +49,151 @@ const getMockCandidates = (category: string) => {
       { type: "定制家居", confidence: 8 },
     ];
   }
-  return [{ type: category, confidence: 98 }];
-};
 
-const getMockSceneTags = (category: string) => {
+  return [{ type: category || "其他", confidence: 98 }];
+}
+
+function getMockSceneTags(category: string) {
   if (category === "空气净化器") return ["家居场景", "白底产品"];
+  if (category === "服装") return ["模特展示", "细节特写"];
+  if (category === "美妆护肤") return ["清爽场景", "成分表达"];
   return [];
-};
+}
 
-const RECOGNITION_STEPS = ["产品类别识别", "产品结构识别", "应用场景识别"];
+function parseAnalysisSnapshot(snapshot: any): AnalysisResult {
+  const recognized = snapshot?.recognized_product || {};
+  const rawVisualFeatures =
+    snapshot?.suggested_styles || snapshot?.visual_features || [];
+
+  return {
+    product_name: recognized.product_name || snapshot?.product_name || "产品",
+    product_type: recognized.image_type || snapshot?.product_type || "实物图",
+    category: recognized.category || snapshot?.category || "其他",
+    visual_features: Array.isArray(rawVisualFeatures)
+      ? rawVisualFeatures
+      : String(rawVisualFeatures)
+          .split(/[,\uFF0C\u3001\n]/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+    suggestions: Array.isArray(snapshot?.suggestions) ? snapshot.suggestions : [],
+  };
+}
 
 export default function AnalyzeStep() {
   const [, setLocation] = useLocation();
   const [analyzing, setAnalyzing] = useState(true);
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [candidates, setCandidates] = useState<Array<{ type: string; confidence: number }>>([]);
   const [firstImageUrl, setFirstImageUrl] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  // Monotonic progress ref
-  const progressRef = useRef(0);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    // Load first image preview
-    const previewsStr = sessionStorage.getItem("uploadSlotPreviews");
-    if (previewsStr) {
-      try {
-        const previews = JSON.parse(previewsStr);
-        if (Array.isArray(previews) && previews.length > 0) {
-          setFirstImageUrl(previews[0].preview || null);
-        }
-      } catch {
-        // ignore
-      }
-    }
-
     let cancelled = false;
-    let fakeTimer: ReturnType<typeof setInterval>;
+
+    const loadFirstImage = async (sessionId: string) => {
+      const previewsStr = sessionStorage.getItem("uploadSlotPreviews");
+      if (previewsStr) {
+        try {
+          const previews = JSON.parse(previewsStr);
+          if (Array.isArray(previews) && previews.length > 0) {
+            setFirstImageUrl(previews[0].preview || null);
+            return;
+          }
+        } catch {
+          // ignore local cache parse errors
+        }
+      }
+
+      const images = await sessionAPI.listImages(sessionId).catch(() => []);
+      if (!cancelled && images.length > 0) {
+        setFirstImageUrl(images[0].url);
+      }
+    };
+
+    const applySnapshot = (snapshot: any) => {
+      const parsed = parseAnalysisSnapshot(snapshot);
+      const nextCandidates = getMockCandidates(parsed.category || parsed.product_name);
+
+      sessionStorage.setItem("analysis_snapshot_full", JSON.stringify(snapshot));
+      sessionStorage.setItem("analysisResult", JSON.stringify(parsed));
+      sessionStorage.removeItem(ANALYSIS_DIRTY_KEY);
+      sessionStorage.removeItem(ANALYZE_SUPPLEMENT_KEY);
+
+      setCandidates(nextCandidates);
+      setResult(parsed);
+      setSelectedCategory(parsed.category || parsed.product_name);
+      setEditedName(parsed.product_name);
+      setError(null);
+      setAnalyzing(false);
+    };
 
     const runAnalysis = async () => {
       const sessionId = sessionStorage.getItem("current_session_id");
       if (!sessionId) {
-        setError("未找到会话ID，请返回重新上传图片。");
+        setError("未找到会话，请返回上传页面重新开始。");
         setAnalyzing(false);
         return;
       }
 
+      await loadFirstImage(sessionId);
+
       try {
-        // Start fake progress
-        fakeTimer = setInterval(() => {
-          if (cancelled) return;
-          progressRef.current = Math.min(progressRef.current + Math.random() * 5 + 1, 65);
+        const forceReanalyze = sessionStorage.getItem(ANALYSIS_DIRTY_KEY) === "1";
+        const snapshot = await sessionAPI.get(sessionId).catch(() => null);
+
+        if (
+          !forceReanalyze &&
+          snapshot?.analysis_snapshot &&
+          [
+            "analyzed",
+            "platform_selected",
+            "copy_ready",
+            "strategy_ready",
+            "generating",
+            "completed",
+            "failed",
+          ].includes(snapshot.status)
+        ) {
+          if (!cancelled) applySnapshot(snapshot.analysis_snapshot);
+          return;
+        }
+
+        progressTimerRef.current = setInterval(() => {
+          if (cancelled || !progressTimerRef.current) return;
         }, 300);
 
-        // Trigger analysis
         const triggerResp = await sessionAPI.triggerAnalysis(sessionId);
-        const jobId = triggerResp.job_id || (triggerResp as any).jobId;
         if (cancelled) return;
 
-        // Poll until done
-        await jobAPI.pollUntilDone(jobId, (status) => {
-          if (cancelled) return;
-          const pct = status.progress_pct ?? status.progress ?? null;
-          if (pct !== null && typeof pct === "number") {
-            progressRef.current = Math.max(progressRef.current, 68 + pct * 0.24);
-          }
-        });
-
+        await jobAPI.pollUntilDone(triggerResp.job_id);
         if (cancelled) return;
-        clearInterval(fakeTimer);
 
-        // Fetch the analysis snapshot
         const analysisResp = await sessionAPI.getAnalysis(sessionId);
         if (cancelled) return;
 
-        const snap = analysisResp?.analysis_snapshot || analysisResp || {};
-        const rp = snap.recognized_product || {};
-        const copyDraft = snap.copy_draft || {};
-
-        const parsed: AnalysisResult = {
-          product_name: rp.product_name || snap.product_name || "未识别产品",
-          product_type: rp.image_type || snap.product_type || "实物图",
-          category: rp.category || snap.category || "",
-          visual_features: snap.suggested_styles || snap.visual_features || [],
-          suggestions: snap.suggestions || [],
-        };
-
-        if (typeof parsed.visual_features === "string") {
-          parsed.visual_features = (parsed.visual_features as unknown as string)
-            .split(/[,，;；]/)
-            .map((s: string) => s.trim())
-            .filter(Boolean);
-        }
-
-        // Save full snapshot for downstream steps
-        sessionStorage.setItem("analysis_snapshot_full", JSON.stringify(snap));
-
-        const mockCandidates = getMockCandidates(parsed.category || parsed.product_name);
-        setCandidates(mockCandidates);
-        setResult(parsed);
-        setSelectedCategory(parsed.category || parsed.product_name);
-        setEditedName(parsed.product_name);
-        setAnalyzing(false);
-
-        sessionStorage.setItem("analysisResult", JSON.stringify(parsed));
-      } catch (err: any) {
+        const snapshotData = analysisResp?.analysis_snapshot || analysisResp || {};
+        applySnapshot(snapshotData);
+      } catch (err) {
         if (cancelled) return;
-        console.error("Analysis error:", err);
-        // Fallback
-        const fallback: AnalysisResult = {
-          product_name: "产品",
-          product_type: "实物图",
-          category: "其它",
-          visual_features: [],
-          suggestions: ["正面展示", "背面结构"],
-        };
-        setCandidates([{ type: "其它", confidence: 70 }]);
-        setResult(fallback);
-        setSelectedCategory("其它");
-        setEditedName("产品");
+        const nextError =
+          err instanceof Error && err.message
+            ? err.message
+            : "AI 识别失败，请返回上传页重试。";
+        setCandidates([]);
+        setResult(null);
+        setSelectedCategory("");
+        setEditedName("");
+        setError(nextError);
         setAnalyzing(false);
-        sessionStorage.setItem("analysisResult", JSON.stringify(fallback));
       } finally {
-        clearInterval(fakeTimer);
+        if (progressTimerRef.current) {
+          clearInterval(progressTimerRef.current);
+          progressTimerRef.current = null;
+        }
       }
     };
 
@@ -167,65 +201,85 @@ export default function AnalyzeStep() {
 
     return () => {
       cancelled = true;
-      clearInterval(fakeTimer);
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
     };
   }, []);
 
-  const handleStartGeneration = () => {
-    if (!selectedCategory) return;
+  const commitEditedName = () => {
+    if (!result) return;
+    const nextName = editedName.trim() || result.product_name;
+    setEditedName(nextName);
+    setResult((prev) => (prev ? { ...prev, product_name: nextName } : prev));
+    setEditingName(false);
+  };
+
+  const handleConfirmAndNext = () => {
+    if (!result || !selectedCategory) return;
+
     const updatedResult = {
       ...result,
       category: selectedCategory,
-      product_name: editedName || result?.product_name,
+      product_name: (editedName || result.product_name).trim() || result.product_name,
     };
+
     sessionStorage.setItem("analysisResult", JSON.stringify(updatedResult));
     sessionStorage.setItem("selectedProductType", selectedCategory);
+    sessionStorage.removeItem(ANALYZE_SUPPLEMENT_KEY);
     setLocation("/create/platform");
   };
 
+  const handleSupplementImages = () => {
+    sessionStorage.setItem(ANALYZE_SUPPLEMENT_KEY, "1");
+    setLocation("/create/upload");
+  };
+
   const topCandidate = candidates[0];
-  const row1Tags = candidates.map((c) => c.type);
+  const row1Tags = candidates.map((candidate) => candidate.type);
   const row2Tags = result ? getMockSceneTags(result.category || result.product_name) : [];
 
-  // ── Error state ──
   if (error) {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
+      <div className="flex min-h-screen flex-col bg-white">
         <StepIndicator currentStep={2} />
-        <div className="flex-1 flex flex-col items-center justify-center px-6">
-          <div className="text-red-500 text-lg font-semibold mb-2">分析出错</div>
-          <p className="text-sm text-gray-500 text-center mb-6">{error}</p>
-          <Button onClick={() => setLocation("/create/upload")} variant="outline">
-            返回上传
-          </Button>
+        <div className="flex flex-1 flex-col items-center justify-center px-6">
+          <div className="mb-2 text-lg font-semibold text-red-500">识别失败</div>
+          <p className="mb-6 text-center text-sm text-gray-500">{error}</p>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => window.location.reload()} variant="outline">
+              重试识别
+            </Button>
+            <Button onClick={() => setLocation("/create/upload")} variant="outline">
+              返回上传
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // ── 加载中 ──
   if (analyzing) {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
+      <div className="flex min-h-screen flex-col bg-white">
         <StepIndicator currentStep={2} />
-        <div className="flex-1 px-4 pt-4 pb-6">
-          {/* 标题 */}
+        <div className="flex-1 px-4 pb-6 pt-4">
           <div className="mb-4">
-            <h2 className="text-xl font-bold text-gray-900">AI视觉识别</h2>
-            <p className="text-sm text-gray-400 mt-0.5">正在识别产品品类别与结构特征</p>
+            <h2 className="text-xl font-bold text-gray-900">AI 视觉识别</h2>
+            <p className="mt-0.5 text-sm text-gray-400">正在识别产品品类与结构特征</p>
           </div>
 
-          {/* 识别进度 */}
           <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <div className="mb-2 flex items-center gap-2">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
               <span className="text-sm font-medium text-gray-700">识别进度</span>
             </div>
             <div className="space-y-1.5 pl-4">
-              {RECOGNITION_STEPS.map((step, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm text-gray-400">
-                  <div className="w-4 h-4 rounded-full border-2 border-gray-200 flex items-center justify-center animate-spin">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+              {RECOGNITION_STEPS.map((step) => (
+                <div key={step} className="flex items-center gap-2 text-sm text-gray-400">
+                  <div className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-gray-200 animate-spin">
+                    <div className="h-1.5 w-1.5 rounded-full bg-gray-300" />
                   </div>
                   {step}
                 </div>
@@ -233,26 +287,21 @@ export default function AnalyzeStep() {
             </div>
           </div>
 
-          {/* 产品图（科技感） */}
-          <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#0a1628] via-[#0d2040] to-[#0a1628] h-36 flex items-center justify-center mb-5">
-            {/* 同心圆光晕 */}
+          <div className="relative mb-5 flex h-36 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a1628] via-[#0d2040] to-[#0a1628]">
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-32 h-32 rounded-full border border-cyan-500/20 animate-ping" style={{ animationDuration: "3s" }} />
-              <div className="absolute w-24 h-24 rounded-full border border-cyan-400/30" />
-              <div className="absolute w-16 h-16 rounded-full border border-cyan-300/40" />
+              <div className="h-32 w-32 animate-ping rounded-full border border-cyan-500/20" style={{ animationDuration: "3s" }} />
+              <div className="absolute h-24 w-24 rounded-full border border-cyan-400/30" />
+              <div className="absolute h-16 w-16 rounded-full border border-cyan-300/40" />
             </div>
-            {/* 横向光线 */}
-            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
-            {/* 四角装饰 */}
-            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-cyan-400/60 rounded-tl" />
-            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-cyan-400/60 rounded-tr" />
-            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-cyan-400/60 rounded-bl" />
-            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-cyan-400/60 rounded-br" />
-            {/* 产品图 */}
+            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
+            <div className="absolute left-2 top-2 h-4 w-4 rounded-tl border-l-2 border-t-2 border-cyan-400/60" />
+            <div className="absolute right-2 top-2 h-4 w-4 rounded-tr border-r-2 border-t-2 border-cyan-400/60" />
+            <div className="absolute bottom-2 left-2 h-4 w-4 rounded-bl border-b-2 border-l-2 border-cyan-400/60" />
+            <div className="absolute bottom-2 right-2 h-4 w-4 rounded-br border-b-2 border-r-2 border-cyan-400/60" />
             {firstImageUrl ? (
               <img src={firstImageUrl} alt="产品" className="relative z-10 h-24 w-24 object-contain drop-shadow-lg" />
             ) : (
-              <Cpu className="relative z-10 w-12 h-12 text-cyan-400/60" />
+              <Cpu className="relative z-10 h-12 w-12 text-cyan-400/60" />
             )}
           </div>
         </div>
@@ -260,110 +309,120 @@ export default function AnalyzeStep() {
     );
   }
 
-  // ── 识别完成 ──
+  if (!result) {
+    return null;
+  }
+
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex min-h-screen flex-col bg-white">
       <StepIndicator currentStep={2} />
-      <div className="flex-1 px-4 pt-4 pb-6">
-        {/* 标题 */}
+      <div className="flex-1 px-4 pb-6 pt-4">
         <div className="mb-4">
-          <h2 className="text-xl font-bold text-gray-900">AI视觉识别</h2>
-          <p className="text-sm text-gray-400 mt-0.5">正在识别产品品类别与结构特征</p>
+          <h2 className="text-xl font-bold text-gray-900">AI 视觉识别</h2>
+          <p className="mt-0.5 text-sm text-gray-400">正在识别产品品类与结构特征</p>
         </div>
 
-        {/* 识别进度（完成） */}
         <div className="mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full bg-green-400" />
+          <div className="mb-2 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-green-400" />
             <span className="text-sm font-medium text-gray-700">识别进度</span>
           </div>
           <div className="space-y-1.5 pl-4">
-            {RECOGNITION_STEPS.map((step, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
-                <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+            {RECOGNITION_STEPS.map((step) => (
+              <div key={step} className="flex items-center gap-2 text-sm text-gray-700">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-500" />
                 {step}
               </div>
             ))}
           </div>
         </div>
 
-        {/* 产品图（科技感） */}
-        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#0a1628] via-[#0d2040] to-[#0a1628] h-36 flex items-center justify-center mb-5">
-          {/* 同心圆光晕 */}
+        <div className="relative mb-5 flex h-36 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a1628] via-[#0d2040] to-[#0a1628]">
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-32 h-32 rounded-full border border-cyan-500/20" />
-            <div className="absolute w-24 h-24 rounded-full border border-cyan-400/30" />
-            <div className="absolute w-16 h-16 rounded-full border border-cyan-300/40" />
+            <div className="h-32 w-32 rounded-full border border-cyan-500/20" />
+            <div className="absolute h-24 w-24 rounded-full border border-cyan-400/30" />
+            <div className="absolute h-16 w-16 rounded-full border border-cyan-300/40" />
           </div>
-          {/* 横向光线 */}
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
-          {/* 四角装饰 */}
-          <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-cyan-400/60 rounded-tl" />
-          <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-cyan-400/60 rounded-tr" />
-          <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-cyan-400/60 rounded-bl" />
-          <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-cyan-400/60 rounded-br" />
-          {/* 产品图 */}
+          <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
+          <div className="absolute left-2 top-2 h-4 w-4 rounded-tl border-l-2 border-t-2 border-cyan-400/60" />
+          <div className="absolute right-2 top-2 h-4 w-4 rounded-tr border-r-2 border-t-2 border-cyan-400/60" />
+          <div className="absolute bottom-2 left-2 h-4 w-4 rounded-bl border-b-2 border-l-2 border-cyan-400/60" />
+          <div className="absolute bottom-2 right-2 h-4 w-4 rounded-br border-b-2 border-r-2 border-cyan-400/60" />
           {firstImageUrl ? (
             <img src={firstImageUrl} alt="产品" className="relative z-10 h-24 w-24 object-contain drop-shadow-lg" />
           ) : (
-            <Cpu className="relative z-10 w-12 h-12 text-cyan-400/60" />
+            <Cpu className="relative z-10 h-12 w-12 text-cyan-400/60" />
           )}
         </div>
 
-        {/* ── 识别结果（无卡片，直接贴白底） ── */}
         <div className="mb-2">
-          <p className="text-sm text-gray-500 mb-1">识别结果</p>
-          <div className="flex items-center justify-between mb-3">
+          <p className="mb-1 text-sm text-gray-500">识别结果</p>
+          <div className="mb-3 flex items-center justify-between">
             {editingName ? (
-              <div className="flex items-center gap-2 flex-1 mr-2">
+              <div className="mr-2 flex flex-1 items-center gap-2">
                 <input
                   autoFocus
                   value={editedName}
-                  onChange={e => setEditedName(e.target.value)}
-                  className="text-lg font-bold text-gray-900 border-b-2 border-blue-400 outline-none bg-transparent flex-1 min-w-0"
+                  onChange={(event) => setEditedName(event.target.value)}
+                  className="min-w-0 flex-1 border-b-2 border-blue-400 bg-transparent text-lg font-bold text-gray-900 outline-none"
                 />
-                <button onClick={() => { if (result) { setResult({ ...result, product_name: editedName }); } setEditingName(false); }} className="text-green-500 hover:text-green-600">
-                  <Check className="w-4 h-4" />
+                <button onClick={commitEditedName} className="text-green-500 hover:text-green-600">
+                  <Check className="h-4 w-4" />
                 </button>
-                <button onClick={() => setEditingName(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-4 h-4" />
+                <button
+                  onClick={() => {
+                    setEditedName(result.product_name);
+                    setEditingName(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
                 <span className="text-lg font-bold text-gray-900">
-                  {result?.product_name || result?.category}
+                  {editedName || result.product_name}
                 </span>
                 <button
-                  onClick={() => { setEditedName(result?.product_name || result?.category || ""); setEditingName(true); }}
-                  className="text-gray-400 hover:text-blue-500 transition-colors"
+                  onClick={() => {
+                    setEditedName(editedName || result.product_name);
+                    setEditingName(true);
+                  }}
+                  className="text-gray-400 transition-colors hover:text-blue-500"
                   title="修改产品名称"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <Pencil className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
             {topCandidate && !editingName && (
-              <span className="text-xs font-semibold bg-green-500 text-white px-2.5 py-0.5 rounded-full shrink-0">
+              <span className="shrink-0 rounded-full bg-green-500 px-2.5 py-0.5 text-xs font-semibold text-white">
                 置信度 {topCandidate.confidence}%
               </span>
             )}
           </div>
-          {/* 第一行标签 */}
+
           {row1Tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-1.5">
-              {row1Tags.map((tag, i) => (
-                <span key={i} className="text-xs border border-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">
+            <div className="mb-1.5 flex flex-wrap gap-2">
+              {row1Tags.map((tag, index) => (
+                <span
+                  key={`${tag}-${index}`}
+                  className="rounded-full border border-gray-200 px-2.5 py-0.5 text-xs text-gray-500"
+                >
                   {tag}
                 </span>
               ))}
             </div>
           )}
-          {/* 第二行标签（场景） */}
+
           {row2Tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {row2Tags.map((tag, i) => (
-                <span key={i} className="text-xs border border-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">
+              {row2Tags.map((tag, index) => (
+                <span
+                  key={`${tag}-${index}`}
+                  className="rounded-full border border-gray-200 px-2.5 py-0.5 text-xs text-gray-500"
+                >
                   {tag}
                 </span>
               ))}
@@ -371,13 +430,11 @@ export default function AnalyzeStep() {
           )}
         </div>
 
-        {/* ── 确认产品类别（浅灰卡片背景） ── */}
-        <div className="bg-gray-50 rounded-2xl p-4 mb-4">
-          <p className="text-sm font-semibold text-gray-800 mb-2">确认产品类别</p>
+        <div className="mb-4 rounded-2xl bg-gray-50 p-4">
+          <p className="mb-2 text-sm font-semibold text-gray-800">确认产品类别</p>
 
-          {/* 下拉选择 */}
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-full text-sm border-gray-200 rounded-lg bg-white mb-1">
+            <SelectTrigger className="mb-1 w-full rounded-lg border-gray-200 bg-white text-sm">
               <SelectValue placeholder="选择产品类型" />
             </SelectTrigger>
             <SelectContent>
@@ -388,51 +445,52 @@ export default function AnalyzeStep() {
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-gray-400 mb-3">
-            AI建议：{result?.category || result?.product_name}，您可以确认或修改
+
+          <p className="mb-3 text-xs text-gray-400">
+            AI 建议：{result.category || "其他"}，您可以确认或修改
           </p>
 
-          {/* 建议补充图片列表 */}
-          {result?.suggestions && result.suggestions.length > 0 && (
+          {result.suggestions.length > 0 && (
             <div className="mb-3">
-              <p className="text-xs text-gray-400 mb-1.5">建议补充以下图片：</p>
+              <p className="mb-1.5 text-xs text-gray-400">建议补充以下图片：</p>
               <ul className="space-y-1">
-                {result.suggestions.map((s, i) => (
-                  <li key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
-                    {s}
+                {result.suggestions.map((suggestion, index) => (
+                  <li
+                    key={`${suggestion}-${index}`}
+                    className="flex items-center gap-2 text-xs text-gray-600"
+                  >
+                    <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-green-400" />
+                    {suggestion}
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          {/* 确认 / 补充图片 按钮 */}
           <div className="flex gap-2">
             <Button
               size="sm"
-              onClick={handleStartGeneration}
+              onClick={handleConfirmAndNext}
               disabled={!selectedCategory}
               variant="outline"
-              className="flex-1 rounded-lg text-sm h-9 border-gray-200 text-gray-700 bg-white disabled:opacity-50"
+              className="h-9 flex-1 rounded-lg border-gray-200 bg-white text-sm text-gray-700 disabled:opacity-50"
             >
               确认
             </Button>
             <Button
               size="sm"
-              className="flex-1 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm h-9"
-              onClick={() => setLocation("/create/upload")}
+              className="h-9 flex-1 rounded-lg bg-green-500 text-sm text-white hover:bg-green-600"
+              onClick={handleSupplementImages}
             >
               补充图片
             </Button>
           </div>
         </div>
 
-        {/* ── 开始AI生成图片按钮 ── */}
         <Button
-          onClick={handleStartGeneration}
+          onClick={handleConfirmAndNext}
           disabled={!selectedCategory}
-          className="w-full h-12 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold rounded-2xl text-base shadow-lg disabled:opacity-50"
+          className="h-12 w-full rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 text-base font-semibold text-white shadow-lg hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50"
         >
           下一步
         </Button>

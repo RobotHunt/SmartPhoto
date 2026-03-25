@@ -1,27 +1,35 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Loader2, RefreshCw, Check, X, Sparkles, RotateCcw, Pencil, Wand2, ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Loader2,
+  RefreshCw,
+  Wand2,
+  X,
+} from "lucide-react";
 import { StepIndicator } from "@/components/StepIndicator";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { sessionAPI, jobAPI, assetAPI } from "@/lib/api";
+import {
+  assetAPI,
+  jobAPI,
+  sessionAPI,
+  type SessionResults,
+  type VersionSummary,
+} from "@/lib/api";
 
-// ─── Role label mapping ─────────────────────────────────────────────────────
 const ROLE_LABELS: Record<string, string> = {
-  hero: "白底主图",
+  hero: "鐧藉簳涓诲浘",
   white_bg: "白底图",
   scene: "场景图",
   selling_point: "卖点图",
   feature: "功能图",
   structure: "结构图",
+  detail: "详情图",
 };
 
-function roleToLabel(role: string | undefined): string {
-  if (!role) return "主图";
-  return ROLE_LABELS[role] ?? role;
-}
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface ResultAsset {
+interface ResultAssetView {
   asset_id: string;
   role: string;
   image_url: string;
@@ -30,279 +38,384 @@ interface ResultAsset {
   isRegenerating: boolean;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+function roleToLabel(role?: string) {
+  if (!role) return "涓诲浘";
+  return ROLE_LABELS[role] || role;
+}
+
+function normalizeGenerationError(message: string) {
+  const raw = String(message || "").trim();
+  if (!raw) {
+    return {
+      code: "unknown",
+      title: "鐢熸垚澶辫触",
+      description: "本次生成未成功，请稍后重试。",
+    };
+  }
+
+  if (raw.includes("white background validation failed")) {
+    return {
+      code: "white_bg_validation_failed",
+      title: "鐧藉簳鍥炬湭閫氳繃鏍￠獙",
+      description: "系统已自动重试一次，但白底图仍未达到平台校验要求。建议返回策略页微调，或直接重新生成。",
+    };
+  }
+
+  if (raw.includes("insufficient") || raw.includes("credits") || raw.includes("浣欓")) {
+    return {
+      code: "insufficient_credits",
+      title: "棰濆害涓嶈冻",
+      description: "您的账户余额不足以完成本次生成，请充值后重试。",
+    };
+  }
+
+  return {
+    code: "generic",
+    title: "鐢熸垚澶辫触",
+    description: raw,
+  };
+}
+
+function buildViewAssets(data: SessionResults): ResultAssetView[] {
+  return (data.assets || []).map((asset, index) => ({
+    asset_id: asset.asset_id,
+    role: asset.role,
+    image_url: asset.image_url,
+    display_order: asset.display_order ?? index,
+    slot_id: asset.slot_id || "",
+    isRegenerating: false,
+  }));
+}
+
+function WatermarkOverlay() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
+      <div
+        className="absolute inset-[-50%] flex flex-wrap items-center justify-center gap-8"
+        style={{ transform: "rotate(-30deg)" }}
+      >
+        {Array.from({ length: 60 }).map((_, index) => (
+          <span
+            key={index}
+            className="select-none whitespace-nowrap text-lg font-bold text-white/20"
+            style={{ letterSpacing: "0.15em" }}
+          >
+            AI鐢靛晢鍋氬浘 路 棰勮姘村嵃
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ResultStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const sessionId = sessionStorage.getItem("current_session_id") || "";
 
-  // Generation state
   const [generating, setGenerating] = useState(true);
   const [progress, setProgress] = useState(0);
-  const progressRef = useRef(0);
-  const safeSetProgress = (val: number) => {
-    const clamped = Math.max(progressRef.current, Math.round(val));
-    progressRef.current = clamped;
-    setProgress(clamped);
-  };
-  const [statusText, setStatusText] = useState("AI 正在努力生成图片...");
+  const [statusText, setStatusText] = useState("AI 姝ｅ湪鍔姏鐢熸垚鍥剧墖...");
   const [error, setError] = useState<string | null>(null);
 
-  // Results
-  const [assets, setAssets] = useState<ResultAsset[]>([]);
+  const [assets, setAssets] = useState<ResultAssetView[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [availableVersions, setAvailableVersions] = useState<number[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const [latestVersion, setLatestVersion] = useState<number>(0);
+  const [versionSummaries, setVersionSummaries] = useState<VersionSummary[]>([]);
 
-  // Product name from earlier steps
-  const productName =
-    sessionStorage.getItem("selectedProductType") ||
-    (() => {
-      try {
-        const ar = sessionStorage.getItem("analysisResult");
-        return ar ? JSON.parse(ar).product_name : "";
-      } catch {
-        return "";
-      }
-    })() ||
-    "产品";
-
-  // Edit-text modal (per image)
-  const [editTextOpen, setEditTextOpen] = useState(false);
-  const [editTextTarget, setEditTextTarget] = useState<string | null>(null);
-  const [editTextValue, setEditTextValue] = useState("");
-
-  // AI optimization modal
-  const [aiOptModalOpen, setAiOptModalOpen] = useState(false);
-  const [aiOptFeedback, setAiOptFeedback] = useState("");
-
-  // Regeneration modal (bottom sheet)
   const [regenModalOpen, setRegenModalOpen] = useState(false);
   const [regenTargetId, setRegenTargetId] = useState<string | null>(null);
   const [regenInstruction, setRegenInstruction] = useState("");
   const [regenLoading, setRegenLoading] = useState(false);
+
+  const [editTextOpen, setEditTextOpen] = useState(false);
+  const [editTextTarget, setEditTextTarget] = useState<string | null>(null);
+  const [editTextValue, setEditTextValue] = useState("");
+
+  const [globalEditOpen, setGlobalEditOpen] = useState(false);
+  const [globalInstruction, setGlobalInstruction] = useState("");
+  const [globalEditLoading, setGlobalEditLoading] = useState(false);
+
+  const progressRef = useRef(0);
   const regenTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const sessionId = sessionStorage.getItem("current_session_id") || "";
+  const productName =
+    sessionStorage.getItem("selectedProductType") ||
+    (() => {
+      try {
+        const raw = sessionStorage.getItem("analysisResult");
+        return raw ? JSON.parse(raw).product_name : "";
+      } catch {
+        return "";
+      }
+    })() ||
+    "浜у搧";
 
-  // ─── Toggle selection ────────────────────────────────────────────────────
+  const safeSetProgress = useCallback((next: number) => {
+    const clamped = Math.max(progressRef.current, Math.round(next));
+    progressRef.current = clamped;
+    setProgress(clamped);
+  }, []);
+
+  const applyResultsData = useCallback((data: SessionResults, explicitVersion?: number) => {
+    const nextAssets = buildViewAssets(data);
+    const resolvedVersion =
+      explicitVersion || data.requested_version || data.latest_result_version || null;
+
+    setAssets(nextAssets);
+    setSelected(new Set(nextAssets.map((asset) => asset.asset_id)));
+    setAvailableVersions(data.available_versions || []);
+    setLatestVersion(data.latest_result_version || 0);
+    setCurrentVersion(resolvedVersion);
+    setVersionSummaries(data.version_summaries || []);
+
+    if (resolvedVersion) {
+      sessionStorage.setItem("current_result_version", String(resolvedVersion));
+    } else {
+      sessionStorage.removeItem("current_result_version");
+    }
+
+    safeSetProgress(100);
+    setGenerating(false);
+  }, [safeSetProgress]);
+
+  const loadResults = useCallback(async (version?: number) => {
+    if (!sessionId) throw new Error("缂哄皯 session_id");
+    const data = await sessionAPI.getResults(sessionId, version);
+    applyResultsData(data, version);
+    return data;
+  }, [applyResultsData, sessionId]);
+
+  const startOrRestoreResults = useCallback(async () => {
+    if (!sessionId) {
+      setGenerating(false);
+      setError("缺少 session_id，请返回重新开始");
+      toast({
+        title: "缂哄皯浼氳瘽",
+        description: "找不到当前会话，请返回重新开始。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let cancelled = false;
+    let fakeTimer: ReturnType<typeof setInterval> | undefined;
+
+    const run = async () => {
+      setGenerating(true);
+      setError(null);
+      setStatusText("姝ｅ湪鍔犺浇鐢熸垚缁撴灉...");
+      progressRef.current = 0;
+      setProgress(0);
+
+      try {
+        const existing = await sessionAPI.getResults(sessionId);
+        if (existing.assets.length > 0) {
+          applyResultsData(existing);
+          return;
+        }
+      } catch {
+        // Ignore and continue to real generation.
+      }
+
+      try {
+        let fakeProgress = 0;
+        fakeTimer = setInterval(() => {
+          fakeProgress += Math.random() * 5 + 1;
+          if (fakeProgress > 40) fakeProgress = 40;
+          if (!cancelled) safeSetProgress(fakeProgress);
+        }, 400);
+
+        setStatusText("姝ｅ湪鏍￠獙涓诲浘绛栫暐...");
+        const snapshot = await sessionAPI.get(sessionId).catch(() => null);
+        if (!snapshot?.strategy_preview) {
+          clearInterval(fakeTimer);
+          setGenerating(false);
+          toast({
+            title: "璇峰厛纭涓诲浘绛栫暐",
+            description: "当前会话还没有可用的主图策略，正在返回策略确认页。",
+          });
+          setLocation("/create/strategy");
+          return;
+        }
+
+        if (cancelled) return;
+
+        if (Number(snapshot.latest_result_version || 0) > 0) {
+          clearInterval(fakeTimer);
+          setStatusText("姝ｅ湪鍔犺浇宸叉湁涓荤粨鏋?...");
+          safeSetProgress(90);
+          await loadResults(snapshot.latest_result_version || undefined);
+          return;
+        }
+
+        if (snapshot.latest_generate_job_id) {
+          clearInterval(fakeTimer);
+          setStatusText("姝ｅ湪鎭㈠宸叉湁鐢熸垚浠诲姟...");
+          safeSetProgress(45);
+          await jobAPI.pollUntilDone(snapshot.latest_generate_job_id, (jobStatus) => {
+            const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
+            const stage = jobStatus.stage || jobStatus.status || "";
+            if (stage && !cancelled) {
+              setStatusText(`鐢熸垚涓?路 ${stage}`);
+            }
+            if (!cancelled) {
+              safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
+            }
+          });
+          if (cancelled) return;
+          setStatusText("姝ｅ湪鍔犺浇鐢熸垚缁撴灉...");
+          safeSetProgress(95);
+          await loadResults();
+          return;
+        }
+
+        setStatusText("AI 姝ｅ湪鍔姏鐢熸垚鍥剧墖...");
+        safeSetProgress(45);
+        const generateResponse = await sessionAPI.generateGallery(sessionId);
+        clearInterval(fakeTimer);
+
+        if (generateResponse?.job_id) {
+          await jobAPI.pollUntilDone(generateResponse.job_id, (jobStatus) => {
+            const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
+            const stage = jobStatus.stage || jobStatus.status || "";
+            if (stage && !cancelled) {
+              setStatusText(`鐢熸垚涓?路 ${stage}`);
+            }
+            if (!cancelled) {
+              safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
+            }
+          });
+        }
+
+        if (cancelled) return;
+
+        setStatusText("姝ｅ湪鍔犺浇鐢熸垚缁撴灉...");
+        safeSetProgress(95);
+        await loadResults();
+      } catch (err: any) {
+        clearInterval(fakeTimer);
+        const normalizedError = normalizeGenerationError(err?.message || "鐢熸垚澶辫触锛岃閲嶈瘯");
+        setError(normalizedError.code === "insufficient_credits" ? "insufficient_credits" : normalizedError.description);
+        setGenerating(false);
+        toast({
+          title: normalizedError.title,
+          description: normalizedError.description,
+          variant: "destructive",
+        });
+      }
+    };
+
+    await run();
+
+    return () => {
+      cancelled = true;
+      clearInterval(fakeTimer);
+    };
+  }, [applyResultsData, loadResults, safeSetProgress, sessionId, toast]);
+
+  useEffect(() => {
+    let cleanup: void | (() => void);
+
+    startOrRestoreResults().then((dispose) => {
+      cleanup = dispose;
+    });
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [startOrRestoreResults]);
+
+  useEffect(() => {
+    const notice = sessionStorage.getItem("post_login_notice");
+    if (notice !== "hd_payment") return;
+
+    sessionStorage.removeItem("post_login_notice");
+    toast({
+      title: "鐧诲綍鎴愬姛",
+      description: "已返回当前结果页，请继续点击“生成无水印高清图”进入支付流程。",
+    });
+  }, [toast]);
+
   const toggleSelect = (assetId: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
+    setSelected((previous) => {
+      const next = new Set(previous);
       if (next.has(assetId)) next.delete(assetId);
       else next.add(assetId);
       return next;
     });
   };
 
-  // ─── Load results from backend ──────────────────────────────────────────
-  const loadResults = useCallback(
-    async (sid: string) => {
-      try {
-        const data = await sessionAPI.getResults(sid);
-        const rawAssets: any[] =
-          data?.assets ?? data?.images ?? data?.results ?? (Array.isArray(data) ? data : []);
-
-        const mapped: ResultAsset[] = rawAssets.map((item: any, idx: number) => ({
-          asset_id: item.asset_id ?? item.id ?? String(idx + 1),
-          role: item.role ?? item.asset_role ?? "hero",
-          image_url: item.image_url ?? item.url ?? "",
-          display_order: item.display_order ?? idx,
-          slot_id: item.slot_id ?? "",
-          isRegenerating: false,
-        }));
-
-        setAssets(mapped);
-        // Select all by default
-        setSelected(new Set(mapped.map((a) => a.asset_id)));
-
-        safeSetProgress(100);
-        setGenerating(false);
-      } catch (err: any) {
-        toast({
-          title: "获取结果失败",
-          description: err.message || "请重试",
-          variant: "destructive",
-        });
-        setGenerating(false);
-      }
-    },
-    [toast],
-  );
-
-  // ─── On mount: try loading existing results first, only generate if none ──
-  useEffect(() => {
-    if (!sessionId) {
-      toast({
-        title: "缺少会话",
-        description: "找不到 session_id，请返回重新开始",
-        variant: "destructive",
-      });
-      setGenerating(false);
-      setError("缺少会话 ID，请返回重新开始");
-      return;
-    }
-
-    let cancelled = false;
-    let fakeTimer: ReturnType<typeof setInterval>;
-
-    (async () => {
-      try {
-        // ── Step 1: Try to load existing results first ──
-        setStatusText("正在加载生成结果...");
-        try {
-          const existingData = await sessionAPI.getResults(sessionId);
-          const existingAssets: any[] =
-            existingData?.assets ?? existingData?.images ?? existingData?.results ?? (Array.isArray(existingData) ? existingData : []);
-
-          if (existingAssets.length > 0 && !cancelled) {
-            // Results already exist — display them directly, no need to regenerate
-            const mapped: ResultAsset[] = existingAssets.map((item: any, idx: number) => ({
-              asset_id: item.asset_id ?? item.id ?? String(idx + 1),
-              role: item.role ?? item.asset_role ?? "hero",
-              image_url: item.image_url ?? item.url ?? "",
-              display_order: item.display_order ?? idx,
-              slot_id: item.slot_id ?? "",
-              isRegenerating: false,
-            }));
-            setAssets(mapped);
-            setSelected(new Set(mapped.map((a) => a.asset_id)));
-            safeSetProgress(100);
-            setGenerating(false);
-            return; // ← Skip generation entirely
-          }
-        } catch {
-          // No existing results or endpoint error — proceed to generate
-        }
-
-        if (cancelled) return;
-
-        // ── Step 2: No existing results — run generation ──
-        let fakeProgress = 0;
-        fakeTimer = setInterval(() => {
-          if (cancelled) return;
-          fakeProgress += Math.random() * 5 + 1;
-          if (fakeProgress > 40) fakeProgress = 40;
-          safeSetProgress(Math.round(fakeProgress));
-        }, 400);
-
-        // Build strategy if needed
-        setStatusText("正在构建生成策略...");
-        try {
-          await sessionAPI.buildStrategy(sessionId);
-        } catch (strategyErr: any) {
-          if (
-            !strategyErr.message?.includes("already") &&
-            !strategyErr.message?.includes("copy not ready")
-          ) {
-            console.warn("Strategy build warning:", strategyErr.message);
-          }
-        }
-
-        if (cancelled) return;
-        safeSetProgress(45);
-        setStatusText("AI 正在努力生成图片...");
-
-        // Start generation
-        const genResp = await sessionAPI.generateGallery(sessionId);
-        const jobId = genResp.job_id || (genResp as any).jobId;
-
-        if (cancelled) return;
-        clearInterval(fakeTimer);
-
-        // Poll until done
-        await jobAPI.pollUntilDone(jobId, (status) => {
-          if (cancelled) return;
-          const pct = status.progress ?? status.progress_pct ?? 0;
-          safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
-          const stage = status.stage || status.status || "";
-          if (stage) setStatusText(`生成中: ${stage}`);
-        });
-
-        if (cancelled) return;
-
-        // Fetch results
-        setStatusText("正在加载生成结果...");
-        safeSetProgress(95);
-        await loadResults(sessionId);
-      } catch (err: any) {
-        if (cancelled) return;
-        clearInterval(fakeTimer!);
-        console.error("Generation failed:", err);
-        const msg = err.message || "生成失败，请重试";
-        const isCredits = msg.includes("insufficient") || msg.includes("credits") || msg.includes("余额");
-        toast({
-          title: isCredits ? "额度不足" : "生成失败",
-          description: isCredits ? "账户余额不足，请充值后重试" : msg,
-          variant: "destructive",
-        });
-        setError(isCredits ? "insufficient_credits" : msg);
-        setGenerating(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      clearInterval(fakeTimer);
-    };
-  }, [sessionId, loadResults, toast]);
-
-  // ─── Open regen modal ──────────────────────────────────────────────────
   const openRegenModal = (assetId: string) => {
     setRegenTargetId(assetId);
     setRegenInstruction("");
     setRegenModalOpen(true);
-    setTimeout(() => regenTextareaRef.current?.focus(), 150);
+    setTimeout(() => regenTextareaRef.current?.focus(), 120);
   };
 
-  // ─── Confirm regeneration ──────────────────────────────────────────────
-  const confirmRegen = async () => {
-    if (!regenTargetId || !sessionId) return;
-    setRegenModalOpen(false);
-    setRegenLoading(true);
+  const handleVersionChange = async (version: number) => {
+    if (!sessionId || version === currentVersion) return;
+    setGenerating(true);
+    setStatusText(`姝ｅ湪鍔犺浇 V${version}...`);
+    progressRef.current = 0;
+    setProgress(20);
+    try {
+      await loadResults(version);
+    } catch (err: any) {
+      setGenerating(false);
+      toast({
+        title: "鍒囨崲鐗堟湰澶辫触",
+        description: err?.message || "请稍后重试",
+        variant: "destructive",
+      });
+    }
+  };
 
-    setAssets((prev) =>
-      prev.map((a) =>
-        a.asset_id === regenTargetId ? { ...a, isRegenerating: true } : a,
+  const handleRegen = async (assetId: string, instruction: string) => {
+    setAssets((previous) =>
+      previous.map((asset) =>
+        asset.asset_id === assetId ? { ...asset, isRegenerating: true } : asset,
       ),
     );
 
     try {
-      const result = await assetAPI.regenerate(
-        regenTargetId,
-        regenInstruction || "重新生成",
+      const response = await assetAPI.regenerate(
+        assetId,
+        instruction || "閲嶆柊鐢熸垚",
       );
-      if (result && result.job_id) {
-        await jobAPI.pollUntilDone(result.job_id);
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id);
       }
-      await loadResults(sessionId);
+      await loadResults();
       toast({
-        title: "重新生成完成",
-        description: regenInstruction
-          ? `已按指示调整：${regenInstruction}`
-          : "已重新生成",
+        title: "閲嶆柊鐢熸垚瀹屾垚",
+        description: instruction ? `已按指示调整：${instruction}` : "已重新生成图片",
       });
     } catch (err: any) {
-      const msg = err.message || "请重试";
-      const isCredits = msg.includes("insufficient") || msg.includes("credits") || msg.includes("余额");
       toast({
-        title: isCredits ? "额度不足" : "重新生成失败",
-        description: isCredits ? "账户余额不足，请充值后重试" : msg,
+        title: "閲嶆柊鐢熸垚澶辫触",
+        description: err?.message || "请稍后重试",
         variant: "destructive",
       });
     } finally {
-      setAssets((prev) =>
-        prev.map((a) =>
-          a.asset_id === regenTargetId ? { ...a, isRegenerating: false } : a,
+      setAssets((previous) =>
+        previous.map((asset) =>
+          asset.asset_id === assetId ? { ...asset, isRegenerating: false } : asset,
         ),
       );
-      setRegenLoading(false);
-      setRegenTargetId(null);
     }
   };
 
-  // ─── Open edit-text modal ──────────────────────────────────────────────
-  const openEditText = (assetId: string) => {
-    setEditTextTarget(assetId);
-    setEditTextValue("");
-    setEditTextOpen(true);
+  const confirmRegen = async () => {
+    if (!regenTargetId) return;
+    setRegenModalOpen(false);
+    setRegenLoading(true);
+    await handleRegen(regenTargetId, regenInstruction);
+    setRegenTargetId(null);
+    setRegenLoading(false);
   };
 
   const confirmEditText = async () => {
@@ -310,137 +423,134 @@ export default function ResultStep() {
       setEditTextOpen(false);
       return;
     }
-    // Treat "edit text" as a regen with specific text instruction
     setEditTextOpen(false);
-    setRegenLoading(true);
+    await handleRegen(editTextTarget, `修改文字：${editTextValue.trim()}`);
+    setEditTextTarget(null);
+    setEditTextValue("");
+  };
 
-    setAssets((prev) =>
-      prev.map((a) =>
-        a.asset_id === editTextTarget ? { ...a, isRegenerating: true } : a,
-      ),
-    );
-
+  const confirmGlobalEdit = async () => {
+    const instruction = globalInstruction.trim() || "鏁翠綋浼樺寲";
+    setGlobalEditOpen(false);
     try {
-      const result = await assetAPI.regenerate(
-        editTextTarget,
-        `修改文字：${editTextValue}`,
-      );
-      if (result && result.job_id) {
-        await jobAPI.pollUntilDone(result.job_id);
+      const response: any = await sessionAPI.globalEdit(sessionId, instruction);
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id);
       }
-      await loadResults(sessionId);
-      toast({ title: "文字编辑完成" });
+      await loadResults();
+      toast({ title: "鏁翠綋浼樺寲瀹屾垚" });
     } catch (err: any) {
       toast({
-        title: "编辑失败",
-        description: err.message || "请重试",
+        title: "鏁翠綋浼樺寲澶辫触",
+        description: err?.message || "请稍后重试",
         variant: "destructive",
       });
     } finally {
-      setAssets((prev) =>
-        prev.map((a) =>
-          a.asset_id === editTextTarget ? { ...a, isRegenerating: false } : a,
-        ),
-      );
-      setRegenLoading(false);
-      setEditTextTarget(null);
+      setGlobalInstruction("");
     }
   };
 
-  // ─── Watermark pattern (diagonal repeated "水印") ──────────────────────
-  const WatermarkOverlay = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
-      <div
-        className="absolute inset-[-50%] flex flex-wrap items-center justify-center gap-8"
-        style={{ transform: "rotate(-30deg)" }}
-      >
-        {Array.from({ length: 60 }).map((_, i) => (
-          <span
-            key={i}
-            className="text-white/20 text-lg font-bold select-none whitespace-nowrap"
-            style={{ letterSpacing: "0.15em" }}
-          >
-            AI电商做图 · 预览水印
-          </span>
-        ))}
-      </div>
-    </div>
-  );
+  const startGlobalEdit = async () => {
+    if (globalEditLoading) return;
+    const instruction = globalInstruction.trim() || "Global optimize";
+    setGlobalEditLoading(true);
+    setGlobalEditOpen(false);
+    setGenerating(true);
+    setError(null);
+    setStatusText("AI is optimizing all images...");
+    progressRef.current = 0;
+    setProgress(15);
+    try {
+      const response: any = await sessionAPI.globalEdit(sessionId, instruction);
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id, (jobStatus) => {
+          const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
+          const stage = jobStatus.stage || jobStatus.status || "";
+          if (stage) {
+            setStatusText(`Optimizing - ${stage}`);
+          }
+          safeSetProgress(Math.min(Math.round(20 + pct * 0.75), 96));
+        });
+      }
+      await loadResults();
+      toast({ title: "整体优化完成" });
+    } catch (err: any) {
+      setGenerating(false);
+      toast({
+        title: "整体优化失败",
+        description: err?.message || "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setGlobalEditLoading(false);
+      setGlobalInstruction("");
+    }
+  };
 
-  // ─── Render: loading state ─────────────────────────────────────────────
+  const selectedCount = selected.size;
+  const hasRunningAssetRegen = regenLoading || assets.some((asset) => asset.isRegenerating);
+  const actionLocked = globalEditLoading || hasRunningAssetRegen;
+
   if (generating) {
     return (
       <div className="min-h-screen bg-[#f5f6f8]">
-        <StepIndicator currentStep={5} step5Label="生成图片" />
-
-        <div className="flex flex-col items-center justify-center min-h-[70vh] px-4">
-          {/* Spinner in light blue circle */}
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6">
-            <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+        <StepIndicator currentStep={5} step5Label="鐢熸垚鍥剧墖" />
+        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100">
+            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
           </div>
-
-          <h2 className="text-xl font-bold text-slate-900 mb-2">{statusText}</h2>
-          <p className="text-sm text-slate-500 mb-6">
-            请耐心等待，AI 正在为您精心制作图片
+          <h2 className="mb-2 text-xl font-bold text-slate-900">{statusText}</h2>
+          <p className="mb-6 text-sm text-slate-500">
+            璇疯€愬績绛夊緟锛孉I 姝ｅ湪涓烘偍绮惧績鍒朵綔鍥剧墖
           </p>
-
-          {/* Progress bar */}
-          <div className="w-full max-w-sm mb-3">
-            <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+          <div className="mb-3 w-full max-w-sm">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
               <div
-                className="bg-gradient-to-r from-blue-500 to-emerald-500 h-full rounded-full transition-all duration-500 ease-out"
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
-          <p className="text-sm text-slate-400 font-medium">{progress}%</p>
+          <p className="text-sm font-medium text-slate-400">{progress}%</p>
         </div>
       </div>
     );
   }
 
-  // ─── Render: error state ───────────────────────────────────────────────
   if (error && assets.length === 0) {
     const isCreditsError = error === "insufficient_credits";
-
     return (
       <div className="min-h-screen bg-[#f5f6f8]">
-        <StepIndicator currentStep={5} step5Label="生成图片" />
-
-        <div className="flex flex-col items-center justify-center min-h-[70vh] px-4">
-          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
-            <X className="w-10 h-10 text-red-400" />
+        <StepIndicator currentStep={5} step5Label="鐢熸垚鍥剧墖" />
+        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-50">
+            <X className="h-10 w-10 text-red-400" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900 mb-2">
-            {isCreditsError ? "额度不足" : "生成失败"}
+          <h2 className="mb-2 text-lg font-bold text-slate-900">
+            {isCreditsError ? "棰濆害涓嶈冻" : "鐢熸垚澶辫触"}
           </h2>
-          <p className="text-sm text-slate-500 mb-6 text-center max-w-xs">
-            {isCreditsError
-              ? "您的账户余额不足以完成本次生成，请充值后重试。"
-              : error}
+          <p className="mb-6 max-w-xs text-center text-sm text-slate-500">
+            {isCreditsError ? "您的账户余额不足以完成本次生成，请充值后重试。" : error}
           </p>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setLocation("/create/confirm")}
-              className="flex items-center gap-2 text-sm text-slate-600 border border-slate-300 rounded-xl px-5 py-2.5 bg-white hover:bg-slate-50 transition"
+              onClick={() => setLocation("/create/strategy")}
+              className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
             >
-              <ArrowLeft className="w-4 h-4" />
-              返回上一页
-            </button>
-            {isCreditsError && (
+              <ArrowLeft className="h-4 w-4" />
+              杩斿洖涓婁竴椤?            </button>
+            {isCreditsError ? (
               <button
                 onClick={() => setLocation("/create/payment")}
-                className="flex items-center gap-2 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-xl px-5 py-2.5 transition"
+                className="rounded-xl bg-blue-500 px-5 py-2.5 text-sm text-white transition hover:bg-blue-600"
               >
-                去充值
-              </button>
-            )}
-            {!isCreditsError && (
+                鍘诲厖鍊?              </button>
+            ) : (
               <button
                 onClick={() => window.location.reload()}
-                className="flex items-center gap-2 text-sm text-blue-600 border border-blue-200 rounded-xl px-5 py-2.5 bg-white hover:bg-blue-50 transition"
+                className="rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-sm text-blue-600 transition hover:bg-blue-50"
               >
-                重试
+                閲嶈瘯
               </button>
             )}
           </div>
@@ -449,22 +559,63 @@ export default function ResultStep() {
     );
   }
 
-  const selectedCount = selected.size;
-
-  // ─── Render: results ───────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f5f6f8]">
-      <StepIndicator currentStep={5} step5Label="生成图片" />
+      <StepIndicator currentStep={5} step5Label="鐢熸垚鍥剧墖" />
 
-      <div className="max-w-lg mx-auto px-4 pb-44 pt-4">
-        {/* Top bar: count */}
-        <div className="mb-3">
+      <div className="mx-auto max-w-lg px-4 pb-44 pt-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <span className="text-sm font-bold text-slate-800">
-            已生成 {assets.length} 张
-          </span>
+            宸茬敓鎴?{assets.length} 寮?          </span>
+          <button
+            onClick={() => {
+              if (actionLocked) return;
+              setGlobalEditOpen(true);
+            }}
+            disabled={actionLocked}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {globalEditLoading ? "AI 优化中..." : "AI 鏁翠綋浼樺寲"}
+          </button>
         </div>
 
-        {/* Image list */}
+        <div className="mb-3 rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+          鐐瑰嚮鍥剧墖鍙充笂瑙掑嬀閫夛紝鍙€夋嫨鍝簺缁撴灉缁х画杩涘叆鏃犳按鍗伴珮娓呭浘娴佺▼銆?        </div>
+
+        {availableVersions.length > 1 && (
+          <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-slate-700">鐗堟湰绠＄悊</span>
+              <span className="text-[11px] text-slate-400">
+                棰勮銆佹敮浠樸€侀珮娓呭潎鍩轰簬褰撳墠鐗堟湰
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {availableVersions.map((version) => {
+                const summary = versionSummaries.find(
+                  (item) => item.version_no === version,
+                );
+                const active = version === currentVersion;
+                return (
+                  <button
+                    key={version}
+                    onClick={() => handleVersionChange(version)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                      active
+                        ? "border-blue-500 bg-blue-500 text-white"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    V{version}
+                    {version === latestVersion ? " · 最新" : ""}
+                    {summary ? ` 路 ${summary.ready_count}/${summary.asset_count}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
           {assets.map((asset) => {
             const isSelected = selected.has(asset.asset_id);
@@ -472,76 +623,68 @@ export default function ResultStep() {
 
             return (
               <div key={asset.asset_id} className="relative">
-                {/* Image card */}
                 <div
-                  className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all ${
-                    isSelected
-                      ? "ring-2 ring-blue-400"
-                      : "ring-1 ring-slate-200"
+                  className={`relative cursor-pointer overflow-hidden rounded-2xl transition-all ${
+                    isSelected ? "ring-2 ring-blue-400" : "ring-1 ring-slate-200"
                   }`}
                   onClick={() => toggleSelect(asset.asset_id)}
                 >
-                  {/* Regenerating overlay */}
                   {asset.isRegenerating && (
-                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-20 gap-2">
-                      <Loader2 className="w-8 h-8 text-white animate-spin" />
-                      <span className="text-white text-sm font-medium">
-                        重新生成中...
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/50">
+                      <Loader2 className="h-8 w-8 animate-spin text-white" />
+                      <span className="text-sm font-medium text-white">
+                        閲嶆柊鐢熸垚涓?..
                       </span>
                     </div>
                   )}
 
-                  {/* Image */}
                   <div className="relative w-full" style={{ aspectRatio: "1 / 1" }}>
                     <img
                       src={asset.image_url}
                       alt={label}
-                      className="w-full h-full object-cover"
+                      className="h-full w-full object-cover"
                       draggable={false}
                     />
-
-                    {/* Watermark overlay */}
                     <WatermarkOverlay />
                   </div>
 
-                  {/* Selection circle top-right */}
-                  <div className="absolute top-3 right-3 z-20">
+                  <div className="absolute right-3 top-3 z-20">
                     <div
-                      className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
+                      className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all ${
                         isSelected
-                          ? "bg-blue-500 border-blue-500"
-                          : "bg-white/80 border-white/60 backdrop-blur-sm"
+                          ? "border-blue-500 bg-blue-500"
+                          : "border-white/60 bg-white/80 backdrop-blur-sm"
                       }`}
                     >
-                      {isSelected && (
-                        <Check className="w-4 h-4 text-white stroke-[3]" />
-                      )}
+                      {isSelected && <Check className="h-4 w-4 stroke-[3] text-white" />}
                     </div>
                   </div>
                 </div>
 
-                {/* Below image: info + actions */}
-                <div className="flex items-center justify-between mt-2 px-1">
-                  {/* Label */}
-                  <span className="text-sm text-slate-700 font-medium">
-                    {productName} · {label}
+                <div className="mt-2 flex items-center justify-between px-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    {productName} 路 {label}
                   </span>
-
-                  {/* Action buttons */}
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => openEditText(asset.asset_id)}
-                      className="text-xs text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-300 rounded-full px-3 py-1 transition bg-white"
+                      onClick={() => {
+                        if (actionLocked) return;
+                        setEditTextTarget(asset.asset_id);
+                        setEditTextValue("");
+                        setEditTextOpen(true);
+                      }}
+                      disabled={actionLocked}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      编辑文字
+                      缂栬緫鏂囧瓧
                     </button>
                     <button
                       onClick={() => openRegenModal(asset.asset_id)}
-                      disabled={asset.isRegenerating || regenLoading}
-                      className="text-xs text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-300 rounded-full px-3 py-1 transition bg-white disabled:opacity-40 flex items-center gap-1"
+                      disabled={actionLocked || asset.isRegenerating}
+                      className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40"
                     >
-                      <RefreshCw className="w-3 h-3" />
-                      重新生成
+                      <RefreshCw className="h-3 w-3" />
+                      閲嶆柊鐢熸垚
                     </button>
                   </div>
                 </div>
@@ -551,186 +694,193 @@ export default function ResultStep() {
         </div>
       </div>
 
-      {/* ─── Bottom fixed bar ──────────────────────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 z-30">
-        <div className="bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-4 py-4">
-          <div className="max-w-lg mx-auto">
-            {/* Selection count + hint */}
-            <div className="flex items-center justify-between mb-3">
+        <div className="border-t border-slate-100 bg-white px-4 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <div className="mx-auto max-w-lg">
+            <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-medium text-slate-800">
-                已选择 {selectedCount} 张
-              </span>
+                宸查€夋嫨 {selectedCount} 寮?              </span>
               <span className="text-xs text-slate-400">
-                确认后生成无水印高清图...
-              </span>
+                纭鍚庣敓鎴愭棤姘村嵃楂樻竻鍥?              </span>
             </div>
-
-            {/* Gradient button */}
             <button
               onClick={() => {
-                // Store selected asset IDs for payment page
                 sessionStorage.setItem(
                   "selected_asset_ids",
                   JSON.stringify(Array.from(selected)),
                 );
+                sessionStorage.setItem("selectedImgCount", String(selectedCount));
+                if (currentVersion) {
+                  sessionStorage.setItem(
+                    "current_result_version",
+                    String(currentVersion),
+                  );
+                }
+                if (authLoading) return;
+                if (!user) {
+                  sessionStorage.setItem("pending_auth_action", "hd_payment");
+                  toast({
+                    title: "璇峰厛鐧诲綍",
+                    description: "登录或注册成功后会回到当前结果页，你可以继续进入高清支付流程。",
+                  });
+                  setLocation(`/login?redirect=${encodeURIComponent("/create/result")}`);
+                  return;
+                }
+                sessionStorage.removeItem("pending_auth_action");
                 setLocation("/create/payment");
               }}
-              disabled={selectedCount === 0}
-              className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600 disabled:from-slate-300 disabled:to-slate-400 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-lg shadow-blue-200/50"
+              disabled={selectedCount === 0 || actionLocked}
+              className="w-full rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 font-bold text-white shadow-lg shadow-blue-200/50 transition active:scale-[0.98] disabled:from-slate-300 disabled:to-slate-400"
             >
-              生成无水印高清图
+              鐢熸垚鏃犳按鍗伴珮娓呭浘
             </button>
           </div>
         </div>
       </div>
 
-      {/* ─── Regeneration modal (bottom sheet) ─────────────────────────────── */}
       {regenModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setRegenModalOpen(false)}
           />
-          <div className="relative w-full max-w-lg bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
-            {/* Drag handle */}
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-
-            {/* Title */}
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-slate-900 text-base">重新生成</h3>
+          <div className="relative w-full max-w-lg rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-2xl">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900">閲嶆柊鐢熸垚</h3>
               <button
                 onClick={() => setRegenModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-xs text-slate-400 mb-3">
-              请告诉 AI 你希望如何调整这张图片（可选）
-            </p>
-
-            {/* Textarea */}
+            <p className="mb-3 text-xs text-slate-400">
+              鍛婅瘔 AI 浣犲笇鏈涘浣曡皟鏁磋繖寮犲浘鐗?            </p>
             <textarea
               ref={regenTextareaRef}
               value={regenInstruction}
-              onChange={(e) => setRegenInstruction(e.target.value)}
-              placeholder="例如：背景换成白色、产品更突出、去掉多余元素..."
+              onChange={(event) => setRegenInstruction(event.target.value)}
               rows={4}
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+              placeholder="渚嬪锛氳儗鏅崲鎴愮櫧鑹层€佷骇鍝佹洿绐佸嚭銆佸幓鎺夊浣欏厓绱?.."
+              className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-
-            {/* Quick tag suggestions */}
-            <div className="flex flex-wrap gap-2 mt-3 mb-5">
-              {[
-                "背景换白色",
-                "产品更突出",
-                "文字更大",
-                "去掉文字",
-                "换横版构图",
-              ].map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() =>
-                    setRegenInstruction((prev) =>
-                      prev ? `${prev}，${tag}` : tag,
-                    )
-                  }
-                  className="text-xs text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-full px-3 py-1 transition"
-                >
-                  + {tag}
-                </button>
-              ))}
+            <div className="mb-5 mt-3 flex flex-wrap gap-2">
+              {["背景换成白色", "产品更突出", "文字更大", "去掉文字", "换横版构图"].map(
+                (tag) => (
+                  <button
+                    key={tag}
+                    onClick={() =>
+                      setRegenInstruction((previous) =>
+                        previous ? `${previous}，${tag}` : tag,
+                      )
+                    }
+                    className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-600 transition hover:bg-blue-100"
+                  >
+                    + {tag}
+                  </button>
+                ),
+              )}
             </div>
-
-            {/* Confirm button */}
             <button
               onClick={confirmRegen}
-              className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition active:scale-[0.98]"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 font-bold text-white transition active:scale-[0.98]"
             >
-              <RefreshCw className="w-4 h-4" />
-              确认，开始重新生成
-            </button>
+              <RefreshCw className="h-4 w-4" />
+              纭骞跺紑濮嬮噸鏂扮敓鎴?            </button>
           </div>
         </div>
       )}
 
-      {/* ─── Edit text modal (bottom sheet) ────────────────────────────────── */}
       {editTextOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setEditTextOpen(false)}
           />
-          <div className="relative w-full max-w-lg bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-slate-900 text-base">编辑文字</h3>
+          <div className="relative w-full max-w-lg rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-2xl">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900">缂栬緫鏂囧瓧</h3>
               <button
                 onClick={() => setEditTextOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-xs text-slate-400 mb-3">
-              请输入你希望修改的文字内容
+            <p className="mb-3 text-xs text-slate-400">
+              杈撳叆浣犲笇鏈涗慨鏀圭殑鏂囧瓧鍐呭
             </p>
-
             <textarea
               value={editTextValue}
-              onChange={(e) => setEditTextValue(e.target.value)}
-              placeholder={'例如：标题改为"新品首发"、副标题改为"限时特惠"...'}
+              onChange={(event) => setEditTextValue(event.target.value)}
               rows={4}
               autoFocus
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+              placeholder="渚嬪锛氭爣棰樻敼涓衡€滄柊鍝侀鍙戔€濓紝鍓爣棰樻敼涓衡€滈檺鏃剁壒鎯犫€?.."
+              className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-
             <button
               onClick={confirmEditText}
-              className="w-full mt-4 bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition active:scale-[0.98]"
+              className="mt-4 w-full rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 font-bold text-white transition active:scale-[0.98]"
             >
-              确认修改
+              纭淇敼
             </button>
           </div>
         </div>
       )}
 
-      {/* ─── AI优化图片弹窗 ──────────────────────────────────────────── */}
-      {aiOptModalOpen && (
+      {globalEditOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAiOptModalOpen(false)} />
-          <div className="relative w-full max-w-lg bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-slate-900 text-base">AI优化图片</h3>
-              <button onClick={() => setAiOptModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setGlobalEditOpen(false)}
+          />
+          <div className="relative w-full max-w-lg rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-2xl">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900">AI 鏁翠綋浼樺寲鍥剧墖</h3>
+              <button
+                onClick={() => setGlobalEditOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <p className="text-xs text-slate-400 mb-3">告诉 AI 你希望对所有图片做哪些整体调整</p>
+            <p className="mb-3 text-xs text-slate-400">
+              鍛婅瘔 AI 浣犲笇鏈涘鎵€鏈夊浘鐗囧仛鍝簺鏁翠綋璋冩暣
+            </p>
             <textarea
-              value={aiOptFeedback}
-              onChange={e => setAiOptFeedback(e.target.value)}
-              placeholder="例如：整体色调更暖、产品放大一些、背景更简洁…"
+              value={globalInstruction}
+              onChange={(event) => setGlobalInstruction(event.target.value)}
               rows={4}
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+              placeholder="渚嬪锛氭暣浣撹壊璋冩洿鏆栥€佷骇鍝佹斁澶т竴鐐广€佽儗鏅洿绠€娲?.."
+              className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <div className="flex flex-wrap gap-2 mt-3 mb-5">
-              {["色调更暖", "产品放大", "背景更简洁", "增加品牌感", "对比度更强"].map(tag => (
-                <button key={tag} onClick={() => setAiOptFeedback(p => p ? `${p}，${tag}` : tag)}
-                  className="text-xs text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-full px-3 py-1 transition">+ {tag}</button>
-              ))}
+            <div className="mb-5 mt-3 flex flex-wrap gap-2">
+              {["色调更暖", "产品放大", "背景更简洁", "增加品牌感", "对比度更强"].map(
+                (tag) => (
+                  <button
+                    key={tag}
+                    onClick={() =>
+                      setGlobalInstruction((previous) =>
+                        previous ? `${previous}，${tag}` : tag,
+                      )
+                    }
+                    className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-600 transition hover:bg-blue-100"
+                  >
+                    + {tag}
+                  </button>
+                ),
+              )}
             </div>
-            <button onClick={async () => {
-              setAiOptModalOpen(false);
-              try {
-                const resp = await sessionAPI.globalEdit(sessionId, aiOptFeedback || "整体优化");
-                if (resp?.job_id) await jobAPI.pollUntilDone(resp.job_id);
-                await loadResults(sessionId);
-                toast({ title: "AI优化完成" });
-              } catch (e: any) { toast({ title: "优化失败", description: e.message, variant: "destructive" }); }
-              setAiOptFeedback("");
-            }} className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition active:scale-[0.98]">
-              <Wand2 className="w-4 h-4" /> 确认，开始AI优化
+            <button
+              onClick={startGlobalEdit}
+              disabled={globalEditLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 font-bold text-white transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Wand2 className="h-4 w-4" />
+              {globalEditLoading ? "优化中..." : "纭骞跺紑濮?AI 浼樺寲"}
             </button>
           </div>
         </div>

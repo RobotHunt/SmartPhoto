@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useEffect } from "react";
 import { 
   Search, 
   ChevronDown, 
@@ -21,9 +22,44 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
+const CREATE_FLOW_KEYS = [
+  "current_session_id",
+  "upload_slot_image_ids",
+  "analysis_dirty",
+  "from_analyze_supplement",
+  "analysis_snapshot_full",
+  "analysisResult",
+  "selectedProductType",
+  "selectedPlatform",
+  "selectedTheme",
+  "productParams",
+  "copywritings",
+  "selected_asset_ids",
+  "selectedImgCount",
+  "selectedPlans",
+  "paymentSuccess",
+  "generatedImages",
+  "hdImages",
+  "current_result_version",
+];
+
 export default function Home() {
   const { user, loading } = useAuth();
-  const [currentPath] = useLocation();
+  const [currentPath, setLocation] = useLocation();
+
+  useEffect(() => {
+    CREATE_FLOW_KEYS.forEach((key) => sessionStorage.removeItem(key));
+  }, []);
+
+  const startCreateFlow = () => {
+    if (!user) {
+      setLocation("/login");
+      return;
+    }
+
+    CREATE_FLOW_KEYS.forEach((key) => sessionStorage.removeItem(key));
+    setLocation("/create/upload");
+  };
 
   if (loading) {
     return (
@@ -106,11 +142,12 @@ export default function Home() {
               <p className="text-sm text-slate-500">拍照上传一键生成· 平台选图配文</p>
             </div>
             <div className="flex items-center gap-3">
-              <Link href={user ? "/create/upload" : "/login"}>
-                <Button className="bg-blue-500 hover:bg-blue-600 text-white px-6 rounded-xl shadow-md">
+              <Button
+                className="bg-blue-500 hover:bg-blue-600 text-white px-6 rounded-xl shadow-md"
+                onClick={startCreateFlow}
+              >
                   立即生成 <Sparkles className="w-4 h-4 ml-1.5" />
-                </Button>
-              </Link>
+              </Button>
               <Button variant="outline" className="px-5 rounded-xl border border-slate-200 bg-white/70"
                 onClick={() => document.getElementById('steps-section')?.scrollIntoView({ behavior: 'smooth' })}>
                 请前往查看 <ChevronDown className="w-4 h-4 ml-1" />
@@ -148,11 +185,13 @@ export default function Home() {
               </h1>
               <p className="text-lg text-slate-600">拍照上传一键生成· 平台选图配文</p>
               <div className="flex flex-wrap gap-4">
-                <Link href={user ? "/create/upload" : "/login"}>
-                  <Button size="lg" className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all">
+                <Button
+                  size="lg"
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all"
+                  onClick={startCreateFlow}
+                >
                     立即生成 <Sparkles className="w-5 h-5 ml-2" />
-                  </Button>
-                </Link>
+                </Button>
                 <Button size="lg" variant="outline" className="px-8 py-6 text-lg rounded-xl border-2 hover:bg-white/50"
                   onClick={() => document.getElementById('steps-section')?.scrollIntoView({ behavior: 'smooth' })}>
                   请前往查看 <ChevronDown className="w-5 h-5 ml-2" />
@@ -396,11 +435,14 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-4xl font-bold mb-4">立即开始，让AI为你的产品赋能</h2>
           <p className="text-xl text-blue-100 mb-8">助力中国智造，让中国智造走向世界</p>
-          <Link href={user ? "/create/upload" : "/login"}>
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
+          <Button
+            size="lg"
+            variant="secondary"
+            className="text-lg px-8 py-6"
+            onClick={startCreateFlow}
+          >
               开始使用 <Sparkles className="ml-2 w-5 h-5" />
-            </Button>
-          </Link>
+          </Button>
         </div>
       </section>
 

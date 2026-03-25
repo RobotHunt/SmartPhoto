@@ -17,8 +17,12 @@ import PlatformStep from "./pages/create/PlatformStep";
 import GenerateStep from "./pages/create/GenerateStep";
 import CopywritingStep from "./pages/create/CopywritingStep";
 import ConfirmStep from "./pages/create/ConfirmStep";
+import StrategyStep from "./pages/create/StrategyStep";
 import ResultStep from "./pages/create/ResultStep";
 import PaymentStep from "./pages/create/PaymentStep";
+import HDResultStep from "./pages/create/HDResultStep";
+import DetailConfirmStep from "./pages/create/DetailConfirmStep";
+import DetailResultStep from "./pages/create/DetailResultStep";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 
@@ -34,10 +38,15 @@ function Router() {
       <Route path="/create/analyze" component={AnalyzeStep} />
       <Route path="/create/platform" component={PlatformStep} />
       <Route path="/create/generate" component={GenerateStep} />
+      <Route path="/create/strategy" component={StrategyStep} />
       <Route path="/create/copywriting" component={CopywritingStep} />
       <Route path="/create/confirm" component={ConfirmStep} />
       <Route path="/create/result" component={ResultStep} />
       <Route path="/create/payment" component={PaymentStep} />
+      <Route path="/create/hd-payment" component={PaymentStep} />
+      <Route path="/create/hd-result" component={HDResultStep} />
+      <Route path="/create/detail-confirm" component={DetailConfirmStep} />
+      <Route path="/create/detail-result" component={DetailResultStep} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/project/:id" component={ProjectDetail} />

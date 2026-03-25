@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { CloudUpload, X, ChevronLeft } from "lucide-react";
 import { StepIndicator } from "@/components/StepIndicator";
@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 
 // ---------- types ----------
 
-type SlotType = "front" | "side" | "top" | "power" | "inner" | "parts";
+type SlotType = "front" | "angle45" | "side" | "extra_1" | "extra_2" | "extra_3";
 
 interface SlotDef {
   slotType: SlotType;
@@ -29,6 +29,8 @@ interface SlotState {
 
 const SESSION_KEY = "current_session_id";
 const SLOT_IDS_KEY = "upload_slot_image_ids"; // persisted map slotType -> imageId
+const ANALYSIS_DIRTY_KEY = "analysis_dirty";
+const ANALYZE_SUPPLEMENT_KEY = "from_analyze_supplement";
 
 const SLOT_DEFS: SlotDef[] = [
   { slotType: "front", label: "正面图", displayOrder: 1 },
@@ -56,6 +58,12 @@ function persistSlotIds(map: Record<string, string>) {
   sessionStorage.setItem(SLOT_IDS_KEY, JSON.stringify(map));
 }
 
+function markAnalysisDirty() {
+  sessionStorage.setItem(ANALYSIS_DIRTY_KEY, "1");
+  sessionStorage.removeItem("analysis_snapshot_full");
+  sessionStorage.removeItem("analysisResult");
+}
+
 // ---------- component ----------
 
 export default function UploadStep() {
@@ -66,7 +74,6 @@ export default function UploadStep() {
   const [sessionId, setSessionId] = useState<string | null>(
     () => sessionStorage.getItem(SESSION_KEY),
   );
-  const sessionCreating = useRef(false);
 
   // Per-slot upload state
   const [slots, setSlots] = useState<Record<SlotType, SlotState>>(() => {
@@ -87,55 +94,42 @@ export default function UploadStep() {
   // Track whether we are navigating away (to disable button)
   const [navigating, setNavigating] = useState(false);
 
-  // ---- ensure a backend session exists ----
-
-  useEffect(() => {
-    if (sessionId) return;
-    if (sessionCreating.current) return;
-    sessionCreating.current = true;
-
-    (async () => {
-      try {
-        const res = await sessionAPI.create();
-        const id = res.session_id;
-        sessionStorage.setItem(SESSION_KEY, id);
-        setSessionId(id);
-      } catch (err) {
-        console.error("Failed to create session:", err);
-        toast({
-          title: "\u521b\u5efa\u4f1a\u8bdd\u5931\u8d25",
-          description: "\u8bf7\u5237\u65b0\u9875\u9762\u91cd\u8bd5",
-          variant: "destructive",
-        });
-      } finally {
-        sessionCreating.current = false;
-      }
-    })();
-  }, [sessionId, toast]);
-
   // ---- hydrate preview URLs for images that were persisted (page refresh) ----
 
   useEffect(() => {
     if (!sessionId) return;
 
-    // Check if any slot has an imageId but no previewUrl
-    const needsHydration = SLOT_DEFS.some(
-      (d) => slots[d.slotType].imageId && !slots[d.slotType].previewUrl,
-    );
+    const needsHydration = SLOT_DEFS.some((def) => {
+      const slot = slots[def.slotType];
+      return !slot.previewUrl || !slot.imageId;
+    });
     if (!needsHydration) return;
+
+    const slotOrder = new Map(SLOT_DEFS.map((def) => [def.displayOrder, def.slotType]));
 
     (async () => {
       try {
-        const images: any[] = await sessionAPI.listImages(sessionId);
-        if (!images || images.length === 0) return;
+        const images = await sessionAPI.listImages(sessionId);
+        if (!images.length) return;
 
         setSlots((prev) => {
           const next = { ...prev };
-          for (const img of images) {
-            const st = img.slot_type as SlotType;
-            if (next[st] && next[st].imageId === img.image_id) {
-              next[st] = { ...next[st], previewUrl: img.url };
-            }
+          for (const image of images) {
+            const preferredSlot =
+              (image.slot_type === "extra"
+                ? slotOrder.get(Number(image.display_order || 0))
+                : image.slot_type) as SlotType | undefined;
+            const fallbackSlot =
+              slotOrder.get(Number(image.display_order || 0)) ||
+              (image.slot_type ? (`${image.slot_type}` as SlotType) : undefined);
+            const slotType = preferredSlot && next[preferredSlot] ? preferredSlot : fallbackSlot;
+
+            if (!slotType || !next[slotType]) continue;
+            next[slotType] = {
+              imageId: image.image_id,
+              previewUrl: image.url,
+              uploading: false,
+            };
           }
           return next;
         });
@@ -143,9 +137,7 @@ export default function UploadStep() {
         console.error("Failed to list images for preview hydration:", err);
       }
     })();
-    // Only run once when sessionId becomes available
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, slots]);
 
   // ---- persist slot image ids whenever they change ----
 
@@ -194,6 +186,7 @@ export default function UploadStep() {
       try {
         const backendSlotType = slotType.startsWith("extra") ? "extra" : slotType;
         const res = await sessionAPI.uploadImage(sid, file, backendSlotType, displayOrder);
+        markAnalysisDirty();
         setSlots((prev) => ({
           ...prev,
           [slotType]: {
@@ -258,6 +251,7 @@ export default function UploadStep() {
       if (sessionId && imageId) {
         try {
           await sessionAPI.deleteImage(sessionId, imageId);
+          markAnalysisDirty();
         } catch (err) {
           console.error(`Delete failed for ${slotType}:`, err);
           // Restore slot on failure
@@ -411,6 +405,9 @@ export default function UploadStep() {
                 "selectedPlatform",
                 "selectedTheme",
                 "analysisResult",
+                "analysis_snapshot_full",
+                ANALYSIS_DIRTY_KEY,
+                ANALYZE_SUPPLEMENT_KEY,
                 "productParams",
                 "copywritings",
                 "selectedImgCount",

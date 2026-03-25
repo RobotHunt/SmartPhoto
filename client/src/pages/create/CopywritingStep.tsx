@@ -13,9 +13,9 @@ import {
   BarChart2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StepIndicator } from "@/components/StepIndicator";
 import { sessionAPI, jobAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { DetailStepIndicator } from "./DetailStepIndicator";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -181,6 +181,7 @@ const ALL_TARGETS = [
 export default function CopywritingStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const detailFlowOrigin = sessionStorage.getItem("detail_flow_origin") || "generate";
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -336,11 +337,12 @@ export default function CopywritingStep() {
   // ── navigation ─────────────────────────────────────────────────────────
 
   const handleModify = useCallback(() => {
-    setLocation("/create/generate");
-  }, [setLocation]);
+    setLocation(detailFlowOrigin === "hd-result" ? "/create/hd-result" : "/create/generate");
+  }, [detailFlowOrigin, setLocation]);
 
   const handleGenerateAll = useCallback(() => {
-    setLocation("/create/confirm");
+    sessionStorage.setItem("generation_target", "detail_page");
+    setLocation("/create/detail-confirm");
   }, [setLocation]);
 
   // ── ordered modules ────────────────────────────────────────────────────
@@ -353,7 +355,7 @@ export default function CopywritingStep() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <StepIndicator currentStep={4} />
+      <DetailStepIndicator currentStep={1} />
 
       {/* ── Loading state ─────────────────────────────────────────────── */}
       {loading && (

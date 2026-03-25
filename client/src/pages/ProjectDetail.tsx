@@ -30,7 +30,7 @@ export default function ProjectDetail() {
     setImagesLoading(true);
     sessionAPI.getResults(sessionId)
       .then((data) => {
-        const imgs = Array.isArray(data) ? data : data?.images || [];
+        const imgs = Array.isArray(data) ? data : data?.assets || [];
         setImages(imgs);
       })
       .catch(() => setImages([]))

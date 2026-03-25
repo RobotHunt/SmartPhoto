@@ -1,5 +1,5 @@
-// Simple toast hook for notifications
 import { useState, useCallback } from "react";
+import { toast as sonnerToast } from "sonner";
 
 export interface Toast {
   title: string;
@@ -11,14 +11,15 @@ export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const toast = useCallback((props: Toast) => {
-    // For now, just use console.log
-    // In a real app, this would show a toast notification
-    console.log(`[Toast] ${props.title}${props.description ? `: ${props.description}` : ""}`);
-    
-    // You can also use alert for immediate feedback
+    setToasts((previous) => [...previous, props]);
+
+    const options = props.description ? { description: props.description } : undefined;
     if (props.variant === "destructive") {
-      console.error(`[Error] ${props.title}: ${props.description}`);
+      sonnerToast.error(props.title, options);
+      return;
     }
+
+    sonnerToast(props.title, options);
   }, []);
 
   return { toast, toasts };
