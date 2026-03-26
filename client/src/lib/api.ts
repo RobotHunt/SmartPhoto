@@ -432,12 +432,15 @@ export const sessionAPI = {
       }),
     });
 
-    // Step 2: Upload to COS via our Vite proxy to avoid CORS issues
-    // Rewrite: https://xxx.cos.ap-beijing.myqcloud.com/path -> /cos-proxy/path
+    // Step 2: Upload to COS
+    // In development (Vite), use proxy to avoid CORS: /__cos_proxy__ -> COS
+    // In production, CORS is configured on COS bucket, use presigned URL directly
     const cosUrl = new URL(presign.upload_url);
-    const proxiedUrl = `/__cos_proxy__${cosUrl.pathname}${cosUrl.search}`;
+    const uploadUrl = import.meta.env.DEV
+      ? `/__cos_proxy__${cosUrl.pathname}${cosUrl.search}`
+      : presign.upload_url;
 
-    const uploadRes = await fetch(proxiedUrl, {
+    const uploadRes = await fetch(uploadUrl, {
       method: presign.method || 'PUT',
       headers: {
         ...(presign.headers || {}),

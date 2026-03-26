@@ -219,4 +219,12 @@ export default defineConfig({
       },
     },
   },
+    preview: {
+    host: true,
+    allowedHosts: [
+      '.ins.chat',
+      'localhost',
+      '127.0.0.1',
+    ],
+  },
 });
