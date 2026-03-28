@@ -43,8 +43,11 @@ function roleToLabel(role?: string) {
   return ROLE_LABELS[role] || role;
 }
 
-function normalizeGenerationError(message: string) {
-  const raw = String(message || "").trim();
+function normalizeGenerationError(error: any) {
+  const raw = String(error?.message || error || "").trim();
+  const code = String(error?.code || "").trim();
+  const upstreamReason = String(error?.result_payload?.upstream_reason || "").trim();
+  const upstreamStatus = Number(error?.result_payload?.upstream_http_status || 0);
   if (!raw) {
     return {
       code: "unknown",
@@ -67,6 +70,20 @@ function normalizeGenerationError(message: string) {
       code: "insufficient_credits",
       title: "额度不足",
       description: "当前账户额度不足以完成本次生成，请稍后重试或联系后端补充联调额度。",
+    };
+  }
+
+  if (
+    code === "42901" ||
+    upstreamReason === "rate_limited" ||
+    upstreamStatus === 429 ||
+    raw.includes("Too Many Requests") ||
+    raw.includes("429")
+  ) {
+    return {
+      code: "upstream_rate_limited",
+      title: "上游限流",
+      description: "当前上游模型出现限流，请稍后重试。这不是你的会话数据丢失。",
     };
   }
 
@@ -259,24 +276,30 @@ export default function ResultStep() {
         }
 
         if (snapshot.latest_generate_job_id) {
-          clearInterval(fakeTimer);
-          setStatusText("正在恢复已有生成任务...");
-          safeSetProgress(45);
-          await jobAPI.pollUntilDone(snapshot.latest_generate_job_id, (jobStatus) => {
-            const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
-            const stage = jobStatus.stage || jobStatus.status || "";
-            if (stage && !cancelled) {
-              setStatusText(`生成中 · ${stage}`);
-            }
-            if (!cancelled) {
-              safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
-            }
-          });
-          if (cancelled) return;
-          setStatusText("正在加载生成结果...");
-          safeSetProgress(95);
-          await loadResults();
-          return;
+          const latestJob = await jobAPI.getStatus(snapshot.latest_generate_job_id).catch(() => null);
+          if (!latestJob || !["failed", "error"].includes(String(latestJob.status || "").toLowerCase())) {
+            clearInterval(fakeTimer);
+            setStatusText("正在恢复已有生成任务...");
+            safeSetProgress(45);
+            await jobAPI.pollUntilDone(snapshot.latest_generate_job_id, (jobStatus) => {
+              const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
+              const stage = jobStatus.stage || jobStatus.status || "";
+              if (stage && !cancelled) {
+                setStatusText(`生成中 · ${stage}`);
+              }
+              if (!cancelled) {
+                safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
+              }
+            });
+            if (cancelled) return;
+            setStatusText("正在加载生成结果...");
+            safeSetProgress(95);
+            await loadResults();
+            return;
+          }
+
+          setStatusText("检测到上一轮生成失败，正在重新创建任务...");
+          safeSetProgress(42);
         }
 
         setStatusText("AI 正在努力生成图片...");
@@ -304,7 +327,7 @@ export default function ResultStep() {
         await loadResults();
       } catch (err: any) {
         clearInterval(fakeTimer);
-        const normalizedError = normalizeGenerationError(err?.message || "生成失败，请重试");
+        const normalizedError = normalizeGenerationError(err || "生成失败，请重试");
         setError(
           normalizedError.code === "insufficient_credits"
             ? "insufficient_credits"
@@ -664,7 +687,7 @@ export default function ResultStep() {
           <div className="mx-auto max-w-lg">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-medium text-slate-800">已选择 {selectedCount} 张</span>
-              <span className="text-xs text-slate-400">确认后生成无水印高清图</span>
+              <span className="text-xs text-slate-400">确认后进入当前版本结果查看页</span>
             </div>
             <button
               onClick={() => {
@@ -678,7 +701,7 @@ export default function ResultStep() {
               disabled={selectedCount === 0 || actionLocked}
               className="w-full rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 font-bold text-white shadow-lg shadow-blue-200/50 transition active:scale-[0.98] disabled:from-slate-300 disabled:to-slate-400"
             >
-              生成无水印高清图
+              查看当前版本结果
             </button>
           </div>
         </div>

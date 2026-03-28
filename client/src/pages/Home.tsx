@@ -1,35 +1,10 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Clock3, FolderOpen, Search, Sparkles, User } from "lucide-react";
+import { ArrowRight, Clock3, FolderOpen, Search, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
-
-const CREATE_FLOW_KEYS = [
-  "current_session_id",
-  "upload_slot_image_ids",
-  "analysis_dirty",
-  "from_analyze_supplement",
-  "analysis_snapshot_full",
-  "analysisResult",
-  "selectedProductType",
-  "selectedPlatform",
-  "selectedTheme",
-  "productParams",
-  "copywritings",
-  "selected_asset_ids",
-  "selectedImgCount",
-  "selectedPlans",
-  "paymentSuccess",
-  "generatedImages",
-  "hdImages",
-  "current_result_version",
-  "detail_current_version",
-  "detail_result_autostart",
-  "hdPaymentSuccess",
-  "hd_unlocked_version",
-];
+import { clearCreateFlow } from "@/lib/createFlow";
 
 const FLOW_STEPS = [
   {
@@ -49,12 +24,7 @@ const FLOW_STEPS = [
   },
 ];
 
-function clearCreateFlow() {
-  CREATE_FLOW_KEYS.forEach((key) => sessionStorage.removeItem(key));
-}
-
 export default function Home() {
-  const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -65,14 +35,6 @@ export default function Home() {
     clearCreateFlow();
     setLocation("/create/upload");
   };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-blue-500" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -99,32 +61,22 @@ export default function Home() {
                 历史
               </span>
             </Link>
-            {user && (
-              <Link href="/account">
-                <span className="cursor-pointer text-sm text-slate-500 transition hover:text-slate-800">
-                  账户
-                </span>
-              </Link>
-            )}
+            <Link href="/account">
+              <span className="cursor-pointer text-sm text-slate-500 transition hover:text-slate-800">
+                账户
+              </span>
+            </Link>
           </div>
 
           <div className="flex items-center gap-2">
             <button className="hidden rounded-xl p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 md:flex">
               <Search className="h-5 w-5" />
             </button>
-            {user ? (
-              <Link href="/account">
-                <button className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500 text-sm font-bold text-white transition hover:bg-blue-600">
-                  {(user.display_name || user.email || "U").charAt(0).toUpperCase()}
-                </button>
-              </Link>
-            ) : (
-              <Link href="/login">
-                <Button className="rounded-2xl bg-blue-500 px-5 text-white hover:bg-blue-600">
-                  登录
-                </Button>
-              </Link>
-            )}
+            <Link href="/account">
+              <Button className="rounded-2xl bg-blue-500 px-5 text-white hover:bg-blue-600">
+                纯图片模式
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
@@ -173,7 +125,7 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2">
                 <FolderOpen className="h-4 w-4 text-blue-500" />
-                结果页支持后续归档到账户
+                当前会话可继续查看与下载结果
               </div>
             </div>
           </div>

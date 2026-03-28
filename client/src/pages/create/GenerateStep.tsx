@@ -98,10 +98,10 @@ function normalizeParams(source: any): ParamItem[] {
       if (!item || typeof item !== "object") return null;
       const label = String(item.label || item.key || "").trim();
       const value = String(item.value || "").trim();
-      if (!label && !value) return null;
+      if (!label || !value) return null;
       return { id: item.id || `param-${index}`, label, value };
     })
-    .filter((item): item is ParamItem => Boolean(item && (item.label || item.value)));
+    .filter((item): item is ParamItem => Boolean(item && item.label && item.value));
 }
 
 function dedupeByText(items: TextItem[]): TextItem[] {
@@ -112,6 +112,26 @@ function dedupeByText(items: TextItem[]): TextItem[] {
     seen.add(key);
     return true;
   });
+}
+
+function hasStep3Content(snapshot: any): boolean {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  if (typeof snapshot.hero_scene === "string" && snapshot.hero_scene.trim()) return true;
+  if (normalizeTextItems(snapshot.core_selling_points).length > 0) return true;
+  if (normalizeParams(snapshot.key_parameters).length > 0) return true;
+  if (normalizeTextItems(snapshot.product_advantages).length > 0) return true;
+  if (normalizeTextItems(snapshot.feature_highlights).length > 0) return true;
+  return false;
+}
+
+function hasEditableFieldContent(snapshot: any, copyFields?: any): boolean {
+  const resolvedHeroScene = String(copyFields?.hero_scene || snapshot?.hero_scene || "").trim();
+  if (resolvedHeroScene) return true;
+  if (normalizeParams(copyFields?.key_parameters || snapshot?.key_parameters).length > 0) return true;
+  if (normalizeTextItems(copyFields?.core_selling_points || snapshot?.core_selling_points).length > 0) return true;
+  if (normalizeTextItems(copyFields?.product_advantages || snapshot?.product_advantages).length > 0) return true;
+  if (normalizeTextItems(copyFields?.feature_highlights || snapshot?.feature_highlights).length > 0) return true;
+  return false;
 }
 
 export default function GenerateStep() {
@@ -150,6 +170,7 @@ export default function GenerateStep() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const referenceImageInputRef = useRef<HTMLInputElement>(null);
+  const autoExtractAttemptedRef = useRef(false);
 
   const availableThemes =
     PRODUCT_THEMES[productCategory] && PRODUCT_THEMES[productCategory].length > 0
@@ -165,7 +186,8 @@ export default function GenerateStep() {
     }
 
     const nextCategory = String(
-      copyFields?.product_category ||
+      copyFields?.category ||
+        copyFields?.product_category ||
         snapshot.product_category ||
         sessionStorage.getItem("selectedProductType") ||
         "",
@@ -176,21 +198,26 @@ export default function GenerateStep() {
     }
 
     const nextTheme = String(snapshot.hero_scene || sessionStorage.getItem("selectedTheme") || "").trim();
-    if (nextTheme) {
-      setSelectedTheme(nextTheme);
-      sessionStorage.setItem("selectedTheme", nextTheme);
+    const resolvedHeroScene = String(copyFields?.hero_scene || nextTheme).trim();
+    if (resolvedHeroScene) {
+      setSelectedTheme(resolvedHeroScene);
+      sessionStorage.setItem("selectedTheme", resolvedHeroScene);
     }
 
-    const nextParams = normalizeParams(snapshot.key_parameters);
+    const nextParams = normalizeParams(copyFields?.key_parameters || snapshot.key_parameters);
     if (nextParams.length > 0) setParams(nextParams);
 
-    const nextSellingPoints = dedupeByText(normalizeTextItems(snapshot.core_selling_points));
+    const nextSellingPoints = dedupeByText(
+      normalizeTextItems(copyFields?.core_selling_points || snapshot.core_selling_points),
+    );
     if (nextSellingPoints.length > 0) setSellingPoints(nextSellingPoints);
 
-    const nextAdvantages = dedupeByText(normalizeTextItems(snapshot.product_advantages));
+    const nextAdvantages = dedupeByText(
+      normalizeTextItems(copyFields?.product_advantages || snapshot.product_advantages),
+    );
     if (nextAdvantages.length > 0) setAdvantages(nextAdvantages);
 
-    const nextFeatures = dedupeByText(normalizeTextItems(snapshot.feature_highlights));
+    const nextFeatures = dedupeByText(normalizeTextItems(copyFields?.feature_highlights || snapshot.feature_highlights));
     if (nextFeatures.length > 0) setFeatureTexts(nextFeatures);
   }, []);
 
@@ -274,12 +301,11 @@ export default function GenerateStep() {
 
         if (cancelled) return;
 
-        if (parametersResult.status === "fulfilled") {
-          const data = parametersResult.value || {};
-          const snapshot = data.parameter_snapshot || data;
-          populateFromSnapshot(snapshot, data.applied_copy_fields);
-        } else if (sessionResult.status === "fulfilled") {
+        if (sessionResult.status === "fulfilled") {
           const session = sessionResult.value || {};
+          if (session.confirmed_copy) {
+            populateFromSnapshot(session.confirmed_copy, session.confirmed_copy);
+          }
           if (session.analysis_snapshot) {
             populateFromSnapshot(session.analysis_snapshot);
             const recognized = session.analysis_snapshot.recognized_product || {};
@@ -293,6 +319,36 @@ export default function GenerateStep() {
             if (nextCategory) {
               setProductCategory(nextCategory);
               sessionStorage.setItem("selectedProductType", nextCategory);
+            }
+          }
+          if (parametersResult.status === "fulfilled") {
+            const data = parametersResult.value || {};
+            const snapshot = data.parameter_snapshot || data;
+            if (hasEditableFieldContent(snapshot, data.applied_copy_fields)) {
+              populateFromSnapshot(snapshot, data.applied_copy_fields);
+            }
+          }
+
+          const currentSnapshot =
+            parametersResult.status === "fulfilled"
+              ? parametersResult.value?.parameter_snapshot || parametersResult.value || {}
+              : {};
+          const hasCurrentContent =
+            hasEditableFieldContent(currentSnapshot, parametersResult.status === "fulfilled" ? parametersResult.value?.applied_copy_fields : undefined) ||
+            hasEditableFieldContent(session.confirmed_copy, session.confirmed_copy);
+
+          if (!hasCurrentContent && session.analysis_snapshot && !autoExtractAttemptedRef.current) {
+            autoExtractAttemptedRef.current = true;
+            try {
+              const trigger = await sessionAPI.extractParameters(sessionId);
+              await jobAPI.pollUntilDone(trigger.job_id);
+              const extracted = await sessionAPI.getParameters(sessionId);
+              const extractedSnapshot = extracted?.parameter_snapshot || extracted;
+              if (hasEditableFieldContent(extractedSnapshot, extracted?.applied_copy_fields)) {
+                populateFromSnapshot(extractedSnapshot, extracted?.applied_copy_fields);
+              }
+            } catch (extractError) {
+              console.warn("Auto parameter extraction skipped:", extractError);
             }
           }
         } else {
@@ -405,12 +461,11 @@ export default function GenerateStep() {
       await jobAPI.pollUntilDone(trigger.job_id);
 
       const latest = await sessionAPI.getParameters(sessionId);
-      const snapshot = latest?.parameter_snapshot || latest;
-      populateFromSnapshot(snapshot, latest?.applied_copy_fields);
-
+      const extractedSnapshot = latest?.parameter_snapshot || latest;
+      populateFromSnapshot(extractedSnapshot, latest?.applied_copy_fields);
       toast({
-        title: "参数提取完成",
-        description: "已根据后端最新结果回填页面内容。",
+        title: "参数刷新完成",
+        description: "已根据当前商品分析和附件整页更新 Step3 内容。",
       });
     } catch (err: any) {
       toast({

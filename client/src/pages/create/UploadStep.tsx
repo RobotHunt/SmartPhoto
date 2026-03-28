@@ -21,10 +21,10 @@ interface SlotState {
   uploading: boolean;
 }
 
+
 const SESSION_KEY = "current_session_id";
 const SLOT_IDS_KEY = "upload_slot_image_ids";
 const ANALYSIS_DIRTY_KEY = "analysis_dirty";
-const ANALYZE_SUPPLEMENT_KEY = "from_analyze_supplement";
 
 const SLOT_DEFS: SlotDef[] = [
   { slotType: "front", label: "正面图", displayOrder: 1 },

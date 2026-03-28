@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import {
   ArrowLeft,
   CheckCircle2,
-  CloudUpload,
   Download,
   FileText,
   Loader2,
@@ -14,7 +13,6 @@ import {
 import { StepIndicator } from "@/components/StepIndicator";
 import { sessionAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 type PreviewAsset = {
   asset_id: string;
@@ -32,16 +30,6 @@ function triggerBrowserDownload(url: string, filename: string) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-}
-
-async function downloadAssetsDirectly(assets: PreviewAsset[]) {
-  for (let index = 0; index < assets.length; index += 1) {
-    const asset = assets[index];
-    triggerBrowserDownload(asset.image_url, `${roleLabel(asset.role)}-${asset.asset_id}.png`);
-    if (index < assets.length - 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 180));
-    }
-  }
 }
 
 function resolveSelectedIds(raw: string | null): string[] {
@@ -66,23 +54,14 @@ function roleLabel(role: string) {
   return roleMap[role] || role || "图片";
 }
 
-function buildClaimRedirect(pathname: string, search: string) {
-  const url = new URL(`${pathname}${search || ""}`, window.location.origin);
-  url.searchParams.set("claim", "1");
-  return `/login?redirect=${encodeURIComponent(`${url.pathname}${url.search}`)}`;
-}
-
 export default function HDResultStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  const [claiming, setClaiming] = useState(false);
   const [assets, setAssets] = useState<PreviewAsset[]>([]);
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [singleDownloadingId, setSingleDownloadingId] = useState<string | null>(null);
-  const [canDownload, setCanDownload] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const sessionId = sessionStorage.getItem("current_session_id") || "";
@@ -95,15 +74,13 @@ export default function HDResultStep() {
       sessionStorage.getItem("current_result_version") ||
       "0",
   );
-  const claimRedirect = buildClaimRedirect(window.location.pathname, window.location.search);
-  const shouldClaimAfterLogin = new URLSearchParams(window.location.search).get("claim") === "1";
 
   useEffect(() => {
     let cancelled = false;
 
     async function bootstrap() {
       if (!sessionId) {
-        setError("缺少当前会话，请返回结果页重新进入高清流程。");
+        setError("缺少当前会话，请返回结果页重新进入当前版本下载页。");
         setLoading(false);
         return;
       }
@@ -112,23 +89,6 @@ export default function HDResultStep() {
       setError(null);
 
       try {
-        if (user && shouldClaimAfterLogin) {
-          setClaiming(true);
-          await sessionAPI.claimGuestSession(sessionId);
-          if (!cancelled) {
-            window.history.replaceState({}, "", window.location.pathname);
-            toast({
-              title: "已保存到当前账户",
-              description: "当前高清主图结果已归档到你的账户，后续可在历史记录中查看。",
-            });
-          }
-        }
-
-        const snapshot = await sessionAPI.get(sessionId);
-        if (cancelled) return;
-
-        setCanDownload(!!snapshot.can_download);
-
         const results = await sessionAPI.getResults(sessionId, unlockedVersion || undefined);
         if (cancelled) return;
 
@@ -147,11 +107,10 @@ export default function HDResultStep() {
         );
       } catch (err: any) {
         if (!cancelled) {
-          setError(err?.message || "加载高清结果失败");
+          setError(err?.message || "加载当前版本结果失败");
         }
       } finally {
         if (!cancelled) {
-          setClaiming(false);
           setLoading(false);
         }
       }
@@ -161,11 +120,11 @@ export default function HDResultStep() {
     return () => {
       cancelled = true;
     };
-  }, [claiming, selectedIds, sessionId, shouldClaimAfterLogin, toast, unlockedVersion, user]);
+  }, [selectedIds, sessionId, unlockedVersion]);
 
   const titleText = useMemo(() => {
-    if (unlockedVersion > 0) return `高清无水印结果 · V${unlockedVersion}`;
-    return "高清无水印结果";
+    if (unlockedVersion > 0) return `当前版本结果 · V${unlockedVersion}`;
+    return "当前版本结果";
   }, [unlockedVersion]);
 
   const handleDownloadZip = async () => {
@@ -173,23 +132,15 @@ export default function HDResultStep() {
 
     setDownloadingZip(true);
     try {
-      if (canDownload) {
-        const blob = await sessionAPI.downloadResults(sessionId, unlockedVersion || undefined);
-        const url = URL.createObjectURL(blob);
-        triggerBrowserDownload(url, `main-gallery-v${unlockedVersion || 1}.zip`);
-        URL.revokeObjectURL(url);
+      const blob = await sessionAPI.downloadResults(sessionId, unlockedVersion || undefined);
+      const url = URL.createObjectURL(blob);
+      triggerBrowserDownload(url, `main-gallery-v${unlockedVersion || 1}.zip`);
+      URL.revokeObjectURL(url);
 
-        toast({
-          title: "开始下载",
-          description: "当前版本压缩包已开始下载。",
-        });
-      } else {
-        await downloadAssetsDirectly(assets);
-        toast({
-          title: "开始下载",
-          description: `已为你发起 ${assets.length} 张图片下载。`,
-        });
-      }
+      toast({
+        title: "开始下载",
+        description: "当前版本压缩包已开始下载。",
+      });
     } catch (err: any) {
       toast({
         title: "下载失败",
@@ -222,7 +173,7 @@ export default function HDResultStep() {
       if (navigator.share) {
         await navigator.share({
           title: titleText,
-          text: "这是我刚生成的高清无水印主图结果。",
+          text: "这是我刚生成的当前版本主图结果。",
           url: window.location.href,
         });
       } else {
@@ -237,49 +188,16 @@ export default function HDResultStep() {
     }
   };
 
-  const handleArchiveToAccount = async () => {
-    if (!sessionId) return;
-
-    if (!user) {
-      setLocation(claimRedirect);
-      return;
-    }
-
-    setClaiming(true);
-    try {
-      await sessionAPI.claimGuestSession(sessionId);
-      setCanDownload(true);
-      toast({
-        title: "已保存到当前账户",
-        description: "当前高清主图结果已归档到你的账户。",
-      });
-    } catch (err: any) {
-      toast({
-        title: "保存失败",
-        description: err?.message || "请稍后重试。",
-        variant: "destructive",
-      });
-    } finally {
-      setClaiming(false);
-    }
-  };
-
-  if (loading || claiming) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <StepIndicator currentStep={5} step5Label="高清结果" />
+        <StepIndicator currentStep={5} step5Label="结果查看" />
         <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-50">
             <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
           </div>
-          <h2 className="mb-1 text-lg font-bold text-slate-900">
-            {claiming ? "正在保存到你的账户..." : "正在加载高清结果"}
-          </h2>
-          <p className="text-sm text-slate-500">
-            {claiming
-              ? "请稍候，我们正在认领当前会话。"
-              : "正在获取当前版本对应的高清无水印主图结果。"}
-          </p>
+          <h2 className="mb-1 text-lg font-bold text-slate-900">正在加载当前版本结果</h2>
+          <p className="text-sm text-slate-500">正在获取当前版本对应的主图结果。</p>
         </div>
       </div>
     );
@@ -288,9 +206,9 @@ export default function HDResultStep() {
   if (error) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <StepIndicator currentStep={5} step5Label="高清结果" />
+        <StepIndicator currentStep={5} step5Label="结果查看" />
         <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
-          <div className="mb-4 text-lg font-bold text-slate-900">高清结果加载失败</div>
+          <div className="mb-4 text-lg font-bold text-slate-900">当前版本结果加载失败</div>
           <p className="mb-5 max-w-sm text-center text-sm text-slate-500">{error}</p>
           <div className="flex items-center gap-3">
             <button
@@ -313,7 +231,7 @@ export default function HDResultStep() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <StepIndicator currentStep={5} step5Label="高清结果" />
+      <StepIndicator currentStep={5} step5Label="结果查看" />
 
       <div className="flex items-center gap-3 border-b border-slate-100 bg-white px-4 py-3">
         <button
@@ -324,7 +242,7 @@ export default function HDResultStep() {
         </button>
         <div>
           <h1 className="text-base font-bold text-slate-900">{titleText}</h1>
-          <p className="text-xs text-slate-400">当前展示的是本次已解锁的高清无水印结果</p>
+          <p className="text-xs text-slate-400">当前页面只负责查看、下载和继续进入详情图流程</p>
         </div>
       </div>
 
@@ -335,9 +253,9 @@ export default function HDResultStep() {
               <Sparkles className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-slate-900">高清无水印主图已解锁</h2>
+              <h2 className="text-xl font-black text-slate-900">当前版本结果已准备完成</h2>
               <p className="mt-1 text-sm text-slate-500">
-                当前页面展示的是当前版本对应的高清结果，图片将按完整比例展示。
+                当前页面已经不再处理登录、账户归档和无水印权限判断，直接按 session 与版本展示结果。
               </p>
             </div>
           </div>
@@ -345,7 +263,7 @@ export default function HDResultStep() {
 
         <div className="mb-4 flex items-center gap-2">
           <CheckCircle2 className="h-5 w-5 text-blue-500" />
-          <span className="text-sm font-semibold text-slate-800">共 {assets.length} 张高清图</span>
+          <span className="text-sm font-semibold text-slate-800">共 {assets.length} 张主图结果</span>
         </div>
 
         {assets.length > 0 ? (
@@ -383,37 +301,13 @@ export default function HDResultStep() {
           </div>
         ) : (
           <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
-            <p className="text-lg font-semibold text-slate-900">暂无高清结果</p>
+            <p className="text-lg font-semibold text-slate-900">暂无当前版本结果</p>
             <p className="mt-2 text-sm text-slate-500">
-              请先从结果页选择图片，并继续进入高清流程。
+              请先从结果页选择图片，并继续进入当前版本查看流程。
             </p>
           </div>
         )}
       </div>
-
-      {!canDownload && (
-        <div className="fixed bottom-24 left-0 right-0 z-20 border-t border-b border-slate-200 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
-                <CloudUpload className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-slate-800">
-                  登录账号，自动保存你的设计资产
-                </div>
-                <div className="text-xs text-slate-400">避免图片丢失</div>
-              </div>
-            </div>
-            <button
-              onClick={handleArchiveToAccount}
-              className="rounded-full bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"
-            >
-              登录 / 注册
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center gap-3">

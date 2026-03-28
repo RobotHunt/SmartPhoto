@@ -14,7 +14,6 @@ import {
 
 import { useToast } from "@/hooks/use-toast";
 import { jobAPI, sessionAPI } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
 
 import { DetailStepIndicator } from "./DetailStepIndicator";
 
@@ -23,6 +22,12 @@ type DetailPanel = {
   panel_id?: string;
   slot_id?: string;
   panel_label?: string | null;
+  narrative_section?: string | null;
+  panel_goal?: string | null;
+  copy_focus?: string | null;
+  panel_type?: string | null;
+  visual_truth_mode?: string | null;
+  origin_note?: string | null;
   image_url: string;
   thumbnail_url?: string | null;
   display_order: number;
@@ -66,35 +71,6 @@ function triggerBrowserDownload(url: string, filename: string) {
   document.body.removeChild(link);
 }
 
-async function downloadDetailImagesDirectly(results: DetailResultsPayload, version: number) {
-  const queue: Array<{ url: string; filename: string }> = [];
-
-  if (results.stitched_asset?.image_url) {
-    queue.push({
-      url: results.stitched_asset.image_url,
-      filename: `detail-page-long-v${version || 1}.png`,
-    });
-  }
-
-  results.panels.forEach((panel, index) => {
-    if (!panel.image_url) return;
-    queue.push({
-      url: panel.image_url,
-      filename: `${panel.panel_label || `detail-${index + 1}`}-v${version || 1}.png`,
-    });
-  });
-
-  for (let index = 0; index < queue.length; index += 1) {
-    const item = queue[index];
-    triggerBrowserDownload(item.url, item.filename);
-    if (index < queue.length - 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 180));
-    }
-  }
-
-  return queue.length;
-}
-
 function normalizeDetailResults(data: any): DetailResultsPayload {
   const panels = Array.isArray(data?.panels) ? data.panels : [];
   const sortedPanels: DetailPanel[] = panels
@@ -103,6 +79,12 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
       panel_id: panel?.panel_id ?? null,
       slot_id: panel?.slot_id ?? null,
       panel_label: panel?.panel_label ?? panel?.panel_id ?? `详情图 ${index + 1}`,
+      narrative_section: panel?.narrative_section ?? null,
+      panel_goal: panel?.panel_goal ?? null,
+      copy_focus: panel?.copy_focus ?? null,
+      panel_type: panel?.panel_type ?? null,
+      visual_truth_mode: panel?.visual_truth_mode ?? null,
+      origin_note: panel?.origin_note ?? null,
       image_url: String(panel?.image_url || panel?.thumbnail_url || ""),
       thumbnail_url: panel?.thumbnail_url ?? null,
       display_order: Number(panel?.display_order ?? index),
@@ -166,6 +148,32 @@ function resolveStageText(stage?: string) {
   return stage;
 }
 
+function normalizeDetailGenerationError(error: any) {
+  const raw = String(error?.message || error || "").trim();
+  const code = String(error?.code || "").trim();
+  const upstreamReason = String(error?.result_payload?.upstream_reason || "").trim();
+  const upstreamStatus = Number(error?.result_payload?.upstream_http_status || 0);
+  if (
+    code === "42901" ||
+    upstreamReason === "rate_limited" ||
+    upstreamStatus === 429 ||
+    raw.includes("Too Many Requests") ||
+    raw.includes("429")
+  ) {
+    return "上游模型当前限流，请稍后重试。";
+  }
+  return raw || "详情图生成失败";
+}
+
+function visualTruthLabel(mode?: string | null) {
+  return {
+    faithful_closeup: "真实局部图",
+    mechanism_illustration: "机制示意图",
+    scene_reconstruction: "场景重建图",
+    parameter_board: "参数信息图",
+  }[String(mode || "")] || "";
+}
+
 function saveBrandStyleProfile(payload: {
   brandName: string;
   sessionId: string;
@@ -200,20 +208,11 @@ function saveBrandStyleProfile(payload: {
   }
 }
 
-function buildClaimRedirect(pathname: string, search: string) {
-  const url = new URL(`${pathname}${search || ""}`, window.location.origin);
-  url.searchParams.set("claim", "1");
-  return `/login?redirect=${encodeURIComponent(`${url.pathname}${url.search}`)}`;
-}
-
 export default function DetailResultStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
 
   const sessionId = sessionStorage.getItem("current_session_id") || "";
-  const claimRedirect = buildClaimRedirect(window.location.pathname, window.location.search);
-  const shouldClaimAfterLogin = new URLSearchParams(window.location.search).get("claim") === "1";
 
   const [phase, setPhase] = useState<"loading" | "done" | "error">("loading");
   const [progress, setProgress] = useState(8);
@@ -222,10 +221,8 @@ export default function DetailResultStep() {
   const [shareOpen, setShareOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [claiming, setClaiming] = useState(false);
   const [results, setResults] = useState<DetailResultsPayload | null>(null);
   const [currentVersion, setCurrentVersion] = useState(0);
-  const [canDownload, setCanDownload] = useState(false);
   const [brandOpen, setBrandOpen] = useState(false);
   const [brandName, setBrandName] = useState("");
 
@@ -264,7 +261,6 @@ export default function DetailResultStep() {
     );
 
     const snapshot = await sessionAPI.get(sessionId);
-    setCanDownload(!!snapshot.can_download);
     const targetVersion = snapshot.detail_latest_result_version || undefined;
     await fetchDetailResults(targetVersion);
     setProgress(100);
@@ -293,22 +289,8 @@ export default function DetailResultStep() {
         setError("");
         setPhase("loading");
 
-        if (user && shouldClaimAfterLogin) {
-          setClaiming(true);
-          await sessionAPI.claimGuestSession(sessionId);
-          if (!cancelled) {
-            window.history.replaceState({}, "", window.location.pathname);
-            toast({
-              title: "已保存到当前账户",
-              description: "当前详情图结果已归档到你的账户。",
-            });
-          }
-        }
-
         const snapshot = await sessionAPI.get(sessionId);
         if (cancelled) return;
-
-        setCanDownload(!!snapshot.can_download);
 
         const shouldAutostart = sessionStorage.getItem("detail_result_autostart") === "true";
         sessionStorage.removeItem("detail_result_autostart");
@@ -332,22 +314,24 @@ export default function DetailResultStep() {
         }
 
         if (snapshot.latest_detail_generate_job_id) {
-          await waitForDetailGeneration(
-            snapshot.latest_detail_generate_job_id,
-            "正在恢复已有详情图任务...",
-          );
-          return;
+          const latestJob = await jobAPI.getStatus(snapshot.latest_detail_generate_job_id).catch(() => null);
+          if (!latestJob || !["failed", "error"].includes(String(latestJob.status || "").toLowerCase())) {
+            await waitForDetailGeneration(
+              snapshot.latest_detail_generate_job_id,
+              "正在恢复已有详情图任务...",
+            );
+            return;
+          }
+
+          setLoadingText("检测到上一轮详情图生成失败，正在重新创建任务...");
+          setProgress(12);
         }
 
         await startGeneration();
       } catch (err: any) {
         if (!cancelled) {
           setPhase("error");
-          setError(err?.message || "详情图生成失败");
-        }
-      } finally {
-        if (!cancelled) {
-          setClaiming(false);
+          setError(normalizeDetailGenerationError(err));
         }
       }
     }
@@ -357,7 +341,7 @@ export default function DetailResultStep() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, setLocation, shouldClaimAfterLogin, toast, user]);
+  }, [sessionId, setLocation, toast]);
 
   const handleRetry = async () => {
     if (!sessionId || regenerating) return;
@@ -396,16 +380,11 @@ export default function DetailResultStep() {
 
     try {
       setDownloading(true);
-      if (canDownload) {
-        const blob = await sessionAPI.downloadDetailResults(sessionId, currentVersion || undefined);
-        const url = URL.createObjectURL(blob);
-        triggerBrowserDownload(url, `detail-page-v${currentVersion || 1}.zip`);
-        URL.revokeObjectURL(url);
-        toast({ title: "开始下载", description: "详情图压缩包已开始下载。" });
-      } else {
-        const count = await downloadDetailImagesDirectly(results, currentVersion || 1);
-        toast({ title: "开始下载", description: `已为你发起 ${count} 张详情图下载。` });
-      }
+      const blob = await sessionAPI.downloadDetailResults(sessionId, currentVersion || undefined);
+      const url = URL.createObjectURL(blob);
+      triggerBrowserDownload(url, `detail-page-v${currentVersion || 1}.zip`);
+      URL.revokeObjectURL(url);
+      toast({ title: "开始下载", description: "详情图压缩包已开始下载。" });
     } catch (err: any) {
       toast({
         title: "下载失败",
@@ -439,64 +418,30 @@ export default function DetailResultStep() {
     setLocation("/");
   };
 
-  const handleArchiveToAccount = async () => {
-    if (!sessionId) return;
-    if (!user) {
-      setLocation(claimRedirect);
-      return;
-    }
-
-    setClaiming(true);
-    try {
-      const snapshot = await sessionAPI.claimGuestSession(sessionId);
-      setCanDownload(!!snapshot.can_download);
-      toast({
-        title: "已保存到当前账户",
-        description: "当前详情图结果已归档到你的账户。",
-      });
-    } catch (err: any) {
-      toast({
-        title: "保存失败",
-        description: err?.message || "请稍后重试。",
-        variant: "destructive",
-      });
-    } finally {
-      setClaiming(false);
-    }
-  };
-
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <DetailStepIndicator currentStep={3} />
 
-      {(phase === "loading" || claiming) && (
+      {phase === "loading" && (
         <div className="flex flex-1 flex-col items-center justify-center px-4">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg shadow-blue-200">
             <Sparkles className="h-8 w-8 text-white" />
           </div>
-          <h2 className="mb-1 text-lg font-bold text-slate-900">
-            {claiming ? "正在保存到你的账户..." : "正在生成详情图..."}
-          </h2>
-          <p className="mb-5 text-sm text-slate-500">
-            {claiming ? "请稍候，我们正在认领当前会话。" : loadingText}
-          </p>
-          {!claiming && (
-            <>
-              <div className="mb-2 w-full max-w-xs">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
-              <p className="text-sm text-slate-400">{progress}%</p>
-            </>
-          )}
+          <h2 className="mb-1 text-lg font-bold text-slate-900">正在生成详情图...</h2>
+          <p className="mb-5 text-sm text-slate-500">{loadingText}</p>
+          <div className="mb-2 w-full max-w-xs">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-sm text-slate-400">{progress}%</p>
         </div>
       )}
 
-      {phase === "error" && !claiming && (
+      {phase === "error" && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
             <AlertCircle className="h-8 w-8 text-red-500" />
@@ -522,7 +467,7 @@ export default function DetailResultStep() {
         </div>
       )}
 
-      {phase === "done" && results && !claiming && (
+      {phase === "done" && results && (
         <div className="flex flex-1 flex-col">
           <div className="flex items-center gap-2.5 border-b border-amber-100 bg-amber-50 px-4 py-2.5">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500">
@@ -594,6 +539,9 @@ export default function DetailResultStep() {
                     <div className="text-sm font-semibold text-slate-900">
                       {panel.panel_label || `详情图 ${index + 1}`}
                     </div>
+                    {panel.panel_goal && (
+                      <div className="mt-1 text-xs text-slate-500">{panel.panel_goal}</div>
+                    )}
                   </div>
                   <div className="bg-slate-100 p-3">
                     <img
@@ -602,6 +550,33 @@ export default function DetailResultStep() {
                       className="w-full rounded-2xl object-contain"
                     />
                   </div>
+                  <div className="space-y-2 px-4 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      {panel.narrative_section && (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
+                          {panel.narrative_section}
+                        </span>
+                      )}
+                      {panel.panel_type && (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
+                          {panel.panel_type}
+                        </span>
+                      )}
+                      {visualTruthLabel(panel.visual_truth_mode) && (
+                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] text-blue-700">
+                          {visualTruthLabel(panel.visual_truth_mode)}
+                        </span>
+                      )}
+                    </div>
+                    {panel.copy_focus && (
+                      <div className="text-xs text-slate-600">文案重点：{panel.copy_focus}</div>
+                    )}
+                    {panel.origin_note && (
+                      <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                        {panel.origin_note}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -609,31 +584,7 @@ export default function DetailResultStep() {
         </div>
       )}
 
-      {!canDownload && phase === "done" && !claiming && (
-        <div className="fixed bottom-24 left-0 right-0 z-20 border-t border-b border-slate-200 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
-                <CloudUpload className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-slate-800">
-                  登录账号，自动保存你的设计资产
-                </div>
-                <div className="text-xs text-slate-400">避免图片丢失</div>
-              </div>
-            </div>
-            <button
-              onClick={handleArchiveToAccount}
-              className="rounded-full bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"
-            >
-              登录 / 注册
-            </button>
-          </div>
-        </div>
-      )}
-
-      {phase === "done" && results && !claiming && (
+      {phase === "done" && results && (
         <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-4 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center gap-3">
             <button
@@ -721,7 +672,6 @@ export default function DetailResultStep() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

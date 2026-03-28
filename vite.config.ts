@@ -175,8 +175,17 @@ function loadEnvVar(varName: string): string | undefined {
 }
 
 const proxyTarget = loadEnvVar('VITE_LOCAL_PROXY_TARGET');
+const localProxyAppKey = loadEnvVar('LOCAL_PROXY_X_APP_KEY');
 
-export default defineConfig({
+export default defineConfig(({ command }) => {
+  if (command === 'serve' && proxyTarget && !localProxyAppKey) {
+    throw new Error(
+      "VITE_LOCAL_PROXY_TARGET is set but LOCAL_PROXY_X_APP_KEY is missing. " +
+        "Set LOCAL_PROXY_X_APP_KEY in your local env so the dev proxy can inject X-App-Key.",
+    );
+  }
+
+  return {
   plugins,
   resolve: {
     alias: {
@@ -193,7 +202,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port: 8000,
+    port: 5173,
     host: true,
     allowedHosts: "all",
     fs: {
@@ -207,6 +216,11 @@ export default defineConfig({
               target: proxyTarget,
               changeOrigin: true,
               secure: false,
+              headers: localProxyAppKey
+                ? {
+                    'X-App-Key': localProxyAppKey,
+                  }
+                : undefined,
             },
           }
         : {}),
@@ -227,4 +241,5 @@ export default defineConfig({
       '127.0.0.1',
     ],
   },
+  };
 });

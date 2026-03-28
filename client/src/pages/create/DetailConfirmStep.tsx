@@ -12,6 +12,11 @@ type DetailPlanItem = {
   panel_id?: string;
   panel_label?: string;
   panel_type?: string;
+  narrative_section?: string;
+  panel_goal?: string;
+  copy_focus?: string;
+  visual_truth_mode?: string;
+  origin_note?: string;
   display_order?: number;
   copy_lines?: string[];
   copy_blocks?: Record<string, any>;
@@ -22,6 +27,9 @@ type PreviewCard = {
   id: string;
   label: string;
   description: string;
+  secondary?: string;
+  modeLabel?: string;
+  originNote?: string;
   previewUrl: string;
 };
 
@@ -61,7 +69,15 @@ function buildPreviewCards(panelPlan: DetailPlanItem[], previewUrls: string[]) {
     return {
       id: String(item.slot_id || item.panel_id || index + 1),
       label: item.panel_label || item.panel_type || `详情图 ${index + 1}`,
-      description: copyLines[0] || item.layout_notes || "将基于当前文案与平台规则生成详情图内容",
+      description:
+        item.panel_goal ||
+        item.copy_focus ||
+        copyLines[0] ||
+        item.layout_notes ||
+        "将基于当前文案与平台规则生成详情图内容",
+      secondary: item.copy_focus || item.narrative_section || "",
+      modeLabel: item.visual_truth_mode || "",
+      originNote: item.origin_note || "",
       previewUrl: fallbackUrls[index % fallbackUrls.length],
     };
   });
@@ -212,11 +228,16 @@ export default function DetailConfirmStep() {
       <DetailStepIndicator currentStep={2} />
 
       <div className="bg-white border-b px-4 py-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <CheckCircle2 className="w-4 h-4 text-blue-500" />
-          <span className="text-sm font-semibold text-slate-800">
-            已规划 {cards.length > 0 ? cards.length : 0} 张详情图
-          </span>
+        <div>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-blue-500" />
+            <span className="text-sm font-semibold text-slate-800">
+              已规划 {cards.length > 0 ? cards.length : 0} 张详情图
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            当前详情页会复用同一个 session 的商品图、分析结果和参数补全结果。
+          </p>
         </div>
         <button
           onClick={handleRegenerate}
@@ -292,11 +313,26 @@ export default function DetailConfirmStep() {
                 <div className="absolute left-4 right-4 bottom-4 text-white">
                   <p className="text-lg font-bold leading-tight">{card.label}</p>
                   <p className="text-sm text-white/85 mt-1 line-clamp-2">{card.description}</p>
+                  {card.secondary && (
+                    <p className="mt-1 text-xs text-white/70 line-clamp-2">{card.secondary}</p>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between px-4 py-2">
-                <span className="text-sm text-slate-500">{card.label}</span>
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-slate-500">{card.label}</span>
+                  {card.modeLabel && (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
+                      {card.modeLabel}
+                    </span>
+                  )}
+                </div>
+                {card.originNote && (
+                  <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    {card.originNote}
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleBack}
