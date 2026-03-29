@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { AlertCircle, Check, Loader2, Pause, Play, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { jobAPI, sessionAPI } from "@/lib/api";
+import { resolveAssetLabel } from "@/lib/assetLabels";
 import { useToast } from "@/hooks/use-toast";
 
 const ALL_COPY_TARGETS = [
@@ -155,7 +156,11 @@ export default function StrategyStep() {
       sessionStorage.getItem("selectedPlatform") ||
       "当前平台";
     const planLabels = assetPlan
-      .map((item) => item?.role_label || item?.slot_label || item?.slot_id || item?.role)
+      .map((item) =>
+        item?.role_label ||
+        item?.slot_label ||
+        resolveAssetLabel(item?.slot_id, item?.role)
+      )
       .filter(Boolean)
       .slice(0, 5);
 

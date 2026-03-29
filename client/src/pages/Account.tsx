@@ -53,10 +53,10 @@ export default function Account() {
             <User className="w-10 h-10 text-slate-300" />
           </div>
           <h2 className="text-lg font-bold text-slate-900 mb-1">
-            登录后查看账户信息
+            登录后查看本地资料
           </h2>
           <p className="text-sm text-slate-500 mb-4">
-            登录即可保存你的设计资产，随时查看历史记录
+            登录后可在当前浏览器保存本地资料和历史记录，不依赖后端账户。
           </p>
           <a
             href={getLoginUrl()}
@@ -101,10 +101,10 @@ export default function Account() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-bold text-slate-900 truncate">
-              {user?.nickname || user?.name || user?.email || "用户"}
+              {user?.nickname || "本地用户"}
             </h2>
             <p className="text-sm text-slate-500 truncate">
-              {user?.email || ""}
+              {user?.phone || "资料仅保存在当前浏览器"}
             </p>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function Account() {
           className="w-full flex items-center gap-3 px-4 py-3.5 text-red-500 hover:bg-red-50 transition"
         >
           <LogOut className="w-5 h-5" />
-          <span className="text-sm font-medium">退出登录</span>
+          <span className="text-sm font-medium">退出本地登录</span>
         </button>
       </div>
 

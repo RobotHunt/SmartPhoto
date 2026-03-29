@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getLoginUrl } from "@/const";
 import { jobAPI, sessionAPI } from "@/lib/api";
+import { resolveGenerationStageText } from "@/lib/generationStatus";
 import { updateSessionRecord } from "@/lib/localUser";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -123,18 +124,6 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
     },
     panels: sortedPanels,
   };
-}
-
-function resolveStageText(stage?: string) {
-  if (!stage) return "详情图生成中";
-  const normalized = String(stage).toLowerCase();
-  if (normalized.includes("queue")) return "任务排队中";
-  if (normalized.includes("planning")) return "正在规划详情图";
-  if (normalized.includes("render")) return "正在渲染详情图";
-  if (normalized.includes("stitch")) return "正在拼接长图";
-  if (normalized.includes("upload")) return "正在整理结果";
-  if (normalized.includes("done")) return "即将完成";
-  return stage;
 }
 
 function normalizeDetailGenerationError(error: any) {
@@ -261,7 +250,7 @@ export default function DetailResultStep() {
         if (nextProgress > 0) {
           setProgress(Math.max(8, Math.min(99, nextProgress)));
         }
-        setLoadingText(resolveStageText(status?.stage || status?.status));
+        setLoadingText(resolveGenerationStageText(status?.stage || status?.status, "detail"));
       },
       2000,
       300000,
@@ -273,6 +262,15 @@ export default function DetailResultStep() {
     setProgress(100);
     setPhase("done");
     if (sessionId) updateSessionRecord(sessionId, { last_step: "detail-result" });
+  }
+
+  async function startGeneration() {
+    const generation = await sessionAPI.generateDetailPage(sessionId);
+    const jobId = generation?.job_id || generation?.jobId;
+    if (!jobId) {
+      throw new Error("未拿到详情图任务 ID");
+    }
+    await waitForDetailGeneration(jobId);
   }
 
   /* ---------------------------------------------------------------- */
@@ -297,6 +295,8 @@ export default function DetailResultStep() {
 
         // If results already exist, show them directly
         if (Number(snapshot.detail_latest_result_version || 0) > 0) {
+          setLoadingText("正在加载详情结果...");
+          setProgress(30);
           await fetchDetailResults(snapshot.detail_latest_result_version || undefined);
           if (cancelled) return;
           setProgress(100);
@@ -346,7 +346,7 @@ export default function DetailResultStep() {
       toast({ title: "已重新生成详情图", description: "当前显示的是最新生成结果。" });
     } catch (err: any) {
       setPhase("error");
-      setError(err?.message || "重新生成详情图失败");
+      setError(normalizeDetailGenerationError(err));
     } finally {
       setRegenerating(false);
     }
@@ -567,8 +567,8 @@ export default function DetailResultStep() {
                   <CloudUpload className="w-4 h-4 text-blue-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-800">登录账号，自动保存你的设计资产</p>
-                  <p className="text-xs text-slate-400">避免图片丢失</p>
+                  <p className="text-xs font-medium text-slate-800">登录后可保存本地资料与历史记录</p>
+                  <p className="text-xs text-slate-400">数据保存在当前浏览器</p>
                 </div>
                 <a
                   href={getLoginUrl()}

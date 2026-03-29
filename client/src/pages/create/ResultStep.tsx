@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 
 import { StepIndicator } from "@/components/StepIndicator";
+import { resolveAssetLabel } from "@/lib/assetLabels";
+import { resolveGenerationStageText } from "@/lib/generationStatus";
 import { updateSessionRecord } from "@/lib/localUser";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -22,16 +24,6 @@ import {
   type SessionResults,
   type VersionSummary,
 } from "@/lib/api";
-
-const ROLE_LABELS: Record<string, string> = {
-  hero: "主图",
-  white_bg: "白底图",
-  scene: "场景图",
-  selling_point: "卖点图",
-  feature: "功能图",
-  structure: "结构图",
-  detail: "详情图",
-};
 
 type ResultAssetView = {
   asset_id: string;
@@ -43,11 +35,6 @@ type ResultAssetView = {
   editOpen: boolean;
   texts: { title: string; subtitle: string; footer: string };
 };
-
-function roleToLabel(role?: string) {
-  if (!role) return "主图";
-  return ROLE_LABELS[role] || role;
-}
 
 function normalizeGenerationError(error: any) {
   const raw = String(error?.message || error || "").trim();
@@ -120,7 +107,7 @@ export default function ResultStep() {
 
   const [generating, setGenerating] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [statusText, setStatusText] = useState("AI 正在努力生成图片...");
+  const [statusText, setStatusText] = useState("正在生成主图...");
   const [error, setError] = useState<string | null>(null);
 
   const [assets, setAssets] = useState<ResultAssetView[]>([]);
@@ -276,8 +263,8 @@ export default function ResultStep() {
             await jobAPI.pollUntilDone(snapshot.latest_generate_job_id, (jobStatus) => {
               const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
               const stage = jobStatus.stage || jobStatus.status || "";
-              if (stage && !cancelled) {
-                setStatusText(`生成中 · ${stage}`);
+              if (!cancelled) {
+                setStatusText(resolveGenerationStageText(stage, "main"));
               }
               if (!cancelled) {
                 safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
@@ -294,7 +281,7 @@ export default function ResultStep() {
           safeSetProgress(42);
         }
 
-        setStatusText("AI 正在努力生成图片...");
+        setStatusText("正在生成主图...");
         safeSetProgress(45);
         const generateResponse = await sessionAPI.generateGallery(sessionId);
         clearInterval(fakeTimer);
@@ -303,8 +290,8 @@ export default function ResultStep() {
           await jobAPI.pollUntilDone(generateResponse.job_id, (jobStatus) => {
             const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
             const stage = jobStatus.stage || jobStatus.status || "";
-            if (stage && !cancelled) {
-              setStatusText(`生成中 · ${stage}`);
+            if (!cancelled) {
+              setStatusText(resolveGenerationStageText(stage, "main"));
             }
             if (!cancelled) {
               safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
@@ -457,9 +444,7 @@ export default function ResultStep() {
         await jobAPI.pollUntilDone(response.job_id, (jobStatus) => {
           const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
           const stage = jobStatus.stage || jobStatus.status || "";
-          if (stage) {
-            setStatusText(`优化中 · ${stage}`);
-          }
+          setStatusText(resolveGenerationStageText(stage, "main"));
           safeSetProgress(Math.min(Math.round(20 + pct * 0.75), 96));
         });
       }
@@ -623,7 +608,7 @@ export default function ResultStep() {
         <div className="space-y-3">
           {assets.map((asset) => {
             const isSelected = selected.has(asset.asset_id);
-            const label = roleToLabel(asset.role);
+            const label = resolveAssetLabel(asset.role, asset.slot_id);
 
             return (
               <div
