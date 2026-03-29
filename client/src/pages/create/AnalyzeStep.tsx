@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Check, CheckCircle2, Cpu, Pencil, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
+import { updateSessionRecord } from "@/lib/localUser";
 import {
   Select,
   SelectContent,
@@ -13,69 +14,99 @@ import {
 } from "@/components/ui/select";
 import { jobAPI, sessionAPI } from "@/lib/api";
 
+interface CandidateItem {
+  type: string;
+  confidence: number;
+  reason: string;
+}
+
+interface SupplementRecommendation {
+  slot_type: string;
+  label: string;
+  reason: string;
+  priority: number;
+  upload_goal: string;
+  must_show: string;
+  framing_hint: string;
+  example_caption: string;
+  image_kind?: string | null;
+}
+
 interface AnalysisResult {
   product_name: string;
   product_type: string;
   category: string;
   visual_features: string[];
   suggestions: string[];
+  scene_tags: string[];
+  category_candidates: CandidateItem[];
+  supplement_image_recommendations: SupplementRecommendation[];
 }
-
-const PRODUCT_CATEGORIES = [
-  "空气净化器",
-  "加湿器",
-  "除湿机",
-  "厨房小家电",
-  "服装",
-  "电子产品",
-  "家居用品",
-  "美妆护肤",
-  "食品饮料",
-  "运动户外",
-  "母婴用品",
-  "图书文具",
-  "其他",
-];
 
 const RECOGNITION_STEPS = ["产品类别识别", "产品结构识别", "应用场景识别"];
 const ANALYSIS_DIRTY_KEY = "analysis_dirty";
 const ANALYZE_SUPPLEMENT_KEY = "from_analyze_supplement";
+const ANALYZE_SUPPLEMENT_LIST_KEY = "analysis_supplement_recommendations";
 
-function getMockCandidates(category: string) {
-  if (category === "空气净化器") {
-    return [
-      { type: "空气净化器", confidence: 98 },
-      { type: "家用电器", confidence: 15 },
-      { type: "定制家居", confidence: 8 },
-    ];
+function parseStringList(value: any): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item: any) => String(item || "").trim()).filter(Boolean);
   }
-
-  return [{ type: category || "其他", confidence: 98 }];
+  return String(value || "")
+    .split(/[,\uFF0C\u3001\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-function getMockSceneTags(category: string) {
-  if (category === "空气净化器") return ["家居场景", "白底产品"];
-  if (category === "服装") return ["模特展示", "细节特写"];
-  if (category === "美妆护肤") return ["清爽场景", "成分表达"];
-  return [];
+function parseCandidates(snapshot: any, fallbackCategory: string): CandidateItem[] {
+  const items = Array.isArray(snapshot?.category_candidates) ? snapshot.category_candidates : [];
+  const parsed = items
+    .map((item: any) => ({
+      type: String(item?.category || "").trim(),
+      confidence: Number(item?.confidence || 0),
+      reason: String(item?.reason || "").trim(),
+    }))
+    .filter((item: CandidateItem) => item.type);
+  if (parsed.length > 0) return parsed;
+  return fallbackCategory
+    ? [{ type: fallbackCategory, confidence: 98, reason: "当前识别结果的主类目。" }]
+    : [{ type: "其他", confidence: 60, reason: "未识别到更明确的品类。" }];
+}
+
+function parseSupplementRecommendations(snapshot: any): SupplementRecommendation[] {
+  const items = Array.isArray(snapshot?.supplement_image_recommendations)
+    ? snapshot.supplement_image_recommendations
+    : [];
+  return items
+    .map((item: any, index: number) => ({
+      slot_type: String(item?.slot_type || "").trim(),
+      label: String(item?.label || "").trim() || "补充图片",
+      reason: String(item?.reason || "").trim(),
+      priority: Number(item?.priority || index + 1),
+      upload_goal: String(item?.upload_goal || "").trim(),
+      must_show: String(item?.must_show || "").trim(),
+      framing_hint: String(item?.framing_hint || "").trim(),
+      example_caption: String(item?.example_caption || "").trim(),
+      image_kind: item?.image_kind ? String(item.image_kind).trim() : null,
+    }))
+    .filter((item: SupplementRecommendation) => item.slot_type && item.label);
 }
 
 function parseAnalysisSnapshot(snapshot: any): AnalysisResult {
   const recognized = snapshot?.recognized_product || {};
-  const rawVisualFeatures =
-    snapshot?.suggested_styles || snapshot?.visual_features || [];
+  const fallbackCategory = String(recognized.category || snapshot?.category || "其他").trim() || "其他";
+  const categoryCandidates = parseCandidates(snapshot, fallbackCategory);
+  const supplementRecommendations = parseSupplementRecommendations(snapshot);
 
   return {
-    product_name: recognized.product_name || snapshot?.product_name || "产品",
-    product_type: recognized.image_type || snapshot?.product_type || "实物图",
-    category: recognized.category || snapshot?.category || "其他",
-    visual_features: Array.isArray(rawVisualFeatures)
-      ? rawVisualFeatures
-      : String(rawVisualFeatures)
-          .split(/[,\uFF0C\u3001\n]/)
-          .map((item) => item.trim())
-          .filter(Boolean),
-    suggestions: Array.isArray(snapshot?.suggestions) ? snapshot.suggestions : [],
+    product_name: String(recognized.product_name || snapshot?.product_name || "产品").trim() || "产品",
+    product_type: String(recognized.image_type || snapshot?.product_type || "实物图").trim() || "实物图",
+    category: fallbackCategory,
+    visual_features: parseStringList(snapshot?.suggested_styles || snapshot?.visual_features),
+    suggestions: parseStringList(snapshot?.suggestions),
+    scene_tags: parseStringList(snapshot?.scene_tags),
+    category_candidates: categoryCandidates,
+    supplement_image_recommendations: supplementRecommendations,
   };
 }
 
@@ -84,7 +115,7 @@ export default function AnalyzeStep() {
   const [analyzing, setAnalyzing] = useState(true);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [candidates, setCandidates] = useState<Array<{ type: string; confidence: number }>>([]);
+  const [candidates, setCandidates] = useState<CandidateItem[]>([]);
   const [firstImageUrl, setFirstImageUrl] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
@@ -116,16 +147,32 @@ export default function AnalyzeStep() {
 
     const applySnapshot = (snapshot: any) => {
       const parsed = parseAnalysisSnapshot(snapshot);
-      const nextCandidates = getMockCandidates(parsed.category || parsed.product_name);
+      const nextCandidates = parsed.category_candidates;
+      const nextSelectedCategory =
+        parsed.category ||
+        nextCandidates[0]?.type ||
+        "其他";
 
       sessionStorage.setItem("analysis_snapshot_full", JSON.stringify(snapshot));
       sessionStorage.setItem("analysisResult", JSON.stringify(parsed));
+
+      const sid = sessionStorage.getItem("current_session_id");
+      if (sid) {
+        updateSessionRecord(sid, {
+          product_name: parsed.product_name || "",
+          thumbnail_url: snapshot?.images?.[0]?.url || "",
+        });
+      }
+      sessionStorage.setItem(
+        ANALYZE_SUPPLEMENT_LIST_KEY,
+        JSON.stringify(parsed.supplement_image_recommendations),
+      );
       sessionStorage.removeItem(ANALYSIS_DIRTY_KEY);
       sessionStorage.removeItem(ANALYZE_SUPPLEMENT_KEY);
 
       setCandidates(nextCandidates);
       setResult(parsed);
-      setSelectedCategory(parsed.category || parsed.product_name);
+      setSelectedCategory(nextSelectedCategory);
       setEditedName(parsed.product_name);
       setError(null);
       setAnalyzing(false);
@@ -227,18 +274,39 @@ export default function AnalyzeStep() {
 
     sessionStorage.setItem("analysisResult", JSON.stringify(updatedResult));
     sessionStorage.setItem("selectedProductType", selectedCategory);
+    sessionStorage.setItem(
+      ANALYZE_SUPPLEMENT_LIST_KEY,
+      JSON.stringify(updatedResult.supplement_image_recommendations || []),
+    );
     sessionStorage.removeItem(ANALYZE_SUPPLEMENT_KEY);
     setLocation("/create/platform");
   };
 
   const handleSupplementImages = () => {
+    if (result?.supplement_image_recommendations?.length) {
+      sessionStorage.setItem(
+        ANALYZE_SUPPLEMENT_LIST_KEY,
+        JSON.stringify(result.supplement_image_recommendations),
+      );
+    }
     sessionStorage.setItem(ANALYZE_SUPPLEMENT_KEY, "1");
     setLocation("/create/upload");
   };
 
   const topCandidate = candidates[0];
   const row1Tags = candidates.map((candidate) => candidate.type);
-  const row2Tags = result ? getMockSceneTags(result.category || result.product_name) : [];
+  const row2Tags = result?.scene_tags || [];
+  const availableCategories = useMemo(() => {
+    const values = [
+      selectedCategory,
+      result?.category,
+      ...candidates.map((candidate) => candidate.type),
+      "其他",
+    ]
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+    return Array.from(new Set(values));
+  }, [candidates, result?.category, selectedCategory]);
 
   if (error) {
     return (
@@ -398,7 +466,7 @@ export default function AnalyzeStep() {
             )}
             {topCandidate && !editingName && (
               <span className="shrink-0 rounded-full bg-green-500 px-2.5 py-0.5 text-xs font-semibold text-white">
-                置信度 {topCandidate.confidence}%
+                置信度 {Math.round(topCandidate.confidence)}%
               </span>
             )}
           </div>
@@ -438,7 +506,7 @@ export default function AnalyzeStep() {
               <SelectValue placeholder="选择产品类型" />
             </SelectTrigger>
             <SelectContent>
-              {PRODUCT_CATEGORIES.map((category) => (
+              {availableCategories.map((category) => (
                 <SelectItem key={category} value={category}>
                   {category}
                 </SelectItem>
@@ -450,9 +518,39 @@ export default function AnalyzeStep() {
             AI 建议：{result.category || "其他"}，您可以确认或修改
           </p>
 
+          {result.supplement_image_recommendations.length > 0 && (
+            <div className="mb-3">
+              <p className="mb-2 text-xs font-medium text-gray-500">建议补传以下图片：</p>
+              <div className="space-y-2">
+                {result.supplement_image_recommendations
+                  .slice()
+                  .sort((a, b) => a.priority - b.priority)
+                  .map((item, index) => (
+                    <div key={`${item.slot_type}-${item.image_kind || "base"}-${index}`} className="rounded-xl border border-green-100 bg-white p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{item.label}</div>
+                          <div className="mt-1 text-xs text-gray-500">{item.reason}</div>
+                        </div>
+                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">
+                          P{item.priority}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                        {item.upload_goal && <p>补图目标：{item.upload_goal}</p>}
+                        {item.must_show && <p>必须拍到：{item.must_show}</p>}
+                        {item.framing_hint && <p>构图建议：{item.framing_hint}</p>}
+                        {item.example_caption && <p>示例标题：{item.example_caption}</p>}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {result.suggestions.length > 0 && (
             <div className="mb-3">
-              <p className="mb-1.5 text-xs text-gray-400">建议补充以下图片：</p>
+              <p className="mb-1.5 text-xs text-gray-400">补充说明：</p>
               <ul className="space-y-1">
                 {result.suggestions.map((suggestion, index) => (
                   <li

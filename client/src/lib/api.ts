@@ -3,8 +3,6 @@
 // Backend: /api/v2 → proxied to FastAPI backend
 // ============================================
 
-import { toast as sonnerToast } from 'sonner';
-
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api/v2').replace(/\/$/, '');
 
 function asArray<T = any>(value: any): T[] {
@@ -74,11 +72,6 @@ export interface SessionSnapshot {
   latest_result_version: number;
   detail_generation_round: number;
   detail_latest_result_version: number;
-  auth_mode?: 'guest' | 'user' | string;
-  guest_quota_remaining?: number | null;
-  login_required_actions?: string[];
-  can_download?: boolean;
-  can_continue_editing?: boolean;
 }
 
 export interface VersionSummary {
@@ -178,16 +171,6 @@ function normalizeSessionSnapshot(data: any): SessionSnapshot {
     latest_result_version: Number(data?.latest_result_version || 0),
     detail_generation_round: Number(data?.detail_generation_round || 0),
     detail_latest_result_version: Number(data?.detail_latest_result_version || 0),
-    auth_mode: data?.auth_mode ?? undefined,
-    guest_quota_remaining:
-      typeof data?.guest_quota_remaining === 'number' ? data.guest_quota_remaining : null,
-    login_required_actions: asArray<string>(data?.login_required_actions),
-    can_download:
-      typeof data?.can_download === 'boolean' ? data.can_download : undefined,
-    can_continue_editing:
-      typeof data?.can_continue_editing === 'boolean'
-        ? data.can_continue_editing
-        : undefined,
   };
 }
 
@@ -229,10 +212,6 @@ function normalizePlatformList(data: any) {
   return asArray<any>(data?.items ?? data?.platforms ?? data);
 }
 
-function normalizePricingRules(data: any) {
-  return asArray<any>(data?.items ?? data?.rules ?? data);
-}
-
 function stringifyErrorValue(value: any): string {
   if (typeof value === 'string') return value;
   if (value == null) return '';
@@ -246,17 +225,15 @@ function stringifyErrorValue(value: any): string {
   return String(value);
 }
 
+function removedFeature(name: string): Promise<never> {
+  return Promise.reject(new Error(`${name} 已下线：后端已切换为纯图片 SaaS 模式。`));
+}
+
 // ===== Core fetch wrapper =====
-export async function apiFetch<T = any>(path: string, options: RequestInit & { _isRetry?: boolean } = {}): Promise<T> {
-  const token = sessionStorage.getItem('auth_token');
-  const hadToken = !!token;
+export async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> || {}),
   };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json';
@@ -267,35 +244,6 @@ export async function apiFetch<T = any>(path: string, options: RequestInit & { _
     headers,
     credentials: 'include',
   });
-
-  if (res.status === 401) {
-    if (!options._isRetry && token) {
-      try {
-        const refreshData = await authAPI.refresh();
-        if (refreshData && refreshData.access_token) {
-          sessionStorage.setItem('auth_token', refreshData.access_token);
-          return apiFetch(path, { ...options, _isRetry: true });
-        }
-      } catch { /* refresh failed */ }
-    }
-    const authMessage = hadToken ? '登录已过期，请重新登录' : '请先登录后继续';
-    const authReason = hadToken ? 'expired' : 'unauthenticated';
-    sessionStorage.removeItem('auth_token');
-    sessionStorage.removeItem('auth_user');
-    window.dispatchEvent(new CustomEvent('auth:logout', {
-      detail: {
-        reason: authReason,
-        path,
-        message: authMessage,
-      },
-    }));
-    sonnerToast.error(authMessage, {
-      description: hadToken
-        ? '登录状态已经失效，当前操作需要重新登录。'
-        : '当前操作需要登录后才能继续。',
-    });
-    throw new Error(authMessage);
-  }
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
@@ -322,66 +270,49 @@ export async function apiFetch<T = any>(path: string, options: RequestInit & { _
 
 // ===== Auth API =====
 export const authAPI = {
-  register(email: string, password: string, displayName: string) {
-    return apiFetch<{ access_token: string; user: any }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, display_name: displayName }),
-    });
+  register(_email: string, _password: string, _displayName: string) {
+    return removedFeature('登录/注册');
   },
-  login(email: string, password: string) {
-    return apiFetch<{ access_token: string; user: any }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+  login(_email: string, _password: string) {
+    return removedFeature('登录');
   },
   logout() {
-    return apiFetch('/auth/logout', { method: 'POST' });
+    return removedFeature('退出登录');
   },
   me() {
-    return apiFetch<any>('/auth/me');
+    return removedFeature('账户信息');
   },
   refresh() {
-    return apiFetch<{ access_token: string }>('/auth/refresh', { method: 'POST' });
+    return removedFeature('登录刷新');
   },
 };
 
 // ===== Account API =====
 export const accountAPI = {
-  getOverview() { return apiFetch<any>('/account/overview'); },
-  async getPurchases() {
-    const data = await apiFetch<any>('/account/purchases');
-    return asArray<any>(data?.items ?? data);
+  getOverview() { return removedFeature('账户总览'); },
+  getPurchases() { return removedFeature('购买记录'); },
+  getNotifications() { return removedFeature('账户通知'); },
+  getWallet() { return removedFeature('钱包额度'); },
+  getSettings() { return removedFeature('账户设置'); },
+  updateSettings(_data: any) {
+    return removedFeature('账户设置');
   },
-  getNotifications() { return apiFetch<any[]>('/account/notifications'); },
-  getWallet() { return apiFetch<any>('/account/wallet'); },
-  getSettings() { return apiFetch<any>('/account/settings'); },
-  updateSettings(data: any) {
-    return apiFetch('/account/settings', { method: 'PUT', body: JSON.stringify(data) });
+  changePassword(_currentPassword: string, _newPassword: string) {
+    return removedFeature('密码修改');
   },
-  changePassword(currentPassword: string, newPassword: string) {
-    return apiFetch('/account/security/change-password', {
-      method: 'POST',
-      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
-    });
+  getProfile() { return removedFeature('个人资料'); },
+  updateProfile(_data: any) {
+    return removedFeature('个人资料');
   },
-  getProfile() { return apiFetch<any>('/account/profile'); },
-  updateProfile(data: any) {
-    return apiFetch('/account/profile', { method: 'PUT', body: JSON.stringify(data) });
-  },
-  async getWalletTransactions() {
-    const data = await apiFetch<any>('/account/wallet/transactions');
-    return asArray<any>(data?.items ?? data);
-  },
-  markNotificationRead(id: string) {
-    return apiFetch(`/account/notifications/${id}/read`, { method: 'POST' });
+  getWalletTransactions() { return removedFeature('钱包流水'); },
+  markNotificationRead(_id: string) {
+    return removedFeature('账户通知');
   },
   markAllNotificationsRead() {
-    return apiFetch('/account/notifications/read-all', { method: 'POST' });
+    return removedFeature('账户通知');
   },
-  async getAssets(params: Record<string, string> = {}) {
-    const qs = new URLSearchParams(params).toString();
-    const data = await apiFetch<any>('/account/assets' + (qs ? `?${qs}` : ''));
-    return normalizeAccountAssets(data);
+  getAssets(_params: Record<string, string> = {}) {
+    return removedFeature('历史资产');
   },
 };
 
@@ -432,12 +363,15 @@ export const sessionAPI = {
       }),
     });
 
-    // Step 2: Upload to COS via our Vite proxy to avoid CORS issues
-    // Rewrite: https://xxx.cos.ap-beijing.myqcloud.com/path -> /cos-proxy/path
+    // Step 2: Upload to COS
+    // In development (Vite), use proxy to avoid CORS: /__cos_proxy__ -> COS
+    // In production, CORS is configured on COS bucket, use presigned URL directly
     const cosUrl = new URL(presign.upload_url);
-    const proxiedUrl = `/__cos_proxy__${cosUrl.pathname}${cosUrl.search}`;
+    const uploadUrl = import.meta.env.DEV
+      ? `/__cos_proxy__${cosUrl.pathname}${cosUrl.search}`
+      : presign.upload_url;
 
-    const uploadRes = await fetch(proxiedUrl, {
+    const uploadRes = await fetch(uploadUrl, {
       method: presign.method || 'PUT',
       headers: {
         ...(presign.headers || {}),
@@ -519,10 +453,8 @@ export const sessionAPI = {
     return normalizeSessionResults(data);
   },
   async downloadResults(sessionId: string, version?: number): Promise<Blob> {
-    const token = sessionStorage.getItem('auth_token');
     const qs = version ? `?version=${version}` : '';
     const res = await fetch(`${API_BASE}/sessions/${sessionId}/download${qs}`, {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       credentials: 'include',
     });
     if (!res.ok) throw new Error('Download failed');
@@ -548,19 +480,15 @@ export const sessionAPI = {
     return apiFetch<any>(`/sessions/${sessionId}/detail-pages/results${qs}`);
   },
   async downloadDetailResults(sessionId: string, version?: number): Promise<Blob> {
-    const token = sessionStorage.getItem('auth_token');
     const qs = version ? `?version=${version}` : '';
     const res = await fetch(`${API_BASE}/sessions/${sessionId}/detail-pages/download${qs}`, {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       credentials: 'include',
     });
     if (!res.ok) throw new Error('Detail download failed');
     return res.blob();
   },
-  claimGuestSession(sessionId: string) {
-    return apiFetch<any>(`/guest/sessions/${sessionId}/claim`, {
-      method: 'POST',
-    }).then(normalizeSessionSnapshot);
+  claimGuestSession(_sessionId: string) {
+    return removedFeature('会话认领');
   },
 
   // Global edit
@@ -577,6 +505,14 @@ export const sessionAPI = {
   },
   extractParameters(sessionId: string) {
     return apiFetch<{ job_id: string; status?: string }>(`/sessions/${sessionId}/parameters/extract`, { method: 'POST' });
+  },
+  completeParameters(sessionId: string, completionInstruction?: string) {
+    return apiFetch<any>(`/sessions/${sessionId}/parameters/complete`, {
+      method: 'POST',
+      body: JSON.stringify({
+        completion_instruction: completionInstruction || null,
+      }),
+    });
   },
 
   // Strategy reference images
@@ -636,19 +572,24 @@ export const jobAPI = {
       onProgress?.(status);
       if (['completed', 'done', 'succeeded'].includes(status.status)) return status;
       if (['failed', 'error'].includes(status.status)) {
-        throw new Error(status.error_message || status.error || 'Job failed');
+        const error: any = new Error(status.error_message || status.error || 'Job failed');
+        error.code = status.error_code || null;
+        error.result_payload = status.result_payload || null;
+        error.jobStatus = status;
+        throw error;
       }
       await new Promise(r => setTimeout(r, interval));
     }
-    throw new Error('Job timed out');
+    const timeoutError: any = new Error('Job timed out');
+    timeoutError.code = 'job_timeout';
+    throw timeoutError;
   },
 
   streamEvents(jobId: string, onEvent: (evt: { type: string; data: any }) => void) {
-    const token = sessionStorage.getItem('auth_token');
     let closed = false;
     try {
       const url = `${API_BASE}/jobs/${jobId}/events`;
-      const es = new EventSource(url + (token ? `?token=${encodeURIComponent(token)}` : ''));
+      const es = new EventSource(url);
       es.onmessage = (e) => {
         if (closed) return;
         try { onEvent({ type: 'message', data: JSON.parse(e.data) }); }
@@ -693,8 +634,7 @@ export const assetAPI = {
 
 // ===== Pricing API =====
 export const pricingAPI = {
-  async getRules() {
-    const data = await apiFetch<any>('/account/pricing');
-    return normalizePricingRules(data);
+  getRules() {
+    return removedFeature('价格规则');
   },
 };

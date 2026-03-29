@@ -6,6 +6,7 @@ import { StepIndicator } from "@/components/StepIndicator";
 import { Button } from "@/components/ui/button";
 import { sessionAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { addSessionRecord } from "@/lib/localUser";
 
 type SlotType = "front" | "angle45" | "side" | "extra_1" | "extra_2" | "extra_3";
 
@@ -21,18 +22,18 @@ interface SlotState {
   uploading: boolean;
 }
 
+
 const SESSION_KEY = "current_session_id";
 const SLOT_IDS_KEY = "upload_slot_image_ids";
 const ANALYSIS_DIRTY_KEY = "analysis_dirty";
-const ANALYZE_SUPPLEMENT_KEY = "from_analyze_supplement";
 
 const SLOT_DEFS: SlotDef[] = [
   { slotType: "front", label: "正面图", displayOrder: 1 },
-  { slotType: "angle45", label: "45°角", displayOrder: 2 },
-  { slotType: "side", label: "侧面图", displayOrder: 3 },
-  { slotType: "extra_1", label: "补充图1", displayOrder: 4 },
-  { slotType: "extra_2", label: "补充图2", displayOrder: 5 },
-  { slotType: "extra_3", label: "补充图3", displayOrder: 6 },
+  { slotType: "side", label: "侧面图", displayOrder: 2 },
+  { slotType: "angle45", label: "顶部图", displayOrder: 3 },
+  { slotType: "extra_1", label: "产品开机图", displayOrder: 4 },
+  { slotType: "extra_2", label: "产品内部图", displayOrder: 5 },
+  { slotType: "extra_3", label: "产品配件图", displayOrder: 6 },
 ];
 
 function loadPersistedSlotIds(): Record<string, string> {
@@ -52,6 +53,63 @@ function markAnalysisDirty() {
   sessionStorage.setItem(ANALYSIS_DIRTY_KEY, "1");
   sessionStorage.removeItem("analysis_snapshot_full");
   sessionStorage.removeItem("analysisResult");
+}
+
+const MAX_DIMENSION = 2048;
+const COMPRESS_QUALITY = 0.85;
+
+function compressImage(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith("image/") || file.type === "image/gif") {
+      resolve(file);
+      return;
+    }
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      let { width, height } = img;
+      if (width <= MAX_DIMENSION && height <= MAX_DIMENSION && file.size <= 2 * 1024 * 1024) {
+        resolve(file);
+        return;
+      }
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || blob.size >= file.size) {
+            resolve(file);
+            return;
+          }
+          const compressed = new File([blob], file.name, {
+            type: file.type === "image/png" ? "image/png" : "image/jpeg",
+            lastModified: Date.now(),
+          });
+          resolve(compressed);
+        },
+        file.type === "image/png" ? "image/png" : "image/jpeg",
+        COMPRESS_QUALITY,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
 }
 
 export default function UploadStep() {
@@ -142,6 +200,15 @@ export default function UploadStep() {
           sid = created.session_id;
           sessionStorage.setItem(SESSION_KEY, sid);
           setSessionId(sid);
+          addSessionRecord({
+            session_id: sid,
+            product_name: "",
+            platform: "",
+            thumbnail_url: "",
+            created_at: new Date().toISOString(),
+            last_step: "upload",
+            image_count: 0,
+          });
         } catch (error: any) {
           toast({
             title: "创建会话失败",
@@ -159,8 +226,9 @@ export default function UploadStep() {
       }));
 
       try {
+        const compressed = await compressImage(file);
         const backendSlotType = slotType.startsWith("extra") ? "extra" : slotType;
-        const uploaded = await sessionAPI.uploadImage(sid, file, backendSlotType, displayOrder);
+        const uploaded = await sessionAPI.uploadImage(sid, compressed, backendSlotType, displayOrder);
         markAnalysisDirty();
 
         setSlots((prev) => ({
@@ -253,7 +321,7 @@ export default function UploadStep() {
     if (!hasImage) {
       toast({
         title: "请先上传图片",
-        description: "至少上传 1 张图片后才能进入 AI 识别。",
+        description: "至少上传 1 张图片后才能开始AI生图。",
         variant: "destructive",
       });
       return;
@@ -278,11 +346,8 @@ export default function UploadStep() {
 
       <div className="mx-auto max-w-5xl px-4 py-12">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
-            上传产品图片，AI 助力一键生图
-          </h1>
-          <p className="mt-4 text-sm text-slate-400 md:text-base">
-            温馨提示：素材越丰富，结果越稳定；手机实拍图即可直接开始。
+          <p className="text-sm text-blue-500 md:text-base">
+            ✨ 温馨提示：<span className="text-blue-600 font-medium">上传素材越多，生成越精准</span>；手机实拍即可
           </p>
         </div>
 
@@ -339,8 +404,8 @@ export default function UploadStep() {
             })}
           </div>
 
-          <div className="mt-8 text-center text-sm text-slate-500">
-            支持 JPG / PNG，至少上传 1 张图片即可开始
+          <div className="mt-8 text-center text-sm text-slate-400">
+            支持 JPG / PNG，至少上传1张图片即可开始
           </div>
 
           <Button
@@ -349,7 +414,7 @@ export default function UploadStep() {
             disabled={!hasAnyImage || anyUploading || navigating}
             className="mt-8 h-14 w-full rounded-2xl bg-blue-500 text-base font-semibold text-white shadow-lg shadow-blue-100 hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {anyUploading ? "图片上传中..." : navigating ? "正在进入识别..." : "开始 AI 识别"}
+            {anyUploading ? "图片上传中..." : navigating ? "正在进入识别..." : "开始AI生图"}
           </Button>
 
           <button

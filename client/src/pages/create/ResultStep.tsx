@@ -4,12 +4,16 @@ import {
   ArrowLeft,
   Check,
   Loader2,
+  Pencil,
   RefreshCw,
+  RotateCcw,
+  Sparkles,
   Wand2,
   X,
 } from "lucide-react";
 
 import { StepIndicator } from "@/components/StepIndicator";
+import { updateSessionRecord } from "@/lib/localUser";
 import { useToast } from "@/hooks/use-toast";
 import {
   assetAPI,
@@ -36,6 +40,8 @@ type ResultAssetView = {
   display_order: number;
   slot_id: string;
   isRegenerating: boolean;
+  editOpen: boolean;
+  texts: { title: string; subtitle: string; footer: string };
 };
 
 function roleToLabel(role?: string) {
@@ -43,8 +49,11 @@ function roleToLabel(role?: string) {
   return ROLE_LABELS[role] || role;
 }
 
-function normalizeGenerationError(message: string) {
-  const raw = String(message || "").trim();
+function normalizeGenerationError(error: any) {
+  const raw = String(error?.message || error || "").trim();
+  const code = String(error?.code || "").trim();
+  const upstreamReason = String(error?.result_payload?.upstream_reason || "").trim();
+  const upstreamStatus = Number(error?.result_payload?.upstream_http_status || 0);
   if (!raw) {
     return {
       code: "unknown",
@@ -70,6 +79,20 @@ function normalizeGenerationError(message: string) {
     };
   }
 
+  if (
+    code === "42901" ||
+    upstreamReason === "rate_limited" ||
+    upstreamStatus === 429 ||
+    raw.includes("Too Many Requests") ||
+    raw.includes("429")
+  ) {
+    return {
+      code: "upstream_rate_limited",
+      title: "上游限流",
+      description: "当前上游模型出现限流，请稍后重试。这不是你的会话数据丢失。",
+    };
+  }
+
   return {
     code: "generic",
     title: "生成失败",
@@ -85,28 +108,9 @@ function buildViewAssets(data: SessionResults): ResultAssetView[] {
     display_order: asset.display_order ?? index,
     slot_id: asset.slot_id || "",
     isRegenerating: false,
+    editOpen: false,
+    texts: { title: "", subtitle: "", footer: "" },
   }));
-}
-
-function WatermarkOverlay() {
-  return (
-    <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
-      <div
-        className="absolute inset-[-50%] flex flex-wrap items-center justify-center gap-8"
-        style={{ transform: "rotate(-30deg)" }}
-      >
-        {Array.from({ length: 60 }).map((_, index) => (
-          <span
-            key={index}
-            className="select-none whitespace-nowrap text-lg font-bold text-white/20"
-            style={{ letterSpacing: "0.15em" }}
-          >
-            AI电商做图 · 预览水印
-          </span>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export default function ResultStep() {
@@ -177,6 +181,11 @@ export default function ResultStep() {
         sessionStorage.setItem("current_result_version", String(resolvedVersion));
       } else {
         sessionStorage.removeItem("current_result_version");
+      }
+
+      const sid = sessionStorage.getItem("current_session_id");
+      if (sid) {
+        updateSessionRecord(sid, { last_step: "result", image_count: nextAssets.length });
       }
 
       safeSetProgress(100);
@@ -259,24 +268,30 @@ export default function ResultStep() {
         }
 
         if (snapshot.latest_generate_job_id) {
-          clearInterval(fakeTimer);
-          setStatusText("正在恢复已有生成任务...");
-          safeSetProgress(45);
-          await jobAPI.pollUntilDone(snapshot.latest_generate_job_id, (jobStatus) => {
-            const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
-            const stage = jobStatus.stage || jobStatus.status || "";
-            if (stage && !cancelled) {
-              setStatusText(`生成中 · ${stage}`);
-            }
-            if (!cancelled) {
-              safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
-            }
-          });
-          if (cancelled) return;
-          setStatusText("正在加载生成结果...");
-          safeSetProgress(95);
-          await loadResults();
-          return;
+          const latestJob = await jobAPI.getStatus(snapshot.latest_generate_job_id).catch(() => null);
+          if (!latestJob || !["failed", "error"].includes(String(latestJob.status || "").toLowerCase())) {
+            clearInterval(fakeTimer);
+            setStatusText("正在恢复已有生成任务...");
+            safeSetProgress(45);
+            await jobAPI.pollUntilDone(snapshot.latest_generate_job_id, (jobStatus) => {
+              const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
+              const stage = jobStatus.stage || jobStatus.status || "";
+              if (stage && !cancelled) {
+                setStatusText(`生成中 · ${stage}`);
+              }
+              if (!cancelled) {
+                safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
+              }
+            });
+            if (cancelled) return;
+            setStatusText("正在加载生成结果...");
+            safeSetProgress(95);
+            await loadResults();
+            return;
+          }
+
+          setStatusText("检测到上一轮生成失败，正在重新创建任务...");
+          safeSetProgress(42);
         }
 
         setStatusText("AI 正在努力生成图片...");
@@ -304,7 +319,7 @@ export default function ResultStep() {
         await loadResults();
       } catch (err: any) {
         clearInterval(fakeTimer);
-        const normalizedError = normalizeGenerationError(err?.message || "生成失败，请重试");
+        const normalizedError = normalizeGenerationError(err || "生成失败，请重试");
         setError(
           normalizedError.code === "insufficient_credits"
             ? "insufficient_credits"
@@ -463,6 +478,57 @@ export default function ResultStep() {
     }
   };
 
+  /* --- per-asset inline edit helpers --- */
+  const toggleEditOpen = (assetId: string) => {
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.asset_id === assetId
+          ? { ...a, editOpen: !a.editOpen }
+          : { ...a, editOpen: false },
+      ),
+    );
+  };
+
+  const updateAssetText = (
+    assetId: string,
+    field: "title" | "subtitle" | "footer",
+    value: string,
+  ) => {
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.asset_id === assetId
+          ? { ...a, texts: { ...a.texts, [field]: value } }
+          : a,
+      ),
+    );
+  };
+
+  const saveAssetText = async (assetId: string) => {
+    const asset = assets.find((a) => a.asset_id === assetId);
+    if (!asset) return;
+    const { title, subtitle, footer } = asset.texts;
+    const parts: string[] = [];
+    if (title.trim()) parts.push(`主标题：${title.trim()}`);
+    if (subtitle.trim()) parts.push(`副标题：${subtitle.trim()}`);
+    if (footer.trim()) parts.push(`底部文字：${footer.trim()}`);
+    if (parts.length === 0) {
+      // nothing to do, just close
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.asset_id === assetId ? { ...a, editOpen: false } : a,
+        ),
+      );
+      return;
+    }
+    const instruction = `修改文字：${parts.join("；")}`;
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.asset_id === assetId ? { ...a, editOpen: false } : a,
+      ),
+    );
+    await handleRegen(assetId, instruction);
+  };
+
   const selectedCount = selected.size;
   const hasRunningAssetRegen = regenLoading || assets.some((asset) => asset.isRegenerating);
   const actionLocked = globalEditLoading || hasRunningAssetRegen;
@@ -477,10 +543,10 @@ export default function ResultStep() {
           </div>
           <h2 className="mb-2 text-xl font-bold text-slate-900">{statusText}</h2>
           <p className="mb-6 text-sm text-slate-500">请耐心等待，AI 正在为您精心制作图片</p>
-          <div className="mb-3 w-full max-w-sm">
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+          <div className="mb-2 w-full max-w-xs">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500 ease-out"
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -533,69 +599,48 @@ export default function ResultStep() {
       <StepIndicator currentStep={5} step5Label="生成图片" />
 
       <div className="mx-auto max-w-lg px-4 pb-44 pt-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <span className="text-sm font-bold text-slate-800">已生成 {assets.length} 张</span>
+        {/* --- Top status bar --- */}
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
+              <Check className="h-3 w-3 stroke-[3] text-white" />
+            </div>
+            <span className="text-sm font-bold text-slate-800">
+              已生成 {assets.length} 张图片
+            </span>
+          </div>
           <button
-            onClick={() => {
-              if (actionLocked) return;
-              setGlobalEditOpen(true);
-            }}
-            disabled={actionLocked}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={() => setLocation("/create/generate")}
+            className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:text-blue-600"
           >
-            {globalEditLoading ? "AI 优化中..." : "AI 整体优化"}
+            <RotateCcw className="h-3 w-3" />
+            重新生成
           </button>
         </div>
+        <p className="mb-4 text-xs text-slate-400">预览图含水印，付费后生成高清清图</p>
 
-        <div className="mb-3 rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-          点击图片右上角勾选，可选择哪些结果继续进入无水印高清图流程。
-        </div>
-
-        {availableVersions.length > 1 && (
-          <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-slate-700">版本管理</span>
-              <span className="text-[11px] text-slate-400">
-                预览、支付、高清均基于当前版本
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {availableVersions.map((version) => {
-                const summary = versionSummaries.find((item) => item.version_no === version);
-                const active = version === currentVersion;
-                return (
-                  <button
-                    key={version}
-                    onClick={() => handleVersionChange(version)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                      active
-                        ? "border-blue-500 bg-blue-500 text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    V{version}
-                    {version === latestVersion ? " · 最新" : ""}
-                    {summary ? ` · ${summary.ready_count}/${summary.asset_count}` : ""}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
+        {/* --- Image cards --- */}
         <div className="space-y-3">
           {assets.map((asset) => {
             const isSelected = selected.has(asset.asset_id);
             const label = roleToLabel(asset.role);
 
             return (
-              <div key={asset.asset_id} className="relative">
+              <div
+                key={asset.asset_id}
+                className={`overflow-hidden rounded-2xl bg-white transition-all ${
+                  isSelected
+                    ? "shadow-md shadow-blue-100 ring-2 ring-blue-400"
+                    : "shadow-sm ring-1 ring-slate-100"
+                }`}
+              >
+                {/* 1:1 image area */}
                 <div
-                  className={`relative cursor-pointer overflow-hidden rounded-2xl transition-all ${
-                    isSelected ? "ring-2 ring-blue-400" : "ring-1 ring-slate-200"
-                  }`}
+                  className="relative w-full cursor-pointer"
+                  style={{ aspectRatio: "1/1" }}
                   onClick={() => toggleSelect(asset.asset_id)}
                 >
+                  {/* regenerating overlay */}
                   {asset.isRegenerating && (
                     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/50">
                       <Loader2 className="h-8 w-8 animate-spin text-white" />
@@ -603,87 +648,178 @@ export default function ResultStep() {
                     </div>
                   )}
 
-                  <div className="relative w-full" style={{ aspectRatio: "1 / 1" }}>
-                    <img
-                      src={asset.image_url}
-                      alt={label}
-                      className="h-full w-full object-cover"
-                      draggable={false}
-                    />
-                    <WatermarkOverlay />
+                  {/* image */}
+                  <img
+                    src={asset.image_url}
+                    alt={label}
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+
+                  {/* Single centered watermark */}
+                  <div className="pointer-events-none absolute inset-0 flex select-none items-center justify-center">
+                    <span
+                      className="whitespace-nowrap font-bold tracking-widest text-white/25 rotate-[-30deg]"
+                      style={{
+                        fontSize: "clamp(16px, 4.5vw, 24px)",
+                        textShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                      }}
+                    >
+                      AI电商做图 · 预览水印
+                    </span>
                   </div>
 
+                  {/* selection circle top-right */}
                   <div className="absolute right-3 top-3 z-20">
                     <div
-                      className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all ${
+                      className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all ${
                         isSelected
                           ? "border-blue-500 bg-blue-500"
                           : "border-white/60 bg-white/80 backdrop-blur-sm"
                       }`}
                     >
-                      {isSelected && <Check className="h-4 w-4 stroke-[3] text-white" />}
+                      {isSelected && <Check className="h-3 w-3 stroke-[3] text-white" />}
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-2 flex items-center justify-between px-1">
-                  <span className="text-sm font-medium text-slate-700">
-                    {productName} · {label}
-                  </span>
+                {/* Info row below image */}
+                <div className="flex items-center justify-between px-3 py-2.5">
                   <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-600">
+                      {productName} · {label}
+                    </span>
                     <button
                       onClick={() => {
                         if (actionLocked) return;
-                        setEditTextTarget(asset.asset_id);
-                        setEditTextValue("");
-                        setEditTextOpen(true);
+                        toggleEditOpen(asset.asset_id);
                       }}
                       disabled={actionLocked}
-                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
                     >
+                      <Pencil className="h-3 w-3" />
                       编辑文字
                     </button>
+                  </div>
+                  <button
+                    onClick={() => openRegenModal(asset.asset_id)}
+                    disabled={actionLocked || asset.isRegenerating}
+                    className="flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 disabled:opacity-40"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    重新生成
+                  </button>
+                </div>
+
+                {/* Expandable inline edit panel */}
+                {asset.editOpen && (
+                  <div className="border-t border-slate-100 bg-slate-50 px-3 pb-3 pt-2">
+                    <div className="space-y-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                          主标题
+                        </label>
+                        <input
+                          type="text"
+                          value={asset.texts.title}
+                          onChange={(e) =>
+                            updateAssetText(asset.asset_id, "title", e.target.value)
+                          }
+                          placeholder="输入主标题..."
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                          副标题
+                        </label>
+                        <input
+                          type="text"
+                          value={asset.texts.subtitle}
+                          onChange={(e) =>
+                            updateAssetText(asset.asset_id, "subtitle", e.target.value)
+                          }
+                          placeholder="输入副标题..."
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                          底部文字
+                        </label>
+                        <input
+                          type="text"
+                          value={asset.texts.footer}
+                          onChange={(e) =>
+                            updateAssetText(asset.asset_id, "footer", e.target.value)
+                          }
+                          placeholder="输入底部文字..."
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                        />
+                      </div>
+                    </div>
                     <button
-                      onClick={() => openRegenModal(asset.asset_id)}
-                      disabled={actionLocked || asset.isRegenerating}
-                      className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40"
+                      onClick={() => saveAssetText(asset.asset_id)}
+                      disabled={actionLocked}
+                      className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <RefreshCw className="h-3 w-3" />
-                      重新生成
+                      <Check className="h-3.5 w-3.5" />
+                      保存文字
                     </button>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
+      {/* --- Bottom fixed bar --- */}
       <div className="fixed bottom-0 left-0 right-0 z-30">
-        <div className="border-t border-slate-100 bg-white px-4 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-          <div className="mx-auto max-w-lg">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-800">已选择 {selectedCount} 张</span>
-              <span className="text-xs text-slate-400">确认后生成无水印高清图</span>
+        <div className="border-t border-slate-100 bg-white px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0 flex-1">
+              {selectedCount > 0 ? (
+                <>
+                  <p className="text-sm font-semibold text-slate-900">
+                    已选择 <span className="text-blue-600">{selectedCount}</span> 张
+                  </p>
+                  <p className="truncate text-xs text-slate-400">
+                    确认后生成无水印高清图...
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  点击图片选择要生成高清版的图片
+                </p>
+              )}
             </div>
             <button
               onClick={() => {
-                sessionStorage.setItem("selected_asset_ids", JSON.stringify(Array.from(selected)));
+                sessionStorage.setItem(
+                  "selected_asset_ids",
+                  JSON.stringify(Array.from(selected)),
+                );
                 sessionStorage.setItem("selectedImgCount", String(selectedCount));
                 if (currentVersion) {
-                  sessionStorage.setItem("current_result_version", String(currentVersion));
+                  sessionStorage.setItem(
+                    "current_result_version",
+                    String(currentVersion),
+                  );
                 }
                 setLocation("/create/payment");
               }}
               disabled={selectedCount === 0 || actionLocked}
-              className="w-full rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 font-bold text-white shadow-lg shadow-blue-200/50 transition active:scale-[0.98] disabled:from-slate-300 disabled:to-slate-400"
+              className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200/50 transition active:scale-[0.98] disabled:from-slate-300 disabled:to-slate-400"
             >
+              <Sparkles className="h-4 w-4" />
               生成无水印高清图
             </button>
           </div>
         </div>
       </div>
 
+      {/* --- Regen modal (bottom-sheet) --- */}
       {regenModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div
@@ -701,7 +837,9 @@ export default function ResultStep() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="mb-3 text-xs text-slate-400">告诉 AI 你希望如何调整这张图片。</p>
+            <p className="mb-3 text-xs text-slate-400">
+              请告诉 AI 你希望如何调整这张图片（可选）
+            </p>
             <textarea
               ref={regenTextareaRef}
               value={regenInstruction}
@@ -742,42 +880,7 @@ export default function ResultStep() {
         </div>
       )}
 
-      {editTextOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setEditTextOpen(false)}
-          />
-          <div className="relative w-full max-w-lg rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-2xl">
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
-            <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">编辑图片文字</h3>
-              <button
-                onClick={() => setEditTextOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <p className="mb-3 text-xs text-slate-400">输入希望 AI 帮你替换或强化的文字内容。</p>
-            <textarea
-              value={editTextValue}
-              onChange={(event) => setEditTextValue(event.target.value)}
-              rows={5}
-              className="w-full rounded-2xl border border-blue-200 px-4 py-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-400"
-              placeholder="例如：把标题改成“高效净化，全屋呼吸更安心”"
-            />
-            <button
-              onClick={confirmEditText}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 text-base font-bold text-white shadow-lg shadow-blue-200/50 transition hover:opacity-95"
-            >
-              <Wand2 className="h-4 w-4" />
-              按文字要求重新生成
-            </button>
-          </div>
-        </div>
-      )}
-
+      {/* --- Global edit modal (kept but hidden entry point) --- */}
       {globalEditOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div

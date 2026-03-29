@@ -1,449 +1,593 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
-  ArrowLeft,
-  CheckCircle2,
-  CloudUpload,
-  Download,
-  FileText,
   Loader2,
+  Crown,
+  FileText,
   Share2,
+  Pencil,
+  Check,
+  CloudUpload,
+  X,
+  RefreshCw,
   Sparkles,
+  CheckCircle2,
+  Download,
 } from "lucide-react";
-
+import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
-import { sessionAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { getLoginUrl } from "@/const";
+import { sessionAPI, assetAPI, jobAPI } from "@/lib/api";
+import { updateSessionRecord } from "@/lib/localUser";
 import { useAuth } from "@/contexts/AuthContext";
 
-type PreviewAsset = {
-  asset_id: string;
-  image_url: string;
-  thumbnail_url?: string | null;
-  role: string;
-};
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
-function triggerBrowserDownload(url: string, filename: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.target = "_blank";
-  link.rel = "noreferrer";
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+interface TextFields {
+  title: string;
+  subtitle: string;
+  footer: string;
 }
 
-async function downloadAssetsDirectly(assets: PreviewAsset[]) {
-  for (let index = 0; index < assets.length; index += 1) {
-    const asset = assets[index];
-    triggerBrowserDownload(asset.image_url, `${roleLabel(asset.role)}-${asset.asset_id}.png`);
-    if (index < assets.length - 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 180));
-    }
-  }
+interface PreviewImage {
+  id: string;
+  type: string;
+  product: string;
+  url: string;
+  editOpen: boolean;
+  isRegenerating: boolean;
+  texts: TextFields;
 }
 
-function resolveSelectedIds(raw: string | null): string[] {
-  try {
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
-  } catch {
-    return [];
-  }
-}
+type Phase = "loading" | "preview" | "hd-loading" | "hd-done";
 
-function roleLabel(role: string) {
-  const roleMap: Record<string, string> = {
-    hero: "主图",
-    main: "主图",
-    white_bg: "白底图",
-    scene: "场景图",
-    selling_point: "卖点图",
-    detail: "详情图",
-    feature: "功能图",
-  };
-  return roleMap[role] || role || "图片";
-}
-
-function buildClaimRedirect(pathname: string, search: string) {
-  const url = new URL(`${pathname}${search || ""}`, window.location.origin);
-  url.searchParams.set("claim", "1");
-  return `/login?redirect=${encodeURIComponent(`${url.pathname}${url.search}`)}`;
-}
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 
 export default function HDResultStep() {
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
-  const [loading, setLoading] = useState(true);
-  const [claiming, setClaiming] = useState(false);
-  const [assets, setAssets] = useState<PreviewAsset[]>([]);
-  const [downloadingZip, setDownloadingZip] = useState(false);
-  const [singleDownloadingId, setSingleDownloadingId] = useState<string | null>(null);
-  const [canDownload, setCanDownload] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // ---------- core state ----------
+  const [phase, setPhase] = useState<Phase>("loading");
+  const [images, setImages] = useState<PreviewImage[]>([]);
+  const [progress, setProgress] = useState(0);
+  const [hdProgress, setHdProgress] = useState(0);
+  const [downloading, setDownloading] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const sessionId = sessionStorage.getItem("current_session_id") || "";
-  const selectedIds = useMemo(
-    () => resolveSelectedIds(sessionStorage.getItem("selected_asset_ids")),
-    [],
-  );
-  const unlockedVersion = Number(
+  const unlockedVersion =
     sessionStorage.getItem("hd_unlocked_version") ||
-      sessionStorage.getItem("current_result_version") ||
-      "0",
-  );
-  const claimRedirect = buildClaimRedirect(window.location.pathname, window.location.search);
-  const shouldClaimAfterLogin = new URLSearchParams(window.location.search).get("claim") === "1";
+    sessionStorage.getItem("current_result_version") ||
+    "1";
+
+  /* ---------------------------------------------------------------- */
+  /*  Load images from API                                             */
+  /* ---------------------------------------------------------------- */
+
+  const loadImages = useCallback(async () => {
+    if (!sessionId) return;
+    const results = await sessionAPI.getResults(sessionId, Number(unlockedVersion));
+
+    // Only show images the user selected on the result page
+    const selectedRaw = sessionStorage.getItem("selected_asset_ids");
+    const selectedIds: string[] | null = selectedRaw ? JSON.parse(selectedRaw) : null;
+
+    const all: PreviewImage[] = (results.assets ?? results ?? []).map(
+      (a: any) => ({
+        id: a.asset_id ?? a.id,
+        type: a.image_type ?? a.type ?? "",
+        product: a.product_name ?? a.product ?? "",
+        url: a.url ?? a.image_url ?? "",
+        editOpen: false,
+        isRegenerating: false,
+        texts: {
+          title: a.title ?? a.texts?.title ?? "",
+          subtitle: a.subtitle ?? a.texts?.subtitle ?? "",
+          footer: a.footer ?? a.texts?.footer ?? "",
+        },
+      })
+    );
+
+    const list = selectedIds ? all.filter((img) => selectedIds.includes(img.id)) : all;
+    setImages(list);
+    return list;
+  }, [sessionId, unlockedVersion]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Mount: decide flow based on hdPaymentSuccess                     */
+  /* ---------------------------------------------------------------- */
 
   useEffect(() => {
     let cancelled = false;
 
-    async function bootstrap() {
-      if (!sessionId) {
-        setError("缺少当前会话，请返回结果页重新进入高清流程。");
-        setLoading(false);
-        return;
-      }
+    async function init() {
+      const paid = sessionStorage.getItem("hdPaymentSuccess");
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        if (user && shouldClaimAfterLogin) {
-          setClaiming(true);
-          await sessionAPI.claimGuestSession(sessionId);
-          if (!cancelled) {
-            window.history.replaceState({}, "", window.location.pathname);
-            toast({
-              title: "已保存到当前账户",
-              description: "当前高清主图结果已归档到你的账户，后续可在历史记录中查看。",
-            });
-          }
+      if (paid) {
+        setPhase("hd-loading");
+        const fake = setInterval(() => {
+          setHdProgress((p) => (p >= 95 ? 95 : p + Math.random() * 8));
+        }, 400);
+        try {
+          await loadImages();
+        } finally {
+          clearInterval(fake);
         }
-
-        const snapshot = await sessionAPI.get(sessionId);
-        if (cancelled) return;
-
-        setCanDownload(!!snapshot.can_download);
-
-        const results = await sessionAPI.getResults(sessionId, unlockedVersion || undefined);
-        if (cancelled) return;
-
-        const filteredAssets =
-          selectedIds.length > 0
-            ? results.assets.filter((asset) => selectedIds.includes(asset.asset_id))
-            : results.assets;
-
-        setAssets(
-          filteredAssets.map((asset) => ({
-            asset_id: asset.asset_id,
-            image_url: asset.image_url,
-            thumbnail_url: asset.thumbnail_url ?? null,
-            role: asset.role,
-          })),
-        );
-      } catch (err: any) {
         if (!cancelled) {
-          setError(err?.message || "加载高清结果失败");
+          setHdProgress(100);
+          setTimeout(() => {
+            if (!cancelled) {
+              setPhase("hd-done");
+              if (sessionId) updateSessionRecord(sessionId, { last_step: "hd-result" });
+            }
+          }, 600);
         }
-      } finally {
+        sessionStorage.removeItem("hdPaymentSuccess");
+      } else {
+        setPhase("loading");
+        const fake = setInterval(() => {
+          setProgress((p) => (p >= 95 ? 95 : p + Math.random() * 10));
+        }, 350);
+        try {
+          await loadImages();
+        } finally {
+          clearInterval(fake);
+        }
         if (!cancelled) {
-          setClaiming(false);
-          setLoading(false);
+          setProgress(100);
+          setTimeout(() => {
+            if (!cancelled) setPhase("preview");
+          }, 500);
         }
       }
     }
 
-    bootstrap();
+    init().catch((err) => {
+      console.error("HDResultStep init error", err);
+      toast({ title: "加载失败", description: err.message, variant: "destructive" });
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [claiming, selectedIds, sessionId, shouldClaimAfterLogin, toast, unlockedVersion, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const titleText = useMemo(() => {
-    if (unlockedVersion > 0) return `高清无水印结果 · V${unlockedVersion}`;
-    return "高清无水印结果";
-  }, [unlockedVersion]);
+  /* ---------------------------------------------------------------- */
+  /*  Helpers                                                          */
+  /* ---------------------------------------------------------------- */
 
-  const handleDownloadZip = async () => {
-    if (!sessionId || assets.length === 0 || downloadingZip) return;
+  const toggleEdit = (id: string) => {
+    setImages((prev) =>
+      prev.map((img) =>
+        img.id === id ? { ...img, editOpen: !img.editOpen } : { ...img, editOpen: false }
+      )
+    );
+  };
 
-    setDownloadingZip(true);
+  const updateText = (id: string, field: keyof TextFields, value: string) => {
+    setImages((prev) =>
+      prev.map((img) =>
+        img.id === id
+          ? { ...img, texts: { ...img.texts, [field]: value } }
+          : img
+      )
+    );
+  };
+
+  const regenSingle = async (id: string) => {
+    const img = images.find((i) => i.id === id);
+    if (!img) return;
+    setImages((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, isRegenerating: true } : i))
+    );
     try {
-      if (canDownload) {
-        const blob = await sessionAPI.downloadResults(sessionId, unlockedVersion || undefined);
-        const url = URL.createObjectURL(blob);
-        triggerBrowserDownload(url, `main-gallery-v${unlockedVersion || 1}.zip`);
-        URL.revokeObjectURL(url);
-
-        toast({
-          title: "开始下载",
-          description: "当前版本压缩包已开始下载。",
-        });
-      } else {
-        await downloadAssetsDirectly(assets);
-        toast({
-          title: "开始下载",
-          description: `已为你发起 ${assets.length} 张图片下载。`,
-        });
-      }
+      const instruction = [img.texts.title, img.texts.subtitle, img.texts.footer]
+        .filter(Boolean)
+        .join(" / ");
+      const { job_id } = await assetAPI.regenerate(id, instruction || "regenerate");
+      await jobAPI.pollUntilDone(job_id);
+      await loadImages();
+      toast({ title: "重新生成完成" });
     } catch (err: any) {
-      toast({
-        title: "下载失败",
-        description: err?.message || "请稍后重试。",
-        variant: "destructive",
-      });
+      toast({ title: "重新生成失败", description: err.message, variant: "destructive" });
     } finally {
-      setDownloadingZip(false);
+      setImages((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, isRegenerating: false } : i))
+      );
     }
   };
 
-  const handleDownloadSingle = async (asset: PreviewAsset) => {
-    if (singleDownloadingId || !asset.image_url) return;
+  const regenAll = () => {
+    navigate("/create/result");
+  };
 
-    setSingleDownloadingId(asset.asset_id);
+  const saveText = (id: string) => {
+    setImages((prev) => prev.map((img) => (img.id === id ? { ...img, editOpen: false } : img)));
+    toast({ title: "文字已保存" });
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
     try {
-      triggerBrowserDownload(asset.image_url, `${roleLabel(asset.role)}-${asset.asset_id}.png`);
-
-      toast({
-        title: "开始下载",
-        description: `${roleLabel(asset.role)} 已开始下载。`,
-      });
+      const blob = await sessionAPI.downloadResults(sessionId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `smartphoto-hd-${sessionId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "下载已开始" });
+    } catch (err: any) {
+      toast({ title: "下载失败", description: err.message, variant: "destructive" });
     } finally {
-      setSingleDownloadingId(null);
+      setDownloading(false);
     }
   };
 
-  const handleShare = async () => {
+  const goToPayment = () => {
+    sessionStorage.setItem("hdFromPreview", "true");
+    sessionStorage.setItem("hdImgCount", String(images.length));
+    navigate("/create/payment");
+  };
+
+  const goToDetailCopywriting = () => {
+    sessionStorage.removeItem("hdPaymentSuccess");
+    sessionStorage.removeItem("hdFromPreview");
+    sessionStorage.removeItem("hdImgCount");
+    navigate("/create/copywriting");
+  };
+
+  const copyShareLink = async () => {
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: titleText,
-          text: "这是我刚生成的高清无水印主图结果。",
-          url: window.location.href,
-        });
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
-        toast({
-          title: "链接已复制",
-          description: "可以把当前页面链接分享给同事查看。",
-        });
-      }
+      await navigator.clipboard.writeText(window.location.href);
+      toast({ title: "已复制链接" });
+      setShowShareModal(false);
     } catch {
-      // user cancelled
+      toast({ title: "复制失败", variant: "destructive" });
     }
   };
 
-  const handleArchiveToAccount = async () => {
-    if (!sessionId) return;
+  /* ================================================================ */
+  /*  PHASE 1: Loading                                                 */
+  /* ================================================================ */
 
-    if (!user) {
-      setLocation(claimRedirect);
-      return;
-    }
-
-    setClaiming(true);
-    try {
-      await sessionAPI.claimGuestSession(sessionId);
-      setCanDownload(true);
-      toast({
-        title: "已保存到当前账户",
-        description: "当前高清主图结果已归档到你的账户。",
-      });
-    } catch (err: any) {
-      toast({
-        title: "保存失败",
-        description: err?.message || "请稍后重试。",
-        variant: "destructive",
-      });
-    } finally {
-      setClaiming(false);
-    }
-  };
-
-  if (loading || claiming) {
+  if (phase === "loading") {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <StepIndicator currentStep={5} step5Label="高清结果" />
-        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-50">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <StepIndicator currentStep={5} />
+        <div className="flex flex-col items-center justify-center flex-1 px-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
+            <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <h2 className="mb-1 text-lg font-bold text-slate-900">
-            {claiming ? "正在保存到你的账户..." : "正在加载高清结果"}
-          </h2>
-          <p className="text-sm text-slate-500">
-            {claiming
-              ? "请稍候，我们正在认领当前会话。"
-              : "正在获取当前版本对应的高清无水印主图结果。"}
-          </p>
+          <h2 className="text-lg font-bold text-slate-900 mb-1">正在生成预览图…</h2>
+          <p className="text-sm text-slate-500 mb-5">AI 正在处理，请稍候片刻</p>
+          <div className="w-full max-w-xs mb-2">
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-400 to-blue-600 h-full rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-sm text-slate-400">{Math.round(progress)}%</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  /* ================================================================ */
+  /*  PHASE 2: Preview (watermark)                                     */
+  /* ================================================================ */
+
+  if (phase === "preview") {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <StepIndicator currentStep={5} step5Label="高清结果" />
-        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
-          <div className="mb-4 text-lg font-bold text-slate-900">高清结果加载失败</div>
-          <p className="mb-5 max-w-sm text-center text-sm text-slate-500">{error}</p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setLocation("/create/result")}
-              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
-            >
-              返回结果页
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="rounded-xl bg-blue-500 px-5 py-2.5 text-sm text-white transition hover:bg-blue-600"
-            >
-              重新加载
-            </button>
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <StepIndicator currentStep={5} />
+
+        {/* status bar */}
+        <div className="bg-white border-b px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-blue-500" />
+            <span className="text-sm font-semibold text-slate-800">
+              已生成 {images.length} 张图片
+            </span>
           </div>
+          <button
+            onClick={regenAll}
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded-full px-2.5 py-1 transition"
+          >
+            <RefreshCw className="w-3 h-3" />
+            重新生成
+          </button>
         </div>
-      </div>
-    );
-  }
+        <p className="px-4 py-1.5 text-xs text-slate-400 bg-white border-b">预览图含水印，付费后生成高清清图</p>
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <StepIndicator currentStep={5} step5Label="高清结果" />
-
-      <div className="flex items-center gap-3 border-b border-slate-100 bg-white px-4 py-3">
-        <button
-          onClick={() => setLocation("/create/result")}
-          className="text-slate-600 transition hover:text-slate-900"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div>
-          <h1 className="text-base font-bold text-slate-900">{titleText}</h1>
-          <p className="text-xs text-slate-400">当前展示的是本次已解锁的高清无水印结果</p>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-5xl px-4 pb-40 pt-5">
-        <div className="mb-4 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-100">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-900">高清无水印主图已解锁</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                当前页面展示的是当前版本对应的高清结果，图片将按完整比例展示。
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4 flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-blue-500" />
-          <span className="text-sm font-semibold text-slate-800">共 {assets.length} 张高清图</span>
-        </div>
-
-        {assets.length > 0 ? (
-          <div className="space-y-5">
-            {assets.map((asset) => (
-              <section
-                key={asset.asset_id}
-                className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"
+        {/* image list */}
+        <div className="flex-1 overflow-y-auto pb-28">
+          {images.map((img) => (
+            <div key={img.id} className="bg-white border-b">
+              {/* image with watermark */}
+              <div
+                className="relative select-none"
+                onContextMenu={(e) => e.preventDefault()}
               >
-                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-                  <div>
-                    <div className="text-base font-bold text-slate-900">{roleLabel(asset.role)}</div>
-                    <div className="mt-1 text-xs text-slate-400">{asset.asset_id.slice(0, 8)}</div>
+                {img.isRegenerating && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                    <Loader2 className="w-8 h-8 text-white animate-spin" />
                   </div>
-                  <button
-                    onClick={() => handleDownloadSingle(asset)}
-                    disabled={singleDownloadingId === asset.asset_id}
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-50"
+                )}
+                <img
+                  src={img.url}
+                  alt={img.type}
+                  className="w-full object-cover pointer-events-none"
+                  draggable={false}
+                  style={{ maxHeight: "400px" }}
+                />
+                {/* watermark */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div
+                    className="text-white/25 font-bold text-xl select-none"
+                    style={{
+                      transform: "rotate(-30deg)",
+                      textShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                      letterSpacing: "0.08em",
+                      whiteSpace: "nowrap",
+                    }}
                   >
-                    {singleDownloadingId === asset.asset_id ? "下载中..." : "下载单张"}
+                    AI电商做图 · 预览版
+                  </div>
+                </div>
+              </div>
+
+              {/* bottom action row */}
+              <div className="flex items-center justify-between px-4 py-2">
+                <span className="text-sm text-slate-500">{img.product} · {img.type}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleEdit(img.id)}
+                    className={`flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition
+                      ${img.editOpen
+                        ? "text-blue-700 border-blue-400 bg-blue-100"
+                        : "text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                      }`}
+                  >
+                    <Pencil className="w-3 h-3" />
+                    编辑文字
+                  </button>
+                  <button
+                    onClick={() => regenSingle(img.id)}
+                    className="flex items-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-full px-2.5 py-1 hover:bg-slate-50 transition"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    重新生成
                   </button>
                 </div>
+              </div>
 
-                <div className="bg-slate-50 px-4 py-4 sm:px-6 sm:py-6">
-                  <div className="flex min-h-[320px] items-center justify-center overflow-hidden rounded-[24px] bg-white">
-                    <img
-                      src={asset.image_url}
-                      alt={roleLabel(asset.role)}
-                      className="max-h-[72vh] w-full object-contain"
-                    />
+              {/* edit panel */}
+              {img.editOpen && (
+                <div className="border-t border-slate-100 px-4 pb-4 pt-3 bg-slate-50">
+                  <div className="space-y-2">
+                    {([
+                      { field: "title" as keyof TextFields, label: "主标题" },
+                      { field: "subtitle" as keyof TextFields, label: "副标题" },
+                      { field: "footer" as keyof TextFields, label: "底部文字" },
+                    ]).map(({ field, label }) => (
+                      <div key={field} className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 w-14 shrink-0">{label}</span>
+                        <input
+                          value={img.texts[field]}
+                          onChange={(e) => updateText(img.id, field, e.target.value)}
+                          className="flex-1 text-sm text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                        />
+                      </div>
+                    ))}
                   </div>
+                  <button
+                    onClick={() => saveText(img.id)}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-xl py-2 font-medium transition"
+                  >
+                    <Check className="w-4 h-4" />
+                    保存文字
+                  </button>
                 </div>
-              </section>
-            ))}
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* fixed bottom CTA */}
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t shadow-lg px-4 py-3">
+          <button
+            onClick={goToPayment}
+            className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-base font-bold bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-200 transition"
+          >
+            <Sparkles className="w-5 h-5" />
+            生成无水印高清图
+          </button>
+          <p className="text-center text-xs text-slate-400 mt-1.5">共 {images.length} 张，确认后全部生成</p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ================================================================ */
+  /*  PHASE 3: HD Loading                                              */
+  /* ================================================================ */
+
+  if (phase === "hd-loading") {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <StepIndicator currentStep={5} />
+        <div className="flex flex-col items-center justify-center flex-1 px-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-orange-200">
+            <Crown className="w-8 h-8 text-white" />
           </div>
-        ) : (
-          <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
-            <p className="text-lg font-semibold text-slate-900">暂无高清结果</p>
-            <p className="mt-2 text-sm text-slate-500">
-              请先从结果页选择图片，并继续进入高清流程。
-            </p>
+          <h2 className="text-lg font-bold text-slate-900 mb-1">正在生成无水印高清图…</h2>
+          <p className="text-sm text-slate-500 mb-5">AI 正在处理，请稍候片刻</p>
+          <div className="w-full max-w-xs mb-2">
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full transition-all duration-300"
+                style={{ width: `${hdProgress}%` }}
+              />
+            </div>
           </div>
-        )}
+          <p className="text-sm text-slate-400">{Math.round(hdProgress)}% · 高清渲染中</p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ================================================================ */
+  /*  PHASE 4: HD Done                                                 */
+  /* ================================================================ */
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <StepIndicator currentStep={5} />
+
+      {/* success banner */}
+      <div className="bg-amber-50 border-b border-amber-100 px-4 py-2.5 flex items-center gap-2.5">
+        <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shrink-0">
+          <Crown className="w-3.5 h-3.5 text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-amber-900">高清图生成成功！</p>
+          <p className="text-xs text-amber-600">无水印 · 可直接用于电商上架</p>
+        </div>
       </div>
 
-      {!canDownload && (
-        <div className="fixed bottom-24 left-0 right-0 z-20 border-t border-b border-slate-200 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
-                <CloudUpload className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-slate-800">
-                  登录账号，自动保存你的设计资产
-                </div>
-                <div className="text-xs text-slate-400">避免图片丢失</div>
-              </div>
+      {/* image count */}
+      <div className="px-4 py-2 flex items-center gap-1.5 bg-white border-b">
+        <span className="text-sm font-semibold text-slate-700">高清图</span>
+        <span className="text-xs text-slate-400">共 {images.length} 张</span>
+      </div>
+
+      {/* image list (no watermark) */}
+      <div className="flex-1 overflow-y-auto pb-36">
+        {images.map((img) => (
+          <div key={img.id} className="bg-white border-b">
+            <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
+              <img
+                src={img.url}
+                alt={img.type}
+                className="w-full object-cover pointer-events-none"
+                draggable={false}
+                style={{ maxHeight: "400px" }}
+              />
             </div>
-            <button
-              onClick={handleArchiveToAccount}
-              className="rounded-full bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-sm text-slate-500">{img.product} · {img.type}</span>
+              <button
+                onClick={() => toggleEdit(img.id)}
+                className={`flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition
+                  ${img.editOpen
+                    ? "text-blue-700 border-blue-400 bg-blue-100"
+                    : "text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                  }`}
+              >
+                <Pencil className="w-3 h-3" />
+                编辑文字
+              </button>
+            </div>
+            {img.editOpen && (
+              <div className="border-t border-slate-100 px-4 pb-4 pt-3 bg-slate-50">
+                <div className="space-y-2">
+                  {([
+                    { field: "title" as keyof TextFields, label: "主标题" },
+                    { field: "subtitle" as keyof TextFields, label: "副标题" },
+                    { field: "footer" as keyof TextFields, label: "底部文字" },
+                  ]).map(({ field, label }) => (
+                    <div key={field} className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400 w-14 shrink-0">{label}</span>
+                      <input
+                        value={img.texts[field]}
+                        onChange={(e) => updateText(img.id, field, e.target.value)}
+                        className="flex-1 text-sm text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => saveText(img.id)}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-xl py-2 font-medium transition"
+                >
+                  <Check className="w-4 h-4" />
+                  保存文字
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* fixed bottom: login bar + action buttons */}
+      <div className="fixed bottom-0 left-0 right-0 z-30">
+        {/* login prompt (hidden when logged in) */}
+        {!isAuthenticated && (
+          <div className="bg-white border-t border-slate-100 px-4 py-2 flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+              <CloudUpload className="w-4 h-4 text-blue-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-slate-800">登录账号，自动保存你的设计资产</p>
+              <p className="text-xs text-slate-400">避免图片丢失</p>
+            </div>
+            <a
+              href={getLoginUrl()}
+              className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
             >
               登录 / 注册
+            </a>
+          </div>
+        )}
+        {/* action buttons */}
+        <div className="bg-white border-t border-slate-100 shadow-lg px-4 py-2.5 flex gap-2">
+          <Button size="lg" variant="outline" className="flex-1 text-slate-600 gap-1.5 border-slate-200" onClick={handleDownload} disabled={downloading}>
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            一键下载
+          </Button>
+          <Button size="lg" variant="ghost" className="px-3 text-slate-500" onClick={() => setShowShareModal(true)}>
+            <Share2 className="w-4 h-4" />
+          </Button>
+          <Button size="lg" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white gap-1.5" onClick={goToDetailCopywriting}>
+            <FileText className="w-4 h-4" />
+            生成详情图
+          </Button>
+        </div>
+      </div>
+
+      {/* share modal (bottom sheet) */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowShareModal(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-t-2xl w-full max-w-sm pb-8 pt-5 px-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-slate-900">选择分享方式</h3>
+              <button onClick={() => setShowShareModal(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              className="w-full h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm transition-colors"
+              onClick={copyShareLink}
+            >
+              复制链接
             </button>
           </div>
         </div>
       )}
-
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-3">
-          <button
-            onClick={handleDownloadZip}
-            disabled={downloadingZip}
-            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 disabled:opacity-50"
-          >
-            {downloadingZip ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Download className="h-5 w-5" />
-            )}
-            一键下载
-          </button>
-          <button
-            onClick={handleShare}
-            className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300"
-          >
-            <Share2 className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => setLocation("/create/copywriting")}
-            className="flex h-14 flex-[1.1] items-center justify-center gap-2 rounded-2xl bg-blue-500 text-white transition hover:bg-blue-600"
-          >
-            <FileText className="h-5 w-5" />
-            生成详情图
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

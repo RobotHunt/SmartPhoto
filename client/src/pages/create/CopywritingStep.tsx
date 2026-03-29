@@ -4,7 +4,7 @@ import {
   Loader2,
   Zap,
   Edit2,
-  RefreshCw,
+  Share2,
   ChevronRight,
   Monitor,
   Star,
@@ -61,8 +61,8 @@ const MODULE_CONFIG: ModuleConfig[] = [
   {
     key: "product_display",
     icon: Monitor,
-    color: "#3b82f6",
-    bgColor: "#eff6ff",
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
     label: "产品展示",
     styleTag: "主图展示",
     styleDesc: "产品全景·品质感",
@@ -80,8 +80,8 @@ const MODULE_CONFIG: ModuleConfig[] = [
   {
     key: "core_selling_point",
     icon: Star,
-    color: "#d97706",
-    bgColor: "#fffbeb",
+    color: "text-amber-600",
+    bgColor: "bg-amber-50",
     label: "核心卖点",
     styleTag: "卖点图",
     styleDesc: "痛点击中·技术风",
@@ -92,8 +92,8 @@ const MODULE_CONFIG: ModuleConfig[] = [
   {
     key: "function_description",
     icon: Zap,
-    color: "#7c3aed",
-    bgColor: "#f5f3ff",
+    color: "text-violet-600",
+    bgColor: "bg-violet-50",
     label: "功能说明",
     styleTag: "功能图",
     styleDesc: "制图高清·制图风格",
@@ -104,8 +104,8 @@ const MODULE_CONFIG: ModuleConfig[] = [
   {
     key: "product_details",
     icon: Search,
-    color: "#4f46e5",
-    bgColor: "#eef2ff",
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50",
     label: "产品细节",
     styleTag: "细节图",
     styleDesc: "工艺细节·品质感",
@@ -123,8 +123,8 @@ const MODULE_CONFIG: ModuleConfig[] = [
   {
     key: "usage_scenarios",
     icon: MapPin,
-    color: "#16a34a",
-    bgColor: "#f0fdf4",
+    color: "text-green-600",
+    bgColor: "bg-green-50",
     label: "使用场景",
     styleTag: "场景图",
     styleDesc: "生活场景·温馨风",
@@ -141,8 +141,8 @@ const MODULE_CONFIG: ModuleConfig[] = [
   {
     key: "product_parameters",
     icon: BarChart2,
-    color: "#0891b2",
-    bgColor: "#ecfeff",
+    color: "text-cyan-600",
+    bgColor: "bg-cyan-50",
     label: "产品参数",
     styleTag: "参数图",
     styleDesc: "数据清晰·专业风",
@@ -351,6 +351,20 @@ export default function CopywritingStep() {
     (key) => MODULE_CONFIG.find((m) => m.key === key)!
   );
 
+  const handleShare = useCallback(() => {
+    const modules = MODULE_ORDER
+      .map((key) => {
+        const mod = MODULE_CONFIG.find((m) => m.key === key)!;
+        const content = mod.extractContent(copyData, analysisSnapshot);
+        if (content.length === 0) return "";
+        return `【${mod.label}】\n${content.join("\n")}`;
+      })
+      .filter(Boolean)
+      .join("\n\n");
+    navigator.clipboard.writeText(modules).catch(() => {});
+    toast({ title: "已复制全部文案到剪贴板" });
+  }, [copyData, analysisSnapshot, toast]);
+
   // ── render ─────────────────────────────────────────────────────────────
 
   return (
@@ -400,24 +414,23 @@ export default function CopywritingStep() {
 
       {/* ── Content ───────────────────────────────────────────────────── */}
       {!loading && !error && (
-        <div className="flex-1 overflow-y-auto pb-28">
-          <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
-            {/* ── White header bar ─────────────────────────────────────── */}
-            <div className="bg-white border-b px-4 py-3 rounded-lg shadow-sm border border-slate-100">
-              <h1 className="text-base font-bold text-slate-900">AI已生成详情页执行方案</h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                根据商品图已生成平台规则，AI已为您规划可直接生成的详情页内容。
-              </p>
-            </div>
+        <div className="flex-1 overflow-y-auto pb-20">
+          {/* ── White header bar ─────────────────────────────────────── */}
+          <div className="bg-white border-b px-4 py-3">
+            <h1 className="text-base font-bold text-slate-900">AI已生成详情页执行方案</h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              根据商品图已生成平台规则，AI已为您规划可直接生成的详情页内容。
+            </p>
+          </div>
 
-            {/* ── Yellow "生产流程" badge ──────────────────────────────── */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-yellow-400 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                <Zap className="w-3 h-3" />
-                生产流程
-                <ChevronRight className="w-3 h-3" />
-              </div>
+          {/* ── Yellow "生产流程" badge ──────────────────────────────── */}
+          <div className="bg-white border-b px-4 py-2 flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-yellow-400 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+              <Zap className="w-3 h-3" />
+              生产流程
+              <ChevronRight className="w-3 h-3" />
             </div>
+          </div>
 
             {/* ── Module cards (only show modules with content) ──────── */}
             {orderedModules.map((mod) => {
@@ -445,13 +458,10 @@ export default function CopywritingStep() {
                     <div className="w-full">
                       {/* 标题文案 */}
                       {titleLine && (
-                        <div
-                          className="rounded-lg px-3 py-2 mb-2"
-                          style={{ backgroundColor: mod.bgColor }}
-                        >
+                        <div className={`${mod.bgColor} rounded-lg px-3 py-2 mb-2`}>
                           <div className="flex items-center gap-1.5 mb-1">
-                            <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: mod.color }} />
-                            <span className="text-xs font-semibold" style={{ color: mod.color }}>{mod.label}</span>
+                            <Icon className={`w-3.5 h-3.5 ${mod.color} shrink-0`} />
+                            <span className={`text-xs font-semibold ${mod.color}`}>{mod.label}</span>
                           </div>
                           <p className="text-sm font-medium text-slate-800 leading-snug">{titleLine}</p>
                         </div>
@@ -472,14 +482,7 @@ export default function CopywritingStep() {
 
                   {/* 风格标签行 */}
                   <div className="px-4 pb-3 flex items-center gap-2">
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full cursor-pointer border"
-                      style={{
-                        color: mod.color,
-                        backgroundColor: mod.bgColor,
-                        borderColor: mod.color + "40",
-                      }}
-                    >
+                    <span className="text-xs text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full cursor-pointer hover:bg-blue-100">
                       {mod.styleTag}
                     </span>
                     <span className="text-xs text-slate-500">{mod.styleDesc}</span>
@@ -489,46 +492,39 @@ export default function CopywritingStep() {
               );
             })}
 
-            {/* ── Footer text ─────────────────────────────────────────── */}
-            <div className="text-center py-2">
-              <p className="text-xs text-slate-400">
-                AI 预计生成：6-8 张详情图
-              </p>
-            </div>
+          {/* ── Footer text ─────────────────────────────────────────── */}
+          <div className="px-4 py-1.5 text-xs text-slate-400 text-center">
+            AI 预计生成：6-8 张详情图
           </div>
         </div>
       )}
 
       {/* ── Bottom fixed bar ──────────────────────────────────────────── */}
       {!loading && !error && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg px-4 py-3 flex items-center gap-3 z-50">
-          {/* "修改内容" button with Edit2 icon */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-3 flex items-center gap-2 z-50">
           <Button
             variant="outline"
             onClick={handleModify}
-            className="flex items-center justify-center gap-1.5 text-sm px-5 h-11 rounded-xl border-slate-300 hover:bg-slate-50"
+            className="flex items-center gap-1.5 text-sm px-4"
           >
             <Edit2 className="w-4 h-4" />
             修改内容
           </Button>
-
-          {/* "生成全部详情图" yellow button with Zap icon */}
           <Button
             onClick={handleGenerateAll}
-            className="flex-1 h-11 bg-yellow-400 hover:bg-yellow-500 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2"
+            className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white font-bold text-sm flex items-center justify-center gap-1.5"
           >
             <Zap className="w-4 h-4" />
             生成全部详情图
           </Button>
-
-          {/* "重新生成" button */}
-          <button
-            onClick={forceRegenerateCopy}
-            className="w-11 h-11 flex items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors flex-shrink-0"
-            title="重新生成文案"
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleShare}
+            className="shrink-0"
           >
-            <RefreshCw className="w-5 h-5" />
-          </button>
+            <Share2 className="w-4 h-4" />
+          </Button>
         </div>
       )}
     </div>

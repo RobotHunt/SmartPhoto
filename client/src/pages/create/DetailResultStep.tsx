@@ -2,40 +2,47 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import {
   AlertCircle,
+  Check,
+  CheckCircle2,
   CloudUpload,
   Crown,
   Download,
+  Info,
   Loader2,
-  RefreshCw,
+  Pencil,
   Share2,
   Sparkles,
   X,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { getLoginUrl } from "@/const";
 import { jobAPI, sessionAPI } from "@/lib/api";
+import { updateSessionRecord } from "@/lib/localUser";
 import { useAuth } from "@/contexts/AuthContext";
 
 import { DetailStepIndicator } from "./DetailStepIndicator";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
 type DetailPanel = {
   asset_id: string;
   panel_id?: string;
   slot_id?: string;
   panel_label?: string | null;
+  narrative_section?: string | null;
+  panel_goal?: string | null;
+  copy_focus?: string | null;
+  panel_type?: string | null;
+  visual_truth_mode?: string | null;
+  origin_note?: string | null;
   image_url: string;
   thumbnail_url?: string | null;
   display_order: number;
   version_no?: number;
-};
-
-type DetailStitchedAsset = {
-  asset_id: string;
-  image_url: string;
-  thumbnail_url?: string | null;
-  version_no?: number;
-  width?: number;
-  height?: number;
 };
 
 type DetailResultsPayload = {
@@ -45,15 +52,26 @@ type DetailResultsPayload = {
   detail_latest_result_version: number;
   requested_version: number;
   available_versions: number[];
-  version_summaries: Array<{ version_no: number; asset_count: number; ready_count: number }>;
   summary: {
     total_count: number;
     ready_count: number;
     panel_count: number;
   };
   panels: DetailPanel[];
-  stitched_asset: DetailStitchedAsset | null;
 };
+
+interface DetailImage {
+  id: string;
+  label: string;
+  url: string;
+  editOpen: boolean;
+  isRegenerating: boolean;
+  text: string;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
 
 function triggerBrowserDownload(url: string, filename: string) {
   const link = document.createElement("a");
@@ -66,35 +84,6 @@ function triggerBrowserDownload(url: string, filename: string) {
   document.body.removeChild(link);
 }
 
-async function downloadDetailImagesDirectly(results: DetailResultsPayload, version: number) {
-  const queue: Array<{ url: string; filename: string }> = [];
-
-  if (results.stitched_asset?.image_url) {
-    queue.push({
-      url: results.stitched_asset.image_url,
-      filename: `detail-page-long-v${version || 1}.png`,
-    });
-  }
-
-  results.panels.forEach((panel, index) => {
-    if (!panel.image_url) return;
-    queue.push({
-      url: panel.image_url,
-      filename: `${panel.panel_label || `detail-${index + 1}`}-v${version || 1}.png`,
-    });
-  });
-
-  for (let index = 0; index < queue.length; index += 1) {
-    const item = queue[index];
-    triggerBrowserDownload(item.url, item.filename);
-    if (index < queue.length - 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 180));
-    }
-  }
-
-  return queue.length;
-}
-
 function normalizeDetailResults(data: any): DetailResultsPayload {
   const panels = Array.isArray(data?.panels) ? data.panels : [];
   const sortedPanels: DetailPanel[] = panels
@@ -103,6 +92,12 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
       panel_id: panel?.panel_id ?? null,
       slot_id: panel?.slot_id ?? null,
       panel_label: panel?.panel_label ?? panel?.panel_id ?? `详情图 ${index + 1}`,
+      narrative_section: panel?.narrative_section ?? null,
+      panel_goal: panel?.panel_goal ?? null,
+      copy_focus: panel?.copy_focus ?? null,
+      panel_type: panel?.panel_type ?? null,
+      visual_truth_mode: panel?.visual_truth_mode ?? null,
+      origin_note: panel?.origin_note ?? null,
       image_url: String(panel?.image_url || panel?.thumbnail_url || ""),
       thumbnail_url: panel?.thumbnail_url ?? null,
       display_order: Number(panel?.display_order ?? index),
@@ -121,36 +116,12 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
     available_versions: Array.isArray(data?.available_versions)
       ? data.available_versions.map((item: any) => Number(item || 0)).filter(Boolean)
       : [],
-    version_summaries: Array.isArray(data?.version_summaries)
-      ? data.version_summaries.map((summary: any) => ({
-          version_no: Number(summary?.version_no || 0),
-          asset_count: Number(summary?.asset_count || 0),
-          ready_count: Number(summary?.ready_count || 0),
-        }))
-      : [],
     summary: {
       total_count: Number(data?.summary?.total_count || sortedPanels.length),
       ready_count: Number(data?.summary?.ready_count || sortedPanels.length),
       panel_count: Number(data?.summary?.panel_count || sortedPanels.length),
     },
     panels: sortedPanels,
-    stitched_asset: data?.stitched_asset
-      ? {
-          asset_id: String(data.stitched_asset.asset_id || "stitched"),
-          image_url: String(data.stitched_asset.image_url || data.stitched_asset.thumbnail_url || ""),
-          thumbnail_url: data.stitched_asset.thumbnail_url ?? null,
-          version_no:
-            typeof data.stitched_asset.version_no === "number"
-              ? data.stitched_asset.version_no
-              : undefined,
-          width:
-            typeof data.stitched_asset.width === "number" ? data.stitched_asset.width : undefined,
-          height:
-            typeof data.stitched_asset.height === "number"
-              ? data.stitched_asset.height
-              : undefined,
-        }
-      : null,
   };
 }
 
@@ -164,6 +135,23 @@ function resolveStageText(stage?: string) {
   if (normalized.includes("upload")) return "正在整理结果";
   if (normalized.includes("done")) return "即将完成";
   return stage;
+}
+
+function normalizeDetailGenerationError(error: any) {
+  const raw = String(error?.message || error || "").trim();
+  const code = String(error?.code || "").trim();
+  const upstreamReason = String(error?.result_payload?.upstream_reason || "").trim();
+  const upstreamStatus = Number(error?.result_payload?.upstream_http_status || 0);
+  if (
+    code === "42901" ||
+    upstreamReason === "rate_limited" ||
+    upstreamStatus === 429 ||
+    raw.includes("Too Many Requests") ||
+    raw.includes("429")
+  ) {
+    return "上游模型当前限流，请稍后重试。";
+  }
+  return raw || "详情图生成失败";
 }
 
 function saveBrandStyleProfile(payload: {
@@ -200,20 +188,16 @@ function saveBrandStyleProfile(payload: {
   }
 }
 
-function buildClaimRedirect(pathname: string, search: string) {
-  const url = new URL(`${pathname}${search || ""}`, window.location.origin);
-  url.searchParams.set("claim", "1");
-  return `/login?redirect=${encodeURIComponent(`${url.pathname}${url.search}`)}`;
-}
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 
 export default function DetailResultStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const sessionId = sessionStorage.getItem("current_session_id") || "";
-  const claimRedirect = buildClaimRedirect(window.location.pathname, window.location.search);
-  const shouldClaimAfterLogin = new URLSearchParams(window.location.search).get("claim") === "1";
 
   const [phase, setPhase] = useState<"loading" | "done" | "error">("loading");
   const [progress, setProgress] = useState(8);
@@ -222,12 +206,19 @@ export default function DetailResultStep() {
   const [shareOpen, setShareOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [claiming, setClaiming] = useState(false);
   const [results, setResults] = useState<DetailResultsPayload | null>(null);
   const [currentVersion, setCurrentVersion] = useState(0);
-  const [canDownload, setCanDownload] = useState(false);
   const [brandOpen, setBrandOpen] = useState(false);
   const [brandName, setBrandName] = useState("");
+  const [brandSavedName, setBrandSavedName] = useState("");
+  const [brandSuccessOpen, setBrandSuccessOpen] = useState(false);
+
+  // UI state for image editing
+  const [images, setImages] = useState<DetailImage[]>([]);
+
+  /* ---------------------------------------------------------------- */
+  /*  API helpers                                                      */
+  /* ---------------------------------------------------------------- */
 
   async function fetchDetailResults(version?: number) {
     const data = await sessionAPI.getDetailResults(sessionId, version);
@@ -241,6 +232,19 @@ export default function DetailResultStep() {
     setResults(normalized);
     setCurrentVersion(resolvedVersion);
     sessionStorage.setItem("detail_current_version", String(resolvedVersion));
+
+    // Build images for UI
+    setImages(
+      normalized.panels.map((panel, index) => ({
+        id: panel.asset_id,
+        label: panel.panel_label || `详情图 ${index + 1}`,
+        url: panel.image_url,
+        editOpen: false,
+        isRegenerating: false,
+        text: panel.panel_label || `详情图 ${index + 1}`,
+      }))
+    );
+
     return normalized;
   }
 
@@ -264,28 +268,23 @@ export default function DetailResultStep() {
     );
 
     const snapshot = await sessionAPI.get(sessionId);
-    setCanDownload(!!snapshot.can_download);
     const targetVersion = snapshot.detail_latest_result_version || undefined;
     await fetchDetailResults(targetVersion);
     setProgress(100);
     setPhase("done");
+    if (sessionId) updateSessionRecord(sessionId, { last_step: "detail-result" });
   }
 
-  async function startGeneration() {
-    const generation = await sessionAPI.generateDetailPage(sessionId);
-    const jobId = generation?.job_id || generation?.jobId;
-    if (!jobId) {
-      throw new Error("未拿到详情图任务 ID");
-    }
-    await waitForDetailGeneration(jobId);
-  }
+  /* ---------------------------------------------------------------- */
+  /*  Bootstrap                                                        */
+  /* ---------------------------------------------------------------- */
 
   useEffect(() => {
     let cancelled = false;
 
     async function bootstrap() {
       if (!sessionId) {
-        setLocation("/create/copywriting");
+        setLocation("/create/detail-confirm");
         return;
       }
 
@@ -293,61 +292,37 @@ export default function DetailResultStep() {
         setError("");
         setPhase("loading");
 
-        if (user && shouldClaimAfterLogin) {
-          setClaiming(true);
-          await sessionAPI.claimGuestSession(sessionId);
-          if (!cancelled) {
-            window.history.replaceState({}, "", window.location.pathname);
-            toast({
-              title: "已保存到当前账户",
-              description: "当前详情图结果已归档到你的账户。",
-            });
-          }
-        }
-
         const snapshot = await sessionAPI.get(sessionId);
         if (cancelled) return;
 
-        setCanDownload(!!snapshot.can_download);
-
-        const shouldAutostart = sessionStorage.getItem("detail_result_autostart") === "true";
-        sessionStorage.removeItem("detail_result_autostart");
-
-        if (shouldAutostart) {
-          await startGeneration();
-          if (cancelled) return;
-          toast({
-            title: "详情图生成完成",
-            description: "已切换到当前最新版本。",
-          });
-          return;
-        }
-
+        // If results already exist, show them directly
         if (Number(snapshot.detail_latest_result_version || 0) > 0) {
           await fetchDetailResults(snapshot.detail_latest_result_version || undefined);
           if (cancelled) return;
           setProgress(100);
           setPhase("done");
+          if (sessionId) updateSessionRecord(sessionId, { last_step: "detail-result" });
           return;
         }
 
+        // If a generation job is in progress, resume polling
         if (snapshot.latest_detail_generate_job_id) {
-          await waitForDetailGeneration(
-            snapshot.latest_detail_generate_job_id,
-            "正在恢复已有详情图任务...",
-          );
-          return;
+          const latestJob = await jobAPI.getStatus(snapshot.latest_detail_generate_job_id).catch(() => null);
+          if (latestJob && !["failed", "error"].includes(String(latestJob.status || "").toLowerCase())) {
+            await waitForDetailGeneration(
+              snapshot.latest_detail_generate_job_id,
+              "正在恢复已有详情图任务...",
+            );
+            return;
+          }
         }
 
-        await startGeneration();
+        // No results and no running job — go back to confirm page to generate
+        setLocation("/create/detail-confirm");
       } catch (err: any) {
         if (!cancelled) {
           setPhase("error");
-          setError(err?.message || "详情图生成失败");
-        }
-      } finally {
-        if (!cancelled) {
-          setClaiming(false);
+          setError(normalizeDetailGenerationError(err));
         }
       }
     }
@@ -357,17 +332,18 @@ export default function DetailResultStep() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, setLocation, shouldClaimAfterLogin, toast, user]);
+  }, [sessionId, setLocation, toast]);
+
+  /* ---------------------------------------------------------------- */
+  /*  UI Handlers                                                      */
+  /* ---------------------------------------------------------------- */
 
   const handleRetry = async () => {
     if (!sessionId || regenerating) return;
     try {
       setRegenerating(true);
       await startGeneration();
-      toast({
-        title: "已重新生成详情图",
-        description: "当前显示的是最新生成结果。",
-      });
+      toast({ title: "已重新生成详情图", description: "当前显示的是最新生成结果。" });
     } catch (err: any) {
       setPhase("error");
       setError(err?.message || "重新生成详情图失败");
@@ -376,49 +352,37 @@ export default function DetailResultStep() {
     }
   };
 
-  const handleVersionChange = async (version: number) => {
-    if (!sessionId || version === currentVersion) return;
-    try {
-      setPhase("loading");
-      setLoadingText(`正在加载 V${version} 详情图...`);
-      setProgress(30);
-      await fetchDetailResults(version);
-      setProgress(100);
-      setPhase("done");
-    } catch (err: any) {
-      setPhase("error");
-      setError(err?.message || "切换详情图版本失败");
-    }
-  };
-
   const handleDownloadAll = async () => {
     if (!sessionId || !results) return;
-
     try {
       setDownloading(true);
-      if (canDownload) {
-        const blob = await sessionAPI.downloadDetailResults(sessionId, currentVersion || undefined);
-        const url = URL.createObjectURL(blob);
-        triggerBrowserDownload(url, `detail-page-v${currentVersion || 1}.zip`);
-        URL.revokeObjectURL(url);
-        toast({ title: "开始下载", description: "详情图压缩包已开始下载。" });
-      } else {
-        const count = await downloadDetailImagesDirectly(results, currentVersion || 1);
-        toast({ title: "开始下载", description: `已为你发起 ${count} 张详情图下载。` });
-      }
+      const blob = await sessionAPI.downloadDetailResults(sessionId, currentVersion || undefined);
+      const url = URL.createObjectURL(blob);
+      triggerBrowserDownload(url, `detail-page-v${currentVersion || 1}.zip`);
+      URL.revokeObjectURL(url);
+      toast({ title: "开始下载", description: "详情图压缩包已开始下载。" });
     } catch (err: any) {
-      toast({
-        title: "下载失败",
-        description: err?.message || "请稍后重试。",
-        variant: "destructive",
-      });
+      toast({ title: "下载失败", description: err?.message || "请稍后重试。", variant: "destructive" });
     } finally {
       setDownloading(false);
     }
   };
 
-  const handleRememberBrand = () => {
-    setBrandOpen(true);
+  const toggleEdit = (id: string) => {
+    setImages((prev) =>
+      prev.map((img) =>
+        img.id === id ? { ...img, editOpen: !img.editOpen } : { ...img, editOpen: false }
+      )
+    );
+  };
+
+  const updateText = (id: string, value: string) => {
+    setImages((prev) => prev.map((img) => (img.id === id ? { ...img, text: value } : img)));
+  };
+
+  const saveText = (id: string) => {
+    setImages((prev) => prev.map((img) => (img.id === id ? { ...img, editOpen: false } : img)));
+    toast({ title: "文字已保存" });
   };
 
   const handleSaveBrand = () => {
@@ -430,73 +394,61 @@ export default function DetailResultStep() {
       version: currentVersion || results.detail_latest_result_version || 1,
       panelCount: results.summary.panel_count || results.panels.length,
     });
-    setBrandName("");
+    setBrandSavedName(trimmed);
     setBrandOpen(false);
-    toast({
-      title: "已记住品牌风格",
-      description: `已保存品牌“${trimmed}”的本地风格记录，正在返回首页。`,
-    });
+    setBrandName("");
+    setBrandSuccessOpen(true);
+  };
+
+  const handleBrandSuccessClose = () => {
+    setBrandSuccessOpen(false);
+    const keysToRemove = [
+      "uploadSlotPreviews", "uploadedImageUrls", "uploadedCount",
+      "uploadedImages", "selectedProductType", "selectedPlatform",
+      "selectedTheme", "analysisResult", "productParams",
+      "copywritings", "selectedImgCount", "selectedPlans",
+      "paymentSuccess", "generatedImages", "hdImages",
+      "hdImgCount", "hdFromPreview", "hdPaymentSuccess",
+      "detailCopySections", "detailPaymentSuccess",
+      "current_session_id", "current_result_version",
+      "selected_asset_ids", "detail_current_version",
+    ];
+    keysToRemove.forEach((k) => sessionStorage.removeItem(k));
     setLocation("/");
   };
 
-  const handleArchiveToAccount = async () => {
-    if (!sessionId) return;
-    if (!user) {
-      setLocation(claimRedirect);
-      return;
-    }
+  const productType = sessionStorage.getItem("selectedProductType") || "产品";
 
-    setClaiming(true);
-    try {
-      const snapshot = await sessionAPI.claimGuestSession(sessionId);
-      setCanDownload(!!snapshot.can_download);
-      toast({
-        title: "已保存到当前账户",
-        description: "当前详情图结果已归档到你的账户。",
-      });
-    } catch (err: any) {
-      toast({
-        title: "保存失败",
-        description: err?.message || "请稍后重试。",
-        variant: "destructive",
-      });
-    } finally {
-      setClaiming(false);
-    }
-  };
+  /* ================================================================ */
+  /*  Render                                                           */
+  /* ================================================================ */
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <DetailStepIndicator currentStep={3} />
 
-      {(phase === "loading" || claiming) && (
-        <div className="flex flex-1 flex-col items-center justify-center px-4">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg shadow-blue-200">
-            <Sparkles className="h-8 w-8 text-white" />
+      {/* Loading phase */}
+      {phase === "loading" && (
+        <div className="flex flex-col items-center justify-center flex-1 px-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
+            <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <h2 className="mb-1 text-lg font-bold text-slate-900">
-            {claiming ? "正在保存到你的账户..." : "正在生成详情图..."}
-          </h2>
-          <p className="mb-5 text-sm text-slate-500">
-            {claiming ? "请稍候，我们正在认领当前会话。" : loadingText}
-          </p>
-          {!claiming && (
-            <>
-              <div className="mb-2 w-full max-w-xs">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
-              <p className="text-sm text-slate-400">{progress}%</p>
-            </>
-          )}
+          <h2 className="text-lg font-bold text-slate-900 mb-1">正在生成详情图…</h2>
+          <p className="text-sm text-slate-500 mb-5">{loadingText}</p>
+          <div className="w-full max-w-xs mb-2">
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-400 to-blue-600 h-full rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-sm text-slate-400">{progress}%</p>
         </div>
       )}
 
-      {phase === "error" && !claiming && (
+      {/* Error phase */}
+      {phase === "error" && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
             <AlertCircle className="h-8 w-8 text-red-500" />
@@ -522,206 +474,239 @@ export default function DetailResultStep() {
         </div>
       )}
 
-      {phase === "done" && results && !claiming && (
-        <div className="flex flex-1 flex-col">
-          <div className="flex items-center gap-2.5 border-b border-amber-100 bg-amber-50 px-4 py-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500">
-              <Crown className="h-3.5 w-3.5 text-white" />
+      {/* Done phase */}
+      {phase === "done" && (
+        <div className="flex-1 flex flex-col">
+          {/* success banner */}
+          <div className="bg-amber-50 border-b border-amber-100 px-4 py-2.5 flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shrink-0">
+              <Crown className="w-3.5 h-3.5 text-white" />
             </div>
-            <div>
-              <div className="text-sm font-semibold text-slate-900">详情图已生成完成</div>
-              <div className="text-xs text-slate-500">当前展示的是当前版本对应的详情图结果</div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-amber-900">详情图生成成功！</p>
+              <p className="text-xs text-amber-600">无水印 · 可直接用于电商上架</p>
             </div>
           </div>
 
-          <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-40 pt-4">
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              {(results.available_versions || []).map((version) => {
-                const active = version === currentVersion;
-                const summary = results.version_summaries.find((item) => item.version_no === version);
-                return (
-                  <button
-                    key={version}
-                    onClick={() => handleVersionChange(version)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                      active
-                        ? "border-blue-500 bg-blue-500 text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    V{version}
-                    {summary ? ` · ${summary.ready_count}/${summary.asset_count}` : ""}
-                  </button>
-                );
-              })}
-            </div>
+          {/* image count */}
+          <div className="px-4 py-2 flex items-center gap-1.5 bg-white border-b">
+            <span className="text-sm font-semibold text-slate-700">详情图</span>
+            <span className="text-xs text-slate-400">共 {images.length} 张</span>
+          </div>
 
-            {results.stitched_asset && (
-              <div className="mb-5 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-                <img
-                  src={results.stitched_asset.image_url}
-                  alt="详情长图"
-                  className="w-full object-contain"
-                />
+          {/* image list */}
+          <div className="flex-1 overflow-y-auto pb-36">
+            {images.map((img) => (
+              <div key={img.id} className="bg-white border-b">
+                {/* image */}
+                <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
+                  {img.isRegenerating ? (
+                    <div className="w-full flex items-center justify-center bg-slate-100" style={{ minHeight: "200px" }}>
+                      <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                    </div>
+                  ) : (
+                    <img
+                      src={img.url}
+                      alt={img.label}
+                      className="w-full object-cover pointer-events-none"
+                      draggable={false}
+                      style={{ maxHeight: "400px" }}
+                    />
+                  )}
+                </div>
+
+                {/* bottom action row */}
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-sm text-slate-500">{productType} · {img.label}</span>
+                  <button
+                    onClick={() => toggleEdit(img.id)}
+                    className={`flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition
+                      ${img.editOpen
+                        ? "text-blue-700 border-blue-400 bg-blue-100"
+                        : "text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                      }`}
+                  >
+                    <Pencil className="w-3 h-3" />
+                    编辑文字
+                  </button>
+                </div>
+
+                {/* edit panel */}
+                {img.editOpen && (
+                  <div className="border-t border-slate-100 px-4 pb-4 pt-3 bg-slate-50">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 w-14 shrink-0">标注文字</span>
+                        <input
+                          value={img.text}
+                          onChange={(e) => updateText(img.id, e.target.value)}
+                          className="flex-1 text-sm text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                          placeholder="输入标注文字"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => saveText(img.id)}
+                      className="mt-3 w-full flex items-center justify-center gap-1.5 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-xl py-2 font-medium transition"
+                    >
+                      <Check className="w-4 h-4" />
+                      保存文字
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* fixed bottom: login bar + action buttons */}
+          <div className="fixed bottom-0 left-0 right-0 z-30">
+            {/* login prompt (hidden when logged in) */}
+            {!isAuthenticated && (
+              <div className="bg-white border-t border-slate-100 px-4 py-2 flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                  <CloudUpload className="w-4 h-4 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-800">登录账号，自动保存你的设计资产</p>
+                  <p className="text-xs text-slate-400">避免图片丢失</p>
+                </div>
+                <a
+                  href={getLoginUrl()}
+                  className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                >
+                  登录 / 注册
+                </a>
               </div>
             )}
-
-            <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500">
-                共 {results.summary.panel_count || results.panels.length} 张详情图
-              </div>
-              <button
-                onClick={handleRetry}
-                disabled={regenerating}
-                className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-50"
-              >
-                {regenerating ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-                重新生成
-              </button>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {results.panels.map((panel, index) => (
-                <div
-                  key={panel.asset_id}
-                  className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
-                >
-                  <div className="border-b border-slate-100 px-4 py-3">
-                    <div className="text-sm font-semibold text-slate-900">
-                      {panel.panel_label || `详情图 ${index + 1}`}
-                    </div>
-                  </div>
-                  <div className="bg-slate-100 p-3">
-                    <img
-                      src={panel.image_url}
-                      alt={panel.panel_label || `详情图 ${index + 1}`}
-                      className="w-full rounded-2xl object-contain"
-                    />
-                  </div>
-                </div>
-              ))}
+            {/* action buttons */}
+            <div className="bg-white border-t border-slate-100 shadow-lg px-4 py-2.5 flex gap-2">
+              <Button size="lg" variant="outline" className="flex-1 text-slate-600 gap-1.5 border-slate-200" onClick={handleDownloadAll} disabled={downloading}>
+                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                一键下载
+              </Button>
+              <Button size="lg" variant="ghost" className="px-3 text-slate-500" onClick={() => setShareOpen(true)}>
+                <Share2 className="w-4 h-4" />
+              </Button>
+              <Button size="lg" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white gap-1.5" onClick={() => setBrandOpen(true)}>
+                记住品牌风格
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {!canDownload && phase === "done" && !claiming && (
-        <div className="fixed bottom-24 left-0 right-0 z-20 border-t border-b border-slate-200 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
-                <CloudUpload className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-slate-800">
-                  登录账号，自动保存你的设计资产
-                </div>
-                <div className="text-xs text-slate-400">避免图片丢失</div>
-              </div>
-            </div>
+      {/* brand save modal (bottom sheet) */}
+      {brandOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setBrandOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-white rounded-t-2xl w-full max-w-sm pb-8 pt-5 px-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={handleArchiveToAccount}
-              className="rounded-full bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"
+              onClick={() => setBrandOpen(false)}
+              className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500"
             >
-              登录 / 注册
+              <X className="w-4 h-4" />
+            </button>
+
+            <h3 className="text-lg font-bold text-slate-900 mb-1">保存品牌/店铺风格?</h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              模型可以记录你生成过的品牌风格偏好，以后生成该品牌图片时，选择品牌会将相应可自动应用一致风格。
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">品牌 / 店铺名称</label>
+              <input
+                type="text"
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+                placeholder="例如：NaoNao宠物、小米官方旗舰店"
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-slate-300"
+              />
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-4 mb-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-sm font-semibold text-blue-900">保存品牌风格</span>
+                <Info className="w-3.5 h-3.5 text-blue-400" />
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed mb-3">
+                模型可以记录你生成过的品牌风格。以后生成的同品牌图片时，选择品牌即可自动生成一致风格。
+              </p>
+              <ul className="space-y-1.5">
+                {["产品实拍", "全套展示", "渲染图", "详情页注版"].map((item) => (
+                  <li key={item} className="flex items-center gap-2 text-xs text-slate-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <button
+              onClick={handleSaveBrand}
+              disabled={!brandName.trim()}
+              className={`w-full h-11 rounded-2xl font-semibold text-sm transition-colors ${
+                brandName.trim()
+                  ? "bg-blue-500 hover:bg-blue-600 text-white"
+                  : "bg-slate-100 text-slate-300 cursor-not-allowed"
+              }`}
+            >
+              保存品牌风格
             </button>
           </div>
         </div>
       )}
 
-      {phase === "done" && results && !claiming && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-4 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center gap-3">
-            <button
-              onClick={handleDownloadAll}
-              disabled={downloading}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 disabled:opacity-50"
-            >
-              {downloading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Download className="h-5 w-5" />
-              )}
-              一键下载
-            </button>
-            <button
-              onClick={() => setShareOpen(true)}
-              className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300"
-            >
-              <Share2 className="h-5 w-5" />
-            </button>
-            <button
-              onClick={handleRememberBrand}
-              className="flex h-14 flex-[1.1] items-center justify-center gap-2 rounded-2xl bg-blue-500 text-white transition hover:bg-blue-600"
-            >
-              <CloudUpload className="h-5 w-5" />
-              记住品牌风格
-            </button>
-          </div>
-        </div>
-      )}
-
-      {shareOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShareOpen(false)} />
-          <div className="relative w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">分享详情图</h3>
-              <button onClick={() => setShareOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
+      {/* brand save success modal */}
+      {brandSuccessOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-3xl w-full max-w-sm px-6 py-8 shadow-2xl flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-green-200">
+              <CheckCircle2 className="w-8 h-8 text-white" />
             </div>
-            <p className="mb-4 text-sm text-slate-500">
-              当前先复制页面链接用于分享，后续可再接正式分享能力。
+            <h3 className="text-lg font-bold text-slate-900 mb-2">
+              已为您记住「{brandSavedName}」品牌风格
+            </h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+              下次生成该品牌图片时，选择「{brandSavedName}」将自动应用一致风格，无需重复设置。
             </p>
             <button
+              onClick={handleBrandSuccessClose}
+              className="w-full h-11 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm transition-colors"
+            >
+              好的，返回主页
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* share modal (bottom sheet) */}
+      {shareOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShareOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-t-2xl w-full max-w-sm pb-8 pt-5 px-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-slate-900">选择分享方式</h3>
+              <button onClick={() => setShareOpen(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              className="w-full h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm transition-colors"
               onClick={async () => {
                 await navigator.clipboard.writeText(window.location.href);
-                toast({ title: "链接已复制", description: "当前页面链接已复制到剪贴板。" });
+                toast({ title: "已复制链接" });
                 setShareOpen(false);
               }}
-              className="w-full rounded-2xl bg-blue-500 py-3 text-sm font-semibold text-white hover:bg-blue-600"
             >
               复制链接
             </button>
           </div>
         </div>
       )}
-
-      {brandOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setBrandOpen(false)} />
-          <div className="relative w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">记住品牌风格</h3>
-              <button onClick={() => setBrandOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <p className="mb-3 text-sm text-slate-500">
-              当前仅做前端本地保存，占位模拟模板效果，不会回传后端。
-            </p>
-            <input
-              value={brandName}
-              onChange={(event) => setBrandName(event.target.value)}
-              placeholder="请输入品牌名称"
-              className="mb-4 h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm outline-none focus:border-blue-400"
-            />
-            <button
-              onClick={handleSaveBrand}
-              disabled={!brandName.trim()}
-              className="w-full rounded-2xl bg-blue-500 py-3 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
-            >
-              保存
-            </button>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
