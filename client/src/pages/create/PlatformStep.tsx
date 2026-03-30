@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
-import { sessionAPI } from "@/lib/api";
+import { jobAPI, sessionAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const PLATFORMS = [
@@ -24,6 +24,7 @@ export default function PlatformStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [isContinuing, setIsContinuing] = useState(false);
 
   const togglePlatform = (id: string) => {
     setSelectedPlatforms(prev =>
@@ -34,10 +35,13 @@ export default function PlatformStep() {
   };
 
   const handleNext = async () => {
+    if (isContinuing) return;
     if (selectedPlatforms.length === 0) {
       alert("请至少选择一个平台");
       return;
     }
+
+    setIsContinuing(true);
 
     // Save selected platforms to sessionStorage for later steps
     sessionStorage.setItem("selectedPlatforms", JSON.stringify(selectedPlatforms));
@@ -47,13 +51,22 @@ export default function PlatformStep() {
     if (sessionId) {
       try {
         await sessionAPI.savePlatformSelection(sessionId, selectedPlatforms, selectedPlatforms[0]);
+
+        toast({
+          title: "正在重新执行 AI 分析",
+          description: "分析完成后会自动进入参数页。",
+        });
+
+        const trigger = await sessionAPI.triggerAnalysis(sessionId);
+        await jobAPI.pollUntilDone(trigger.job_id);
       } catch (err) {
         console.error("Failed to save platform selection:", err);
         toast({
-          title: "平台选择保存失败",
+          title: "进入下一步失败",
           description: err instanceof Error ? err.message : "请稍后重试。",
           variant: "destructive",
         });
+        setIsContinuing(false);
         return;
       }
     }
@@ -142,13 +155,15 @@ export default function PlatformStep() {
         {/* 底部按钮 */}
         <Button
           onClick={handleNext}
-          disabled={selectedPlatforms.length === 0}
+          disabled={selectedPlatforms.length === 0 || isContinuing}
           className="w-full bg-blue-500 hover:bg-blue-600 text-white py-6 text-xl rounded-full disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
         >
-          下一步
-          <svg className="w-6 h-6 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>
-          </svg>
+          {isContinuing ? "AI分析中..." : "下一步"}
+          {!isContinuing && (
+            <svg className="w-6 h-6 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          )}
         </Button>
       </div>
     </div>
