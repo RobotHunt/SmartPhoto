@@ -84,6 +84,8 @@ export interface SessionResultAsset {
   asset_id: string;
   role: string;
   slot_id?: string | null;
+  expression_mode?: string | null;
+  rule_pack_id?: string | null;
   status?: string;
   display_order: number;
   image_url: string;
@@ -106,6 +108,42 @@ export interface SessionResults {
     ready_count: number;
   };
   assets: SessionResultAsset[];
+}
+
+export interface MainGalleryCopyBlocks {
+  headline: string;
+  supporting: string;
+  proof_lines: string[];
+  matrix_lines: string[];
+}
+
+export interface PromptPreviewItem {
+  role: string;
+  slot_id?: string | null;
+  slot_label?: string | null;
+  role_label?: string | null;
+  display_order: number;
+  copy_blocks: MainGalleryCopyBlocks;
+}
+
+export interface PromptPreviewData {
+  session_id: string;
+  prompts: PromptPreviewItem[];
+  latest_assets: Array<Record<string, any>>;
+}
+
+export interface StrategyOverrideItem {
+  slot_id: string;
+  copy_blocks_override: Partial<MainGalleryCopyBlocks>;
+  raw_prompt_override?: string | null;
+  expression_mode_override?: string | null;
+  applied_preset_id?: string | null;
+  locked?: boolean;
+}
+
+export interface StrategyOverridesData {
+  session_id: string;
+  overrides: StrategyOverrideItem[];
 }
 
 function normalizeAccountAssets(data: any): AccountAssetListResponse {
@@ -179,6 +217,8 @@ function normalizeSessionResults(data: any): SessionResults {
     asset_id: String(item?.asset_id || item?.id || index + 1),
     role: String(item?.role || item?.asset_role || 'hero'),
     slot_id: item?.slot_id ?? null,
+    expression_mode: item?.expression_mode ?? null,
+    rule_pack_id: item?.rule_pack_id ?? null,
     status: item?.status,
     display_order: Number(item?.display_order ?? index),
     image_url: String(item?.image_url || item?.url || ''),
@@ -433,6 +473,27 @@ export const sessionAPI = {
     if (instruction) body.instruction = instruction;
     return apiFetch<{ job_id: string }>(`/sessions/${sessionId}/copy/regenerate`, {
       method: 'POST', body: JSON.stringify(body),
+    });
+  },
+  previewPrompts(
+    sessionId: string,
+    options: { instruction?: string | null; include_latest_assets?: boolean } = {},
+  ) {
+    return apiFetch<PromptPreviewData>(`/sessions/${sessionId}/prompts/preview`, {
+      method: 'POST',
+      body: JSON.stringify({
+        instruction: options.instruction ?? null,
+        include_latest_assets: options.include_latest_assets ?? true,
+      }),
+    });
+  },
+  getStrategyOverrides(sessionId: string) {
+    return apiFetch<StrategyOverridesData>(`/sessions/${sessionId}/strategy/overrides`);
+  },
+  saveStrategyOverrides(sessionId: string, data: { overrides: StrategyOverrideItem[] }) {
+    return apiFetch<StrategyOverridesData>(`/sessions/${sessionId}/strategy/overrides`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   },
 

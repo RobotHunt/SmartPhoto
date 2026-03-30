@@ -21,9 +21,18 @@ import {
   assetAPI,
   jobAPI,
   sessionAPI,
+  type MainGalleryCopyBlocks,
+  type PromptPreviewItem,
   type SessionResults,
+  type StrategyOverrideItem,
   type VersionSummary,
 } from "@/lib/api";
+import {
+  copyLinesToTextarea,
+  resolveMainGalleryAssetCopy,
+  textareaToCopyLines,
+  upsertStrategyOverride,
+} from "@/lib/mainGalleryCopy";
 
 type ResultAssetView = {
   asset_id: string;
@@ -31,9 +40,10 @@ type ResultAssetView = {
   image_url: string;
   display_order: number;
   slot_id: string;
+  resolved_slot_id: string | null;
   isRegenerating: boolean;
   editOpen: boolean;
-  texts: { title: string; subtitle: string; footer: string };
+  copy_blocks: MainGalleryCopyBlocks;
 };
 
 function normalizeGenerationError(error: any) {
@@ -87,8 +97,19 @@ function normalizeGenerationError(error: any) {
   };
 }
 
-function buildViewAssets(data: SessionResults): ResultAssetView[] {
+function buildViewAssets(
+  data: SessionResults,
+  prompts: PromptPreviewItem[],
+  overrides: StrategyOverrideItem[],
+): ResultAssetView[] {
   return (data.assets || []).map((asset, index) => ({
+    ...(() => {
+      const resolved = resolveMainGalleryAssetCopy(asset, prompts, overrides);
+      return {
+        resolved_slot_id: resolved.slotId,
+        copy_blocks: resolved.copyBlocks,
+      };
+    })(),
     asset_id: asset.asset_id,
     role: asset.role,
     image_url: asset.image_url,
@@ -96,7 +117,6 @@ function buildViewAssets(data: SessionResults): ResultAssetView[] {
     slot_id: asset.slot_id || "",
     isRegenerating: false,
     editOpen: false,
-    texts: { title: "", subtitle: "", footer: "" },
   }));
 }
 
@@ -111,6 +131,8 @@ export default function ResultStep() {
   const [error, setError] = useState<string | null>(null);
 
   const [assets, setAssets] = useState<ResultAssetView[]>([]);
+  const [promptPreviews, setPromptPreviews] = useState<PromptPreviewItem[]>([]);
+  const [strategyOverrides, setStrategyOverrides] = useState<StrategyOverrideItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [availableVersions, setAvailableVersions] = useState<number[]>([]);
   const [currentVersion, setCurrentVersion] = useState<number | null>(null);
@@ -152,11 +174,18 @@ export default function ResultStep() {
   }, []);
 
   const applyResultsData = useCallback(
-    (data: SessionResults, explicitVersion?: number) => {
-      const nextAssets = buildViewAssets(data);
+    (
+      data: SessionResults,
+      prompts: PromptPreviewItem[],
+      overrides: StrategyOverrideItem[],
+      explicitVersion?: number,
+    ) => {
+      const nextAssets = buildViewAssets(data, prompts, overrides);
       const resolvedVersion =
         explicitVersion || data.requested_version || data.latest_result_version || null;
 
+      setPromptPreviews(prompts);
+      setStrategyOverrides(overrides);
       setAssets(nextAssets);
       setSelected(new Set(nextAssets.map((asset) => asset.asset_id)));
       setAvailableVersions(data.available_versions || []);
@@ -184,8 +213,19 @@ export default function ResultStep() {
   const loadResults = useCallback(
     async (version?: number) => {
       if (!sessionId) throw new Error("缺少 session_id");
-      const data = await sessionAPI.getResults(sessionId, version);
-      applyResultsData(data, version);
+      const [data, promptPreviewRes, overrideRes] = await Promise.all([
+        sessionAPI.getResults(sessionId, version),
+        sessionAPI
+          .previewPrompts(sessionId, { include_latest_assets: true })
+          .catch(() => null),
+        sessionAPI.getStrategyOverrides(sessionId).catch(() => null),
+      ]);
+      applyResultsData(
+        data,
+        promptPreviewRes?.prompts || [],
+        overrideRes?.overrides || [],
+        version,
+      );
       return data;
     },
     [applyResultsData, sessionId],
@@ -216,7 +256,15 @@ export default function ResultStep() {
       try {
         const existing = await sessionAPI.getResults(sessionId);
         if (existing.assets.length > 0) {
-          applyResultsData(existing);
+          const promptPreviewRes = await sessionAPI
+            .previewPrompts(sessionId, { include_latest_assets: true })
+            .catch(() => null);
+          const overrideRes = await sessionAPI.getStrategyOverrides(sessionId).catch(() => null);
+          applyResultsData(
+            existing,
+            promptPreviewRes?.prompts || [],
+            overrideRes?.overrides || [],
+          );
           return;
         }
       } catch {
@@ -476,13 +524,33 @@ export default function ResultStep() {
 
   const updateAssetText = (
     assetId: string,
-    field: "title" | "subtitle" | "footer",
+    field: "headline" | "supporting",
     value: string,
   ) => {
     setAssets((prev) =>
       prev.map((a) =>
         a.asset_id === assetId
-          ? { ...a, texts: { ...a.texts, [field]: value } }
+          ? { ...a, copy_blocks: { ...a.copy_blocks, [field]: value } }
+          : a,
+      ),
+    );
+  };
+
+  const updateAssetLineText = (
+    assetId: string,
+    field: "proof_lines" | "matrix_lines",
+    value: string,
+  ) => {
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.asset_id === assetId
+          ? {
+              ...a,
+              copy_blocks: {
+                ...a.copy_blocks,
+                [field]: textareaToCopyLines(value),
+              },
+            }
           : a,
       ),
     );
@@ -491,27 +559,40 @@ export default function ResultStep() {
   const saveAssetText = async (assetId: string) => {
     const asset = assets.find((a) => a.asset_id === assetId);
     if (!asset) return;
-    const { title, subtitle, footer } = asset.texts;
-    const parts: string[] = [];
-    if (title.trim()) parts.push(`主标题：${title.trim()}`);
-    if (subtitle.trim()) parts.push(`副标题：${subtitle.trim()}`);
-    if (footer.trim()) parts.push(`底部文字：${footer.trim()}`);
-    if (parts.length === 0) {
-      // nothing to do, just close
-      setAssets((prev) =>
-        prev.map((a) =>
-          a.asset_id === assetId ? { ...a, editOpen: false } : a,
-        ),
-      );
+    const slotId =
+      asset.resolved_slot_id ||
+      resolveMainGalleryAssetCopy(asset, promptPreviews, strategyOverrides).slotId;
+    if (!slotId || !sessionId) {
+      toast({
+        title: "保存失败",
+        description: "当前图片缺少可用槽位标识，暂时无法保存文案。",
+        variant: "destructive",
+      });
       return;
     }
-    const instruction = `修改文字：${parts.join("；")}`;
     setAssets((prev) =>
       prev.map((a) =>
         a.asset_id === assetId ? { ...a, editOpen: false } : a,
       ),
     );
-    await handleRegen(assetId, instruction);
+    try {
+      const nextOverrides = upsertStrategyOverride(
+        strategyOverrides,
+        slotId,
+        asset.copy_blocks,
+      );
+      const saved = await sessionAPI.saveStrategyOverrides(sessionId, {
+        overrides: nextOverrides,
+      });
+      setStrategyOverrides(saved.overrides || nextOverrides);
+      await handleRegen(assetId, "按当前文案 override 重生");
+    } catch (err: any) {
+      toast({
+        title: "保存失败",
+        description: err?.message || "请稍后重试。",
+        variant: "destructive",
+      });
+    }
   };
 
   const selectedCount = selected.size;
@@ -706,9 +787,9 @@ export default function ResultStep() {
                         </label>
                         <input
                           type="text"
-                          value={asset.texts.title}
+                          value={asset.copy_blocks.headline}
                           onChange={(e) =>
-                            updateAssetText(asset.asset_id, "title", e.target.value)
+                            updateAssetText(asset.asset_id, "headline", e.target.value)
                           }
                           placeholder="输入主标题..."
                           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
@@ -720,9 +801,9 @@ export default function ResultStep() {
                         </label>
                         <input
                           type="text"
-                          value={asset.texts.subtitle}
+                          value={asset.copy_blocks.supporting}
                           onChange={(e) =>
-                            updateAssetText(asset.asset_id, "subtitle", e.target.value)
+                            updateAssetText(asset.asset_id, "supporting", e.target.value)
                           }
                           placeholder="输入副标题..."
                           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
@@ -730,15 +811,29 @@ export default function ResultStep() {
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-500">
-                          底部文字
+                          佐证短句
                         </label>
-                        <input
-                          type="text"
-                          value={asset.texts.footer}
+                        <textarea
+                          rows={3}
+                          value={copyLinesToTextarea(asset.copy_blocks.proof_lines)}
                           onChange={(e) =>
-                            updateAssetText(asset.asset_id, "footer", e.target.value)
+                            updateAssetLineText(asset.asset_id, "proof_lines", e.target.value)
                           }
-                          placeholder="输入底部文字..."
+                          placeholder={"每行一条，例如：\n通过质检认证\n核心参数可视化"}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                          标签短句
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={copyLinesToTextarea(asset.copy_blocks.matrix_lines)}
+                          onChange={(e) =>
+                            updateAssetLineText(asset.asset_id, "matrix_lines", e.target.value)
+                          }
+                          placeholder={"每行一条，例如：\n净化除湿二合一\n低噪运行"}
                           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
                         />
                       </div>

@@ -44,6 +44,10 @@ type DetailPanel = {
   thumbnail_url?: string | null;
   display_order: number;
   version_no?: number;
+  display_module_title?: string | null;
+  display_module_kind?: string | null;
+  display_module_intent?: string | null;
+  display_tags?: string[] | null;
 };
 
 type DetailResultsPayload = {
@@ -98,6 +102,10 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
       copy_focus: panel?.copy_focus ?? null,
       panel_type: panel?.panel_type ?? null,
       visual_truth_mode: panel?.visual_truth_mode ?? null,
+      display_module_title: panel?.display_module_title ?? null,
+      display_module_kind: panel?.display_module_kind ?? null,
+      display_module_intent: panel?.display_module_intent ?? null,
+      display_tags: Array.isArray(panel?.display_tags) ? panel.display_tags : null,
       origin_note: panel?.origin_note ?? null,
       image_url: String(panel?.image_url || panel?.thumbnail_url || ""),
       thumbnail_url: panel?.thumbnail_url ?? null,
@@ -226,11 +234,11 @@ export default function DetailResultStep() {
     setImages(
       normalized.panels.map((panel, index) => ({
         id: panel.asset_id,
-        label: panel.panel_label || `详情图 ${index + 1}`,
+        label: panel.display_module_title || panel.panel_label || `详情图 ${index + 1}`,
         url: panel.image_url,
         editOpen: false,
         isRegenerating: false,
-        text: panel.panel_label || `详情图 ${index + 1}`,
+        text: panel.display_module_title || panel.panel_label || `详情图 ${index + 1}`,
       }))
     );
 

@@ -23,6 +23,10 @@ type DetailPlanItem = {
   copy_lines?: string[];
   copy_blocks?: Record<string, any>;
   layout_notes?: string;
+  display_module_title?: string;
+  display_module_kind?: string;
+  display_module_intent?: string;
+  display_tags?: string[];
 };
 
 type PlanningCard = {
@@ -70,16 +74,13 @@ function buildPlanningCards(panelPlan: DetailPlanItem[]): PlanningCard[] {
       .filter(Boolean)
       .slice(0, 3);
 
-    const tags = [
-      item.panel_type,
-      item.narrative_section,
-      visualTruthLabel(item.visual_truth_mode),
-    ].filter(Boolean) as string[];
+    const tags = Array.isArray(item.display_tags) ? item.display_tags : [];
 
     return {
       id: String(item.slot_id || item.panel_id || index + 1),
-      label: item.panel_label || item.panel_type || `详情图 ${index + 1}`,
+      label: item.display_module_title || item.panel_label || `详情图 ${index + 1}`,
       description:
+        item.display_module_intent ||
         item.panel_goal ||
         item.copy_focus ||
         copyHighlights[0] ||

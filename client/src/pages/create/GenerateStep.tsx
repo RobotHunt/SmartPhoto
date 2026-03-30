@@ -184,6 +184,15 @@ export default function GenerateStep() {
       ? PRODUCT_THEMES[productCategory]
       : PRODUCT_THEMES["其它"];
 
+  const resetEditableFields = useCallback(() => {
+    setSelectedTheme("");
+    setParams([]);
+    setSellingPoints([]);
+    setAdvantages([]);
+    setFeatureTexts([]);
+    sessionStorage.removeItem("selectedTheme");
+  }, []);
+
   const populateFromSnapshot = useCallback((snapshot: any, copyFields?: any) => {
     if (!snapshot || typeof snapshot !== "object") return;
 
@@ -370,11 +379,7 @@ export default function GenerateStep() {
 
         if (cancelled) return;
 
-        const confirmedCopySnapshot = session?.confirmed_copy || null;
-
-        if (confirmedCopySnapshot) {
-          populateFromSnapshot(confirmedCopySnapshot, confirmedCopySnapshot);
-        }
+        resetEditableFields();
 
         populateFromSnapshot(analysisSnapshot);
         const recognized = analysisSnapshot?.recognized_product || {};
@@ -408,7 +413,7 @@ export default function GenerateStep() {
             parametersResult.status === "fulfilled"
               ? parametersResult.value?.applied_copy_fields
               : undefined,
-          ) || hasEditableFieldContent(confirmedCopySnapshot, confirmedCopySnapshot);
+          );
 
         if (!hasCurrentContent && analysisSnapshot && !autoExtractAttemptedRef.current) {
           autoExtractAttemptedRef.current = true;
@@ -439,7 +444,7 @@ export default function GenerateStep() {
     return () => {
       cancelled = true;
     };
-  }, [loadParamAttachments, loadReferenceImages, populateFromSnapshot]);
+  }, [loadParamAttachments, loadReferenceImages, populateFromSnapshot, resetEditableFields]);
 
   useEffect(() => {
     sessionStorage.setItem(REFERENCE_LINKS_KEY, JSON.stringify(referenceLinks));
