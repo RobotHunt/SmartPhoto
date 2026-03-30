@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
 import { sessionAPI } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 const PLATFORMS = [
   { id: "1688", name: "1688", logo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663275834844/FqDWyGWuKYUEGqpy3yF7qj/1688_31c661d3.png" },
@@ -21,6 +22,7 @@ const PLATFORMS = [
 
 export default function PlatformStep() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
 
   const togglePlatform = (id: string) => {
@@ -47,6 +49,12 @@ export default function PlatformStep() {
         await sessionAPI.savePlatformSelection(sessionId, selectedPlatforms, selectedPlatforms[0]);
       } catch (err) {
         console.error("Failed to save platform selection:", err);
+        toast({
+          title: "平台选择保存失败",
+          description: err instanceof Error ? err.message : "请稍后重试。",
+          variant: "destructive",
+        });
+        return;
       }
     }
 

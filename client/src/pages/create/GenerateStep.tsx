@@ -134,11 +134,24 @@ function hasEditableFieldContent(snapshot: any, copyFields?: any): boolean {
   return false;
 }
 
+function hasAnalysisContent(snapshot: any): boolean {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  const recognized = snapshot.recognized_product || {};
+  if (String(recognized.product_name || "").trim()) return true;
+  if (String(recognized.category || snapshot.product_category || snapshot.category || "").trim()) return true;
+  if (normalizeTextItems(snapshot.visual_features).length > 0) return true;
+  if (normalizeTextItems(snapshot.suggestions).length > 0) return true;
+  if (normalizeTextItems(snapshot.scene_tags).length > 0) return true;
+  if (Array.isArray(snapshot.category_candidates) && snapshot.category_candidates.length > 0) return true;
+  return false;
+}
+
 export default function GenerateStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("正在等待 AI 分析完成...");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -253,6 +266,37 @@ export default function GenerateStep() {
     }
   }, []);
 
+  const waitForAnalysisReady = useCallback(async (sessionId: string) => {
+    const timeoutMs = 90000;
+    const intervalMs = 2000;
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const session = await sessionAPI.get(sessionId).catch(() => null);
+      if (session?.analysis_snapshot && hasAnalysisContent(session.analysis_snapshot)) {
+        return {
+          session,
+          analysisSnapshot: session.analysis_snapshot,
+        };
+      }
+
+      const analysisResponse = await sessionAPI.getAnalysis(sessionId).catch(() => null);
+      const analysisSnapshot =
+        analysisResponse?.analysis_snapshot || analysisResponse || null;
+      if (analysisSnapshot && hasAnalysisContent(analysisSnapshot)) {
+        return {
+          session,
+          analysisSnapshot,
+        };
+      }
+
+      setLoadingMessage("AI 分析尚未完成，正在等待后端返回结果...");
+      await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error("AI 分析结果尚未准备完成，请稍后重试。");
+  }, []);
+
   useEffect(() => {
     const sessionId = getSessionId();
     const savedLinks = sessionStorage.getItem(REFERENCE_LINKS_KEY);
@@ -292,78 +336,74 @@ export default function GenerateStep() {
 
     const run = async () => {
       try {
-        const [parametersResult, sessionResult] = await Promise.allSettled([
+        setLoadingMessage("正在等待 AI 分析完成...");
+
+        const { session, analysisSnapshot } = await waitForAnalysisReady(sessionId);
+        if (cancelled) return;
+
+        setLoadingMessage("正在同步 AI 参数内容...");
+
+        const [parametersResult] = await Promise.allSettled([
           sessionAPI.getParameters(sessionId),
-          sessionAPI.get(sessionId),
           loadParamAttachments(sessionId),
           loadReferenceImages(sessionId),
         ]);
 
         if (cancelled) return;
 
-        if (sessionResult.status === "fulfilled") {
-          const session = sessionResult.value || {};
-          if (session.confirmed_copy) {
-            populateFromSnapshot(session.confirmed_copy, session.confirmed_copy);
-          }
-          if (session.analysis_snapshot) {
-            populateFromSnapshot(session.analysis_snapshot);
-            const recognized = session.analysis_snapshot.recognized_product || {};
-            const nextProductName = String(
-              recognized.product_name || session.analysis_snapshot.product_name || "",
-            ).trim();
-            if (nextProductName) setProductName(nextProductName);
-            const nextCategory = String(
-              recognized.category || session.analysis_snapshot.product_category || "",
-            ).trim();
-            if (nextCategory) {
-              setProductCategory(nextCategory);
-              sessionStorage.setItem("selectedProductType", nextCategory);
-            }
-          }
-          if (parametersResult.status === "fulfilled") {
-            const data = parametersResult.value || {};
-            const snapshot = data.parameter_snapshot || data;
-            if (hasEditableFieldContent(snapshot, data.applied_copy_fields)) {
-              populateFromSnapshot(snapshot, data.applied_copy_fields);
-            }
-          }
+        const confirmedCopySnapshot = session?.confirmed_copy || null;
 
-          const currentSnapshot =
+        if (confirmedCopySnapshot) {
+          populateFromSnapshot(confirmedCopySnapshot, confirmedCopySnapshot);
+        }
+
+        populateFromSnapshot(analysisSnapshot);
+        const recognized = analysisSnapshot?.recognized_product || {};
+        const nextProductName = String(
+          recognized.product_name || analysisSnapshot?.product_name || "",
+        ).trim();
+        if (nextProductName) setProductName(nextProductName);
+        const nextCategory = String(
+          recognized.category || analysisSnapshot?.product_category || "",
+        ).trim();
+        if (nextCategory) {
+          setProductCategory(nextCategory);
+          sessionStorage.setItem("selectedProductType", nextCategory);
+        }
+
+        if (parametersResult.status === "fulfilled") {
+          const data = parametersResult.value || {};
+          const snapshot = data.parameter_snapshot || data;
+          if (hasEditableFieldContent(snapshot, data.applied_copy_fields)) {
+            populateFromSnapshot(snapshot, data.applied_copy_fields);
+          }
+        }
+
+        const currentSnapshot =
+          parametersResult.status === "fulfilled"
+            ? parametersResult.value?.parameter_snapshot || parametersResult.value || {}
+            : {};
+        const hasCurrentContent =
+          hasEditableFieldContent(
+            currentSnapshot,
             parametersResult.status === "fulfilled"
-              ? parametersResult.value?.parameter_snapshot || parametersResult.value || {}
-              : {};
-          const hasCurrentContent =
-            hasEditableFieldContent(currentSnapshot, parametersResult.status === "fulfilled" ? parametersResult.value?.applied_copy_fields : undefined) ||
-            hasEditableFieldContent(session.confirmed_copy, session.confirmed_copy);
+              ? parametersResult.value?.applied_copy_fields
+              : undefined,
+          ) || hasEditableFieldContent(confirmedCopySnapshot, confirmedCopySnapshot);
 
-          if (!hasCurrentContent && session.analysis_snapshot && !autoExtractAttemptedRef.current) {
-            autoExtractAttemptedRef.current = true;
-            try {
-              const trigger = await sessionAPI.extractParameters(sessionId);
-              await jobAPI.pollUntilDone(trigger.job_id);
-              const extracted = await sessionAPI.getParameters(sessionId);
-              const extractedSnapshot = extracted?.parameter_snapshot || extracted;
-              if (hasEditableFieldContent(extractedSnapshot, extracted?.applied_copy_fields)) {
-                populateFromSnapshot(extractedSnapshot, extracted?.applied_copy_fields);
-              }
-            } catch (extractError) {
-              console.warn("Auto parameter extraction skipped:", extractError);
+        if (!hasCurrentContent && analysisSnapshot && !autoExtractAttemptedRef.current) {
+          autoExtractAttemptedRef.current = true;
+          setLoadingMessage("AI 分析已完成，正在生成参数内容...");
+          try {
+            const trigger = await sessionAPI.extractParameters(sessionId);
+            await jobAPI.pollUntilDone(trigger.job_id);
+            const extracted = await sessionAPI.getParameters(sessionId);
+            const extractedSnapshot = extracted?.parameter_snapshot || extracted;
+            if (hasEditableFieldContent(extractedSnapshot, extracted?.applied_copy_fields)) {
+              populateFromSnapshot(extractedSnapshot, extracted?.applied_copy_fields);
             }
-          }
-        } else {
-          const cachedSnapshot = sessionStorage.getItem("analysis_snapshot_full");
-          if (cachedSnapshot) {
-            const parsed = JSON.parse(cachedSnapshot);
-            populateFromSnapshot(parsed);
-            const recognized = parsed?.recognized_product || {};
-            const nextProductName = String(recognized.product_name || parsed.product_name || "").trim();
-            if (nextProductName) setProductName(nextProductName);
-            const nextCategory = String(recognized.category || parsed.product_category || "").trim();
-            if (nextCategory) {
-              setProductCategory(nextCategory);
-              sessionStorage.setItem("selectedProductType", nextCategory);
-            }
+          } catch (extractError) {
+            console.warn("Auto parameter extraction skipped:", extractError);
           }
         }
       } catch (err) {
@@ -584,7 +624,7 @@ export default function GenerateStep() {
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mb-4" />
-          <p className="text-slate-500 text-sm">AI正在分析产品特性...</p>
+          <p className="text-slate-500 text-sm">{loadingMessage}</p>
         </div>
       </div>
     );
