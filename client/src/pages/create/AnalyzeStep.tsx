@@ -4,6 +4,14 @@ import { Check, CheckCircle2, Cpu, Pencil, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
+import {
+  ANALYSIS_DIRTY_KEY,
+  ANALYSIS_SUPPLEMENT_LIST_KEY,
+  type AnalysisResult,
+  type CandidateItem,
+  completeAnalysisRefresh,
+  parseAnalysisSnapshot,
+} from "@/lib/analysisSnapshot";
 import { updateSessionRecord } from "@/lib/localUser";
 import {
   Select,
@@ -14,101 +22,8 @@ import {
 } from "@/components/ui/select";
 import { jobAPI, sessionAPI } from "@/lib/api";
 
-interface CandidateItem {
-  type: string;
-  confidence: number;
-  reason: string;
-}
-
-interface SupplementRecommendation {
-  slot_type: string;
-  label: string;
-  reason: string;
-  priority: number;
-  upload_goal: string;
-  must_show: string;
-  framing_hint: string;
-  example_caption: string;
-  image_kind?: string | null;
-}
-
-interface AnalysisResult {
-  product_name: string;
-  product_type: string;
-  category: string;
-  visual_features: string[];
-  suggestions: string[];
-  scene_tags: string[];
-  category_candidates: CandidateItem[];
-  supplement_image_recommendations: SupplementRecommendation[];
-}
-
 const RECOGNITION_STEPS = ["产品类别识别", "产品结构识别", "应用场景识别"];
-const ANALYSIS_DIRTY_KEY = "analysis_dirty";
 const ANALYZE_SUPPLEMENT_KEY = "from_analyze_supplement";
-const ANALYZE_SUPPLEMENT_LIST_KEY = "analysis_supplement_recommendations";
-
-function parseStringList(value: any): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item: any) => String(item || "").trim()).filter(Boolean);
-  }
-  return String(value || "")
-    .split(/[,\uFF0C\u3001\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parseCandidates(snapshot: any, fallbackCategory: string): CandidateItem[] {
-  const items = Array.isArray(snapshot?.category_candidates) ? snapshot.category_candidates : [];
-  const parsed = items
-    .map((item: any) => ({
-      type: String(item?.category || "").trim(),
-      confidence: Number(item?.confidence || 0),
-      reason: String(item?.reason || "").trim(),
-    }))
-    .filter((item: CandidateItem) => item.type);
-  if (parsed.length > 0) return parsed;
-  return fallbackCategory
-    ? [{ type: fallbackCategory, confidence: 98, reason: "当前识别结果的主类目。" }]
-    : [{ type: "其他", confidence: 60, reason: "未识别到更明确的品类。" }];
-}
-
-function parseSupplementRecommendations(snapshot: any): SupplementRecommendation[] {
-  const items = Array.isArray(snapshot?.supplement_image_recommendations)
-    ? snapshot.supplement_image_recommendations
-    : [];
-  return items
-    .map((item: any, index: number) => ({
-      slot_type: String(item?.slot_type || "").trim(),
-      label: String(item?.label || "").trim() || "补充图片",
-      reason: String(item?.reason || "").trim(),
-      priority: Number(item?.priority || index + 1),
-      upload_goal: String(item?.upload_goal || "").trim(),
-      must_show: String(item?.must_show || "").trim(),
-      framing_hint: String(item?.framing_hint || "").trim(),
-      example_caption: String(item?.example_caption || "").trim(),
-      image_kind: item?.image_kind ? String(item.image_kind).trim() : null,
-    }))
-    .filter((item: SupplementRecommendation) => item.slot_type && item.label);
-}
-
-function parseAnalysisSnapshot(snapshot: any): AnalysisResult {
-  const recognized = snapshot?.recognized_product || {};
-  const fallbackCategory = String(recognized.category || snapshot?.category || "其他").trim() || "其他";
-  const categoryCandidates = parseCandidates(snapshot, fallbackCategory);
-  const supplementRecommendations = parseSupplementRecommendations(snapshot);
-
-  return {
-    product_name: String(recognized.product_name || snapshot?.product_name || "产品").trim() || "产品",
-    product_type: String(recognized.image_type || snapshot?.product_type || "实物图").trim() || "实物图",
-    category: fallbackCategory,
-    visual_features: parseStringList(snapshot?.suggested_styles || snapshot?.visual_features),
-    suggestions: parseStringList(snapshot?.suggestions),
-    scene_tags: parseStringList(snapshot?.scene_tags),
-    category_candidates: categoryCandidates,
-    supplement_image_recommendations: supplementRecommendations,
-  };
-}
 
 export default function AnalyzeStep() {
   const [, setLocation] = useLocation();
@@ -146,15 +61,12 @@ export default function AnalyzeStep() {
     };
 
     const applySnapshot = (snapshot: any) => {
-      const parsed = parseAnalysisSnapshot(snapshot);
+      const parsed = completeAnalysisRefresh(snapshot);
       const nextCandidates = parsed.category_candidates;
       const nextSelectedCategory =
         parsed.category ||
         nextCandidates[0]?.type ||
         "其他";
-
-      sessionStorage.setItem("analysis_snapshot_full", JSON.stringify(snapshot));
-      sessionStorage.setItem("analysisResult", JSON.stringify(parsed));
 
       const sid = sessionStorage.getItem("current_session_id");
       if (sid) {
@@ -163,11 +75,6 @@ export default function AnalyzeStep() {
           thumbnail_url: snapshot?.images?.[0]?.url || "",
         });
       }
-      sessionStorage.setItem(
-        ANALYZE_SUPPLEMENT_LIST_KEY,
-        JSON.stringify(parsed.supplement_image_recommendations),
-      );
-      sessionStorage.removeItem(ANALYSIS_DIRTY_KEY);
       sessionStorage.removeItem(ANALYZE_SUPPLEMENT_KEY);
 
       setCandidates(nextCandidates);
@@ -274,20 +181,20 @@ export default function AnalyzeStep() {
 
     sessionStorage.setItem("analysisResult", JSON.stringify(updatedResult));
     sessionStorage.setItem("selectedProductType", selectedCategory);
-    sessionStorage.setItem(
-      ANALYZE_SUPPLEMENT_LIST_KEY,
-      JSON.stringify(updatedResult.supplement_image_recommendations || []),
-    );
+      sessionStorage.setItem(
+        ANALYSIS_SUPPLEMENT_LIST_KEY,
+        JSON.stringify(updatedResult.supplement_image_recommendations || []),
+      );
     sessionStorage.removeItem(ANALYZE_SUPPLEMENT_KEY);
     setLocation("/create/platform");
   };
 
   const handleSupplementImages = () => {
     if (result?.supplement_image_recommendations?.length) {
-      sessionStorage.setItem(
-        ANALYZE_SUPPLEMENT_LIST_KEY,
-        JSON.stringify(result.supplement_image_recommendations),
-      );
+        sessionStorage.setItem(
+          ANALYSIS_SUPPLEMENT_LIST_KEY,
+          JSON.stringify(result.supplement_image_recommendations),
+        );
     }
     sessionStorage.setItem(ANALYZE_SUPPLEMENT_KEY, "1");
     setLocation("/create/upload");

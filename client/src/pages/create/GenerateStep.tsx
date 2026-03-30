@@ -6,6 +6,12 @@ import { StepIndicator } from "@/components/StepIndicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { jobAPI, sessionAPI } from "@/lib/api";
+import {
+  ANALYSIS_REFRESH_REQUIRED_KEY,
+  ANALYSIS_SNAPSHOT_KEY,
+  completeAnalysisRefresh,
+  hasAnalysisContent,
+} from "@/lib/analysisSnapshot";
 import { useToast } from "@/hooks/use-toast";
 
 const REFERENCE_LINKS_KEY = "generate_reference_links";
@@ -134,18 +140,6 @@ function hasEditableFieldContent(snapshot: any, copyFields?: any): boolean {
   return false;
 }
 
-function hasAnalysisContent(snapshot: any): boolean {
-  if (!snapshot || typeof snapshot !== "object") return false;
-  const recognized = snapshot.recognized_product || {};
-  if (String(recognized.product_name || "").trim()) return true;
-  if (String(recognized.category || snapshot.product_category || snapshot.category || "").trim()) return true;
-  if (normalizeTextItems(snapshot.visual_features).length > 0) return true;
-  if (normalizeTextItems(snapshot.suggestions).length > 0) return true;
-  if (normalizeTextItems(snapshot.scene_tags).length > 0) return true;
-  if (Array.isArray(snapshot.category_candidates) && snapshot.category_candidates.length > 0) return true;
-  return false;
-}
-
 export default function GenerateStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -270,24 +264,49 @@ export default function GenerateStep() {
     const timeoutMs = 90000;
     const intervalMs = 2000;
     const startedAt = Date.now();
+    const forceFreshAnalysis = sessionStorage.getItem(ANALYSIS_REFRESH_REQUIRED_KEY) === "1";
 
     while (Date.now() - startedAt < timeoutMs) {
-      const session = await sessionAPI.get(sessionId).catch(() => null);
-      if (session?.analysis_snapshot && hasAnalysisContent(session.analysis_snapshot)) {
-        return {
-          session,
-          analysisSnapshot: session.analysis_snapshot,
-        };
+      if (forceFreshAnalysis) {
+        const cachedAnalysis = sessionStorage.getItem(ANALYSIS_SNAPSHOT_KEY);
+        if (cachedAnalysis) {
+          try {
+            const parsed = JSON.parse(cachedAnalysis);
+            if (hasAnalysisContent(parsed)) {
+              const session = await sessionAPI.get(sessionId).catch(() => null);
+              completeAnalysisRefresh(parsed);
+              return {
+                session,
+                analysisSnapshot: parsed,
+              };
+            }
+          } catch {
+            sessionStorage.removeItem(ANALYSIS_SNAPSHOT_KEY);
+          }
+        }
       }
 
       const analysisResponse = await sessionAPI.getAnalysis(sessionId).catch(() => null);
       const analysisSnapshot =
         analysisResponse?.analysis_snapshot || analysisResponse || null;
       if (analysisSnapshot && hasAnalysisContent(analysisSnapshot)) {
+        const session = await sessionAPI.get(sessionId).catch(() => null);
+        completeAnalysisRefresh(analysisSnapshot);
         return {
           session,
           analysisSnapshot,
         };
+      }
+
+      if (!forceFreshAnalysis) {
+        const session = await sessionAPI.get(sessionId).catch(() => null);
+        if (session?.analysis_snapshot && hasAnalysisContent(session.analysis_snapshot)) {
+          completeAnalysisRefresh(session.analysis_snapshot);
+          return {
+            session,
+            analysisSnapshot: session.analysis_snapshot,
+          };
+        }
       }
 
       setLoadingMessage("AI 分析尚未完成，正在等待后端返回结果...");

@@ -3,6 +3,11 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
 import { jobAPI, sessionAPI } from "@/lib/api";
+import {
+  cacheAnalysisSnapshot,
+  hasAnalysisContent,
+  markAnalysisRefreshRequired,
+} from "@/lib/analysisSnapshot";
 import { useToast } from "@/hooks/use-toast";
 
 const PLATFORMS = [
@@ -50,6 +55,7 @@ export default function PlatformStep() {
     const sessionId = sessionStorage.getItem("current_session_id");
     if (sessionId) {
       try {
+        markAnalysisRefreshRequired();
         await sessionAPI.savePlatformSelection(sessionId, selectedPlatforms, selectedPlatforms[0]);
 
         toast({
@@ -59,6 +65,33 @@ export default function PlatformStep() {
 
         const trigger = await sessionAPI.triggerAnalysis(sessionId);
         await jobAPI.pollUntilDone(trigger.job_id);
+
+        const startedAt = Date.now();
+        const timeoutMs = 30000;
+        const intervalMs = 1500;
+        let freshSnapshot: any = null;
+
+        while (Date.now() - startedAt < timeoutMs) {
+          const analysisResponse = await sessionAPI.getAnalysis(sessionId).catch(() => null);
+          const analysisSnapshot =
+            analysisResponse?.analysis_snapshot || analysisResponse || null;
+
+          if (analysisSnapshot && hasAnalysisContent(analysisSnapshot)) {
+            freshSnapshot = analysisSnapshot;
+            break;
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
+        }
+
+        if (!freshSnapshot) {
+          throw new Error("AI 分析结果刷新超时，请稍后重试。");
+        }
+
+        const parsed = cacheAnalysisSnapshot(freshSnapshot);
+        if (parsed.category) {
+          sessionStorage.setItem("selectedProductType", parsed.category);
+        }
       } catch (err) {
         console.error("Failed to save platform selection:", err);
         toast({
