@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { StepIndicator } from "@/components/StepIndicator";
+import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 import { resolveAssetLabel } from "@/lib/assetLabels";
 import { resolveGenerationStageText } from "@/lib/generationStatus";
 import { updateSessionRecord } from "@/lib/localUser";
@@ -129,6 +130,7 @@ export default function ResultStep() {
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("正在生成主图...");
   const [error, setError] = useState<string | null>(null);
+  const generateStartRef = useRef(Date.now());
 
   const [assets, setAssets] = useState<ResultAssetView[]>([]);
   const [promptPreviews, setPromptPreviews] = useState<PromptPreviewItem[]>([]);
@@ -248,6 +250,7 @@ export default function ResultStep() {
 
     const run = async () => {
       setGenerating(true);
+      generateStartRef.current = Date.now();
       setError(null);
       setStatusText("正在加载生成结果...");
       progressRef.current = 0;
@@ -312,7 +315,7 @@ export default function ResultStep() {
               const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
               const stage = jobStatus.stage || jobStatus.status || "";
               if (!cancelled) {
-                setStatusText(resolveGenerationStageText(stage, "main"));
+                setStatusText(resolveGenerationStageText(stage, "main").title);
               }
               if (!cancelled) {
                 safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
@@ -339,7 +342,7 @@ export default function ResultStep() {
             const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
             const stage = jobStatus.stage || jobStatus.status || "";
             if (!cancelled) {
-              setStatusText(resolveGenerationStageText(stage, "main"));
+              setStatusText(resolveGenerationStageText(stage, "main").title);
             }
             if (!cancelled) {
               safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
@@ -408,6 +411,7 @@ export default function ResultStep() {
   const handleVersionChange = async (version: number) => {
     if (!sessionId || version === currentVersion) return;
     setGenerating(true);
+    generateStartRef.current = Date.now();
     setStatusText(`正在加载 V${version}...`);
     progressRef.current = 0;
     setProgress(20);
@@ -481,6 +485,7 @@ export default function ResultStep() {
     setGlobalEditLoading(true);
     setGlobalEditOpen(false);
     setGenerating(true);
+    generateStartRef.current = Date.now();
     setError(null);
     setStatusText("AI 正在整体优化图片...");
     progressRef.current = 0;
@@ -492,7 +497,7 @@ export default function ResultStep() {
         await jobAPI.pollUntilDone(response.job_id, (jobStatus) => {
           const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
           const stage = jobStatus.stage || jobStatus.status || "";
-          setStatusText(resolveGenerationStageText(stage, "main"));
+          setStatusText(resolveGenerationStageText(stage, "main").title);
           safeSetProgress(Math.min(Math.round(20 + pct * 0.75), 96));
         });
       }
@@ -600,25 +605,15 @@ export default function ResultStep() {
   const actionLocked = globalEditLoading || hasRunningAssetRegen;
 
   if (generating) {
+    const elapsedMs = Date.now() - generateStartRef.current;
     return (
       <div className="min-h-screen bg-[#f5f6f8]">
         <StepIndicator currentStep={5} step5Label="生成图片" />
-        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100">
-            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-          </div>
-          <h2 className="mb-2 text-xl font-bold text-slate-900">{statusText}</h2>
-          <p className="mb-6 text-sm text-slate-500">请耐心等待，AI 正在为您精心制作图片</p>
-          <div className="mb-2 w-full max-w-xs">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-          <p className="text-sm font-medium text-slate-400">{progress}%</p>
-        </div>
+        <GenerationWaitingUI
+          kind="main"
+          progress={progress}
+          stage={statusText}
+        />
       </div>
     );
   }

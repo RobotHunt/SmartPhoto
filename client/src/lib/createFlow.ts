@@ -20,6 +20,10 @@ const CREATE_FLOW_KEYS = [
   "detail_result_autostart",
   "hdPaymentSuccess",
   "hd_unlocked_version",
+  "detail_payment_success",
+  "detail_preview_count",
+  "detail_preview_version",
+  "detail_unlocked_version",
 ];
 
 export function clearCreateFlow() {
@@ -28,6 +32,7 @@ export function clearCreateFlow() {
 
 export function getResumeFlowPath(): string {
   if (sessionStorage.getItem("detail_current_version")) return "/create/detail-result";
+  if (sessionStorage.getItem("detail_payment_success")) return "/create/detail-payment";
   if (sessionStorage.getItem("hd_unlocked_version")) return "/create/hd-result";
   if (sessionStorage.getItem("current_result_version")) return "/create/result";
   if (sessionStorage.getItem("current_session_id")) return "/create/upload";

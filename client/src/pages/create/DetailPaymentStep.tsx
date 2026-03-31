@@ -1,27 +1,29 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from "lucide-react";
-import { StepIndicator } from "@/components/StepIndicator";
+
+import { DetailStepIndicator } from "./DetailStepIndicator";
 import { sessionAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const PERKS = [
-  "无水印高清图",
-  "阿里巴巴详情尺寸",
-  "可直接用于阿里巴巴上架",
+  "无水印高清详情图",
+  "电商详情页尺寸",
+  "可直接用于上架",
   "永久保存",
 ];
 
-export default function HDPaymentStep() {
+export default function DetailPaymentStep() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [paying, setPaying] = useState(false);
+
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
 
   const sessionId = sessionStorage.getItem("current_session_id") || "";
-  const unlockedVersion = Number(sessionStorage.getItem("hd_unlocked_version") || "0");
-  const selectedCount = parseInt(sessionStorage.getItem("selectedImgCount") || sessionStorage.getItem("hdImgCount") || "0");
+  const detailPreviewVersion = Number(sessionStorage.getItem("detail_preview_version") || "0");
+  const selectedCount = parseInt(sessionStorage.getItem("detail_preview_count") || "6");
   const PREVIEW_MAX = 3;
   const remaining = Math.max(0, selectedCount - PREVIEW_MAX);
 
@@ -35,7 +37,7 @@ export default function HDPaymentStep() {
       }
 
       try {
-        const results = await sessionAPI.getResults(sessionId, unlockedVersion || undefined);
+        const results = await sessionAPI.getResults(sessionId, detailPreviewVersion || undefined);
         if (cancelled) return;
 
         const urls = results.assets
@@ -51,30 +53,35 @@ export default function HDPaymentStep() {
 
     loadThumbnails();
     return () => { cancelled = true; };
-  }, [sessionId, unlockedVersion]);
+  }, [sessionId, detailPreviewVersion]);
 
   const handlePay = () => {
     setPaying(true);
     setTimeout(() => {
       setPaying(false);
-      sessionStorage.setItem("hdPaymentSuccess", "true");
-      setLocation("/create/hd-result");
-    }, 2000);
+      sessionStorage.setItem("detail_payment_success", "true");
+      sessionStorage.setItem("detail_unlocked_version", String(detailPreviewVersion || 0));
+      toast({
+        title: "支付成功",
+        description: "正在生成详情图。",
+      });
+      setLocation("/create/detail-result");
+    }, 1200);
   };
 
   return (
     <div className="min-h-screen bg-white">
-      <StepIndicator currentStep={5} />
+      <DetailStepIndicator currentStep={3} />
 
       {/* 顶部导航 */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
         <button
-          onClick={() => setLocation("/create/hd-result")}
+          onClick={() => setLocation("/create/detail-confirm")}
           className="text-slate-600 hover:text-slate-900 transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-base font-bold text-slate-900">生成无水印高清图</h1>
+        <h1 className="text-base font-bold text-slate-900">生成无水印详情图</h1>
       </div>
 
       <div className="max-w-lg mx-auto px-4 pb-48">
@@ -83,7 +90,7 @@ export default function HDPaymentStep() {
         <div className="flex items-center gap-2 mt-4 mb-4">
           <CheckCircle2 className="w-5 h-5 text-blue-500" />
           <span className="text-sm font-semibold text-slate-800">
-            共 <span className="text-blue-600">{selectedCount}</span> 张图片
+            共 <span className="text-blue-600">{selectedCount}</span> 张详情图
           </span>
         </div>
 
@@ -114,7 +121,7 @@ export default function HDPaymentStep() {
 
         {/* 套餐名称 */}
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-slate-800">无水印高清图 · AI生成</span>
+          <span className="text-sm font-semibold text-slate-800">无水印详情图 · AI生成</span>
         </div>
 
         {/* 价格区域 */}
@@ -144,7 +151,7 @@ export default function HDPaymentStep() {
           ) : (
             <>
               <Sparkles className="w-5 h-5" />
-              <span>立即生成高清图 ¥69</span>
+              <span>立即生成详情图 ¥69</span>
             </>
           )}
         </button>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import {
   AlertCircle,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 import { useToast } from "@/hooks/use-toast";
 import { getLoginUrl } from "@/const";
 import { jobAPI, sessionAPI } from "@/lib/api";
@@ -201,6 +202,7 @@ export default function DetailResultStep() {
   const [loadingText, setLoadingText] = useState("正在生成详情图...");
   const [error, setError] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
+  const generateStartRef = useRef(Date.now());
   const [downloading, setDownloading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [results, setResults] = useState<DetailResultsPayload | null>(null);
@@ -258,7 +260,7 @@ export default function DetailResultStep() {
         if (nextProgress > 0) {
           setProgress(Math.max(8, Math.min(99, nextProgress)));
         }
-        setLoadingText(resolveGenerationStageText(status?.stage || status?.status, "detail"));
+        setLoadingText(resolveGenerationStageText(status?.stage || status?.status, "detail").title);
       },
       2000,
       300000,
@@ -313,6 +315,16 @@ export default function DetailResultStep() {
           return;
         }
 
+        // Payment gate: if not paid, redirect to detail payment page
+        const paymentSuccess = sessionStorage.getItem("detail_payment_success");
+        if (!paymentSuccess) {
+          setLocation("/create/detail-payment");
+          return;
+        }
+
+        // Clear one-time payment flag
+        sessionStorage.removeItem("detail_payment_success");
+
         // If a generation job is in progress, resume polling
         if (snapshot.latest_detail_generate_job_id) {
           const latestJob = await jobAPI.getStatus(snapshot.latest_detail_generate_job_id).catch(() => null);
@@ -325,8 +337,18 @@ export default function DetailResultStep() {
           }
         }
 
-        // No results and no running job — go back to confirm page to generate
-        setLocation("/create/detail-confirm");
+        // Paid but no results and no running job — start generation
+        try {
+          setPhase("loading");
+          setLoadingText("正在启动详情图生成...");
+          setProgress(8);
+          await startGeneration();
+        } catch (genErr: any) {
+          if (!cancelled) {
+            setPhase("error");
+            setError(normalizeDetailGenerationError(genErr));
+          }
+        }
       } catch (err: any) {
         if (!cancelled) {
           setPhase("error");
@@ -433,26 +455,15 @@ export default function DetailResultStep() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <DetailStepIndicator currentStep={3} />
+      <DetailStepIndicator currentStep={4} />
 
       {/* Loading phase */}
       {phase === "loading" && (
-        <div className="flex flex-col items-center justify-center flex-1 px-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
-            <Sparkles className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-lg font-bold text-slate-900 mb-1">正在生成详情图…</h2>
-          <p className="text-sm text-slate-500 mb-5">{loadingText}</p>
-          <div className="w-full max-w-xs mb-2">
-            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-blue-400 to-blue-600 h-full rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-          <p className="text-sm text-slate-400">{progress}%</p>
-        </div>
+        <GenerationWaitingUI
+          kind="detail"
+          progress={progress}
+          stage={loadingText}
+        />
       )}
 
       {/* Error phase */}

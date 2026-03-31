@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   Loader2,
@@ -17,6 +17,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
+import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 import { useToast } from "@/hooks/use-toast";
 import { getLoginUrl } from "@/const";
 import { useAuth } from "@/contexts/AuthContext";
@@ -89,6 +90,7 @@ export default function HDResultStep() {
   const [strategyOverrides, setStrategyOverrides] = useState<StrategyOverrideItem[]>([]);
   const [progress, setProgress] = useState(0);
   const [hdProgress, setHdProgress] = useState(0);
+  const generateStartRef = useRef(Date.now());
   const [downloading, setDownloading] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
@@ -373,7 +375,7 @@ export default function HDResultStep() {
   const goToPayment = () => {
     sessionStorage.setItem("hdFromPreview", "true");
     sessionStorage.setItem("hdImgCount", String(images.length));
-    navigate("/create/payment");
+    navigate("/create/hd-payment");
   };
 
   const goToDetailCopywriting = () => {
@@ -397,22 +399,11 @@ export default function HDResultStep() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <StepIndicator currentStep={5} />
-        <div className="flex flex-col items-center justify-center flex-1 px-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
-            <Sparkles className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-lg font-bold text-slate-900 mb-1">正在生成预览图…</h2>
-          <p className="text-sm text-slate-500 mb-5">AI 正在处理，请稍候片刻</p>
-          <div className="w-full max-w-xs mb-2">
-            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-blue-400 to-blue-600 h-full rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-          <p className="text-sm text-slate-400">{Math.round(progress)}%</p>
-        </div>
+        <GenerationWaitingUI
+          kind="main"
+          progress={progress}
+          stage="正在生成预览图"
+        />
       </div>
     );
   }
@@ -521,22 +512,11 @@ export default function HDResultStep() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <StepIndicator currentStep={5} />
-        <div className="flex flex-col items-center justify-center flex-1 px-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-orange-200">
-            <Crown className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-lg font-bold text-slate-900 mb-1">正在生成无水印高清图…</h2>
-          <p className="text-sm text-slate-500 mb-5">AI 正在处理，请稍候片刻</p>
-          <div className="w-full max-w-xs mb-2">
-            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full transition-all duration-300"
-                style={{ width: `${hdProgress}%` }}
-              />
-            </div>
-          </div>
-          <p className="text-sm text-slate-400">{Math.round(hdProgress)}% · 高清渲染中</p>
-        </div>
+        <GenerationWaitingUI
+          kind="hd"
+          progress={hdProgress}
+          stage="正在生成无水印高清图"
+        />
       </div>
     );
   }

@@ -4,10 +4,11 @@ import { useLocation } from "wouter";
 const DETAIL_STEPS = [
   { id: 1, label: "文案确认", path: "/create/copywriting" },
   { id: 2, label: "详情图确认", path: "/create/detail-confirm" },
-  { id: 3, label: "生成详情图", path: "/create/detail-result" },
+  { id: 3, label: "支付确认", path: "/create/detail-payment" },
+  { id: 4, label: "生成详情图", path: "/create/detail-result" },
 ] as const;
 
-export function DetailStepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 }) {
+export function DetailStepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
   const [, setLocation] = useLocation();
 
   return (

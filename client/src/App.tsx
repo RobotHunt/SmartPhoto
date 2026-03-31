@@ -20,8 +20,10 @@ import ConfirmStep from "./pages/create/ConfirmStep";
 import StrategyStep from "./pages/create/StrategyStep";
 import ResultStep from "./pages/create/ResultStep";
 import PaymentStep from "./pages/create/PaymentStep";
+import HDPaymentStep from "./pages/create/HDPaymentStep";
 import HDResultStep from "./pages/create/HDResultStep";
 import DetailConfirmStep from "./pages/create/DetailConfirmStep";
+import DetailPaymentStep from "./pages/create/DetailPaymentStep";
 import DetailResultStep from "./pages/create/DetailResultStep";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
@@ -43,9 +45,10 @@ function Router() {
       <Route path="/create/confirm" component={ConfirmStep} />
       <Route path="/create/result" component={ResultStep} />
       <Route path="/create/payment" component={PaymentStep} />
-      <Route path="/create/hd-payment" component={PaymentStep} />
+      <Route path="/create/hd-payment" component={HDPaymentStep} />
       <Route path="/create/hd-result" component={HDResultStep} />
       <Route path="/create/detail-confirm" component={DetailConfirmStep} />
+      <Route path="/create/detail-payment" component={DetailPaymentStep} />
       <Route path="/create/detail-result" component={DetailResultStep} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
