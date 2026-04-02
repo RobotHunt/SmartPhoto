@@ -9,6 +9,7 @@ import {
   markAnalysisRefreshRequired,
 } from "@/lib/analysisSnapshot";
 import { useToast } from "@/hooks/use-toast";
+import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 
 const PLATFORMS = [
   { id: "1688", name: "1688", logo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663275834844/FqDWyGWuKYUEGqpy3yF7qj/1688_31c661d3.png" },
@@ -58,11 +59,6 @@ export default function PlatformStep() {
         markAnalysisRefreshRequired();
         await sessionAPI.savePlatformSelection(sessionId, selectedPlatforms, selectedPlatforms[0]);
 
-        toast({
-          title: "正在重新执行 AI 分析",
-          description: "分析完成后会自动进入参数页。",
-        });
-
         const trigger = await sessionAPI.triggerAnalysis(sessionId);
         await jobAPI.pollUntilDone(trigger.job_id);
 
@@ -104,12 +100,19 @@ export default function PlatformStep() {
       }
     }
 
-    // 跳转到主图文案生成页面
     setLocation("/create/generate");
   };
 
+  if (isContinuing) {
+    return (
+      <div className="flex min-h-screen flex-col aurora-bg z-50">
+        <GenerationWaitingUI kind="analysis" progress={0} />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen aurora-bg pb-12">
       <StepIndicator currentStep={2} />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* 标题区域 */}
@@ -118,8 +121,8 @@ export default function PlatformStep() {
             3
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">选择平台与类型</h1>
-            <p className="text-xs text-slate-500 mt-0.5">按照平台规范精准生图</p>
+            <h1 className="text-xl font-bold text-white tracking-wide">选择平台与类型</h1>
+            <p className="text-xs text-slate-300 mt-0.5">按照平台规范精准生图</p>
           </div>
         </div>
 
@@ -131,8 +134,8 @@ export default function PlatformStep() {
               <div
                 key={platform.id}
                 onClick={() => togglePlatform(platform.id)}
-                className={`bg-white rounded-xl flex flex-col items-center justify-center py-4 px-2 relative cursor-pointer transition-all hover:scale-105 shadow-sm border ${
-                  isSelected ? 'ring-2 ring-blue-500 border-blue-300' : 'border-slate-100'
+                className={`glass-panel rounded-xl flex flex-col items-center justify-center py-4 px-2 relative cursor-pointer transition-all hover:scale-[1.02] ${
+                  isSelected ? 'ring-2 ring-cyan-400 border-cyan-400/50 bg-cyan-900/20' : 'border-white/10 hover:bg-white/5'
                 }`}
               >
                 {/* 平台Logo */}
@@ -151,20 +154,20 @@ export default function PlatformStep() {
                     />
                   </div>
                 ) : (
-                  <div className="w-12 h-12 flex items-center justify-center mb-2 bg-slate-100 rounded-lg">
+                  <div className="w-12 h-12 flex items-center justify-center mb-2 bg-slate-800/80 border border-white/10 rounded-lg">
                     <span className="text-2xl font-bold text-slate-400">官</span>
                   </div>
                 )}
 
                 {/* 平台名称 */}
-                <div className="text-[11px] font-medium text-slate-900 text-center whitespace-nowrap leading-tight">
+                <div className="text-[11px] font-medium text-slate-200 text-center whitespace-nowrap leading-tight mt-1">
                   {platform.name}
                 </div>
 
                 {/* 选中标记 */}
                 {isSelected && (
-                  <div className="absolute inset-0 bg-blue-500 bg-opacity-10 rounded-xl flex items-center justify-center">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <div className="absolute inset-0 bg-cyan-500/10 rounded-xl flex items-center justify-center pointer-events-none">
+                    <div className="w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.6)]">
                       <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
                       </svg>
@@ -178,9 +181,9 @@ export default function PlatformStep() {
 
         {/* 已选平台提示 */}
         {selectedPlatforms.length > 0 && (
-          <div className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200">
-            <p className="text-slate-700 text-sm">
-              已选择 <span className="font-bold text-blue-600">{selectedPlatforms.length}</span> 个平台
+          <div className="glass-panel bg-cyan-900/30 rounded-xl p-4 mb-6 border border-cyan-500/30 text-center">
+            <p className="text-slate-200 text-sm">
+              已选择 <span className="font-bold text-cyan-400 px-1">{selectedPlatforms.length}</span> 个平台
             </p>
           </div>
         )}
@@ -189,9 +192,9 @@ export default function PlatformStep() {
         <Button
           onClick={handleNext}
           disabled={selectedPlatforms.length === 0 || isContinuing}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-6 text-xl rounded-full disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+          className="sci-fi-button w-full h-14 text-lg font-bold tracking-wider"
         >
-          {isContinuing ? "AI分析中..." : "下一步"}
+          {isContinuing ? "准备分析..." : "下一步 / 开始分析"}
           {!isContinuing && (
             <svg className="w-6 h-6 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>

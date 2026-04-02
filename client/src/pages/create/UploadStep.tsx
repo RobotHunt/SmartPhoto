@@ -341,17 +341,18 @@ export default function UploadStep() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen aurora-bg">
       <StepIndicator currentStep={1} />
 
       <div className="mx-auto max-w-5xl px-4 py-12">
-        <div className="mb-8 text-center">
-          <p className="text-sm text-blue-500 md:text-base">
-            ✨ 温馨提示：<span className="text-blue-600 font-medium">上传素材越多，生成越精准</span>；手机实拍即可
-          </p>
+        <div className="mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-white tracking-wide">上传商品原图</h1>
+            <p className="text-sm text-slate-300 mt-1">支持批量上传，单张最大10MB</p>
+          </div>
         </div>
 
-        <div className="rounded-[32px] bg-white p-8 shadow-lg shadow-slate-100 md:p-10">
+        <div className="glass-panel border-white/10 rounded-3xl p-6 md:p-8 mb-8 shadow-xl">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {SLOT_DEFS.map((def) => {
               const slot = slots[def.slotType];
@@ -361,7 +362,7 @@ export default function UploadStep() {
                 <div key={def.slotType} className="relative">
                   {hasPreview ? (
                     <div className="relative aspect-square">
-                      <div className="h-full w-full overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-100">
+                      <div className="h-full w-full overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-800/50">
                         <img
                           src={slot.previewUrl!}
                           alt={def.label}
@@ -377,7 +378,7 @@ export default function UploadStep() {
                       <button
                         onClick={() => removeImage(def.slotType)}
                         disabled={slot.uploading}
-                        className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg transition hover:bg-slate-900 disabled:opacity-50"
+                        className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600 disabled:opacity-50"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -412,7 +413,7 @@ export default function UploadStep() {
             onClick={handleStartAnalysis}
             size="lg"
             disabled={!hasAnyImage || anyUploading || navigating}
-            className="mt-8 h-14 w-full rounded-2xl bg-blue-500 text-base font-semibold text-white shadow-lg shadow-blue-100 hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-8 h-14 w-full rounded-2xl sci-fi-button text-base font-semibold text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed"
           >
             {anyUploading ? "图片上传中..." : navigating ? "正在进入识别..." : "开始AI生图"}
           </Button>

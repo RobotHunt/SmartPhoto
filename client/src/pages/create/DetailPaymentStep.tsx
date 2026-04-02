@@ -70,110 +70,117 @@ export default function DetailPaymentStep() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen aurora-bg pb-24">
       <DetailStepIndicator currentStep={3} />
 
-      {/* 顶部导航 */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
-        <button
-          onClick={() => setLocation("/create/detail-confirm")}
-          className="text-slate-600 hover:text-slate-900 transition"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-base font-bold text-slate-900">生成无水印详情图</h1>
-      </div>
+      <div className="max-w-lg mx-auto mt-8 sm:mt-12 px-4 relative z-10">
+        <div className="glass-panel border-white/10 rounded-[32px] overflow-hidden shadow-[0_0_50px_rgba(34,211,238,0.15)] flex flex-col">
+          {/* 顶部导航 */}
+          <div className="flex items-center gap-3 px-6 py-5 bg-white/5 border-b border-white/10">
+            <button
+              onClick={() => setLocation("/create/detail-confirm")}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-black/40 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <h1 className="text-lg font-bold tracking-widest text-slate-100">生成无水印详情图</h1>
+          </div>
 
-      <div className="max-w-lg mx-auto px-4 pb-48">
-
-        {/* 已选图片数量 */}
-        <div className="flex items-center gap-2 mt-4 mb-4">
-          <CheckCircle2 className="w-5 h-5 text-blue-500" />
-          <span className="text-sm font-semibold text-slate-800">
-            共 <span className="text-blue-600">{selectedCount}</span> 张详情图
-          </span>
-        </div>
-
-        {/* 图片缩略图预览 */}
-        <div className="flex gap-2.5 mb-6">
-          {loading ? (
-            <div className="flex gap-2.5">
-              {Array.from({ length: Math.min(PREVIEW_MAX, selectedCount) }).map((_, i) => (
-                <div key={i} className="shrink-0 w-24 h-24 rounded-xl bg-slate-100 animate-pulse" />
-              ))}
+          <div className="p-6 sm:p-8">
+            {/* 已选图片数量 */}
+            <div className="flex items-center gap-2 mb-6 bg-black/40 border border-cyan-500/20 px-4 py-2 rounded-xl inline-flex shadow-sm">
+              <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+              <span className="text-sm font-bold tracking-widest text-cyan-100">
+                共 <span className="text-cyan-400 px-1">{selectedCount}</span> 张详情图
+              </span>
             </div>
-          ) : (
-            <>
-              {previewImages.map((src, i) => (
-                <div key={i} className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={src} alt="" className="w-full h-full object-cover" />
+
+            {/* 图片缩略图预览 */}
+            <div className="flex gap-3 mb-8">
+              {loading ? (
+                <>
+                  {Array.from({ length: Math.min(PREVIEW_MAX, selectedCount || PREVIEW_MAX) }).map((_, i) => (
+                    <div key={i} className="shrink-0 w-24 h-24 rounded-2xl border border-white/5 bg-black/40 animate-pulse shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]" />
+                  ))}
+                </>
+              ) : (
+                <>
+                  {previewImages.map((src, i) => (
+                    <div key={i} className="relative shrink-0 w-24 h-24 rounded-2xl overflow-hidden border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] bg-black/50">
+                      <img src={src} alt="" className="w-full h-full object-cover blur-md scale-110 opacity-60 mix-blend-screen" />
+                    </div>
+                  ))}
+                </>
+              )}
+              {remaining > 0 && (
+                <div className="shrink-0 w-24 h-24 rounded-2xl border border-white/10 bg-black/40 flex flex-col items-center justify-center shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
+                  <span className="text-xl font-black text-slate-300">+{remaining}</span>
+                  <span className="text-[10px] tracking-widest font-bold text-slate-500 mt-1">张图片</span>
+                </div>
+              )}
+            </div>
+
+            {/* 套餐名称 */}
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-bold tracking-widest text-slate-300 flex items-center gap-2">
+                <div className="w-1.5 h-4 bg-cyan-500 rounded-full"></div>
+                无水印详情图 · AI生成
+              </span>
+            </div>
+
+            {/* 价格区域 */}
+            <div className="flex flex-wrap items-center gap-4 mb-8 bg-black/30 border border-white/5 p-4 rounded-2xl">
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-bold tracking-widest text-slate-500 line-through">¥99/套</span>
+                <span className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-cyan-300 to-blue-500 drop-shadow-sm">¥69</span>
+              </div>
+              <div className="bg-gradient-to-r from-amber-600 to-orange-500 text-white rounded-xl px-3 py-1.5 shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+                <div className="text-xs font-bold tracking-widest leading-none mb-1 shadow-sm">新用户首套</div>
+                <div className="text-[10px] font-medium tracking-wide opacity-90 leading-none">后续续订 <span className="font-black tracking-tighter">¥99</span></div>
+              </div>
+            </div>
+
+            {/* 权益列表 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+              {PERKS.map(perk => (
+                <div key={perk} className="flex items-center gap-2">
+                  <div className="w-5 h-5 flex items-center justify-center rounded-full bg-cyan-900/40 border border-cyan-500/30 shrink-0">
+                    <span className="text-cyan-400 font-bold text-[10px]">✓</span>
+                  </div>
+                  <span className="text-xs font-bold tracking-widest text-slate-300">{perk}</span>
                 </div>
               ))}
-            </>
-          )}
-          {remaining > 0 && (
-            <div className="shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center bg-slate-50">
-              <span className="text-xl font-black text-slate-400">+{remaining}</span>
-              <span className="text-[10px] text-slate-400 mt-0.5">张图片</span>
             </div>
-          )}
-        </div>
 
-        {/* 套餐名称 */}
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-slate-800">无水印详情图 · AI生成</span>
-        </div>
-
-        {/* 价格区域 */}
-        <div className="flex items-center gap-3 mb-5">
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm text-slate-400 line-through">¥99/套</span>
-            <span className="text-4xl font-black text-slate-900 tracking-tight">¥69</span>
+            {/* 支付按钮 */}
+            <button
+              onClick={handlePay}
+              disabled={paying}
+              className="sci-fi-button w-full h-14 rounded-2xl flex items-center justify-center gap-2 text-base font-bold tracking-widest transition active:scale-95 disabled:opacity-50"
+            >
+              {paying ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>处理支付请求…</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5" />
+                  <span>立即生成详情图 ¥69</span>
+                </>
+              )}
+            </button>
           </div>
-          <div className="bg-orange-500 text-white rounded-lg px-2.5 py-1.5 leading-snug text-center">
-            <div className="text-[11px] font-semibold">新用户首套</div>
-            <div className="text-[11px]">后续续费<span className="font-black"> 99</span></div>
-          </div>
-        </div>
-
-        {/* 支付按钮 */}
-        <button
-          onClick={handlePay}
-          disabled={paying}
-          className="w-full bg-gradient-to-r from-blue-400 to-emerald-500 hover:from-blue-500 hover:to-emerald-600 disabled:opacity-70 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-base transition active:scale-95 mb-6"
-          style={{ boxShadow: "0 8px 24px rgba(20,184,166,0.35)" }}
-        >
-          {paying ? (
-            <>
-              <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              <span>支付中…</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-5 h-5" />
-              <span>立即生成详情图 ¥69</span>
-            </>
-          )}
-        </button>
-
-        {/* 权益列表 */}
-        <div className="space-y-3">
-          {PERKS.map(perk => (
-            <div key={perk} className="flex items-center gap-2.5">
-              <span className="text-blue-500 font-bold text-base shrink-0">✓</span>
-              <span className="text-sm text-slate-700">{perk}</span>
-            </div>
-          ))}
         </div>
       </div>
 
       {/* 底部协议文字 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t border-slate-100 px-4 py-3 z-30">
-        <p className="text-center text-[10px] text-slate-400">
+      <div className="fixed bottom-0 left-0 right-0 bg-[#050914]/80 backdrop-blur-xl border-t border-white/5 py-4 z-30">
+        <p className="text-center text-[11px] tracking-widest text-slate-500 font-bold">
           支付即代表同意
-          <Link href="/terms" className="text-blue-500 hover:text-blue-600 hover:underline mx-0.5">《用户协议》</Link>
+          <Link href="/terms" className="text-cyan-500 hover:text-cyan-400 hover:underline mx-1">《用户协议》</Link>
           和
-          <Link href="/privacy" className="text-blue-500 hover:text-blue-600 hover:underline mx-0.5">《隐私政策》</Link>
+          <Link href="/privacy" className="text-cyan-500 hover:text-cyan-400 hover:underline mx-1">《隐私政策》</Link>
         </p>
       </div>
     </div>

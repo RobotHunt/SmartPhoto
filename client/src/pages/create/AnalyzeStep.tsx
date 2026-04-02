@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Check, CheckCircle2, Cpu, Pencil, X } from "lucide-react";
+import { Check, CheckCircle2, Cpu, Pencil, X, AlertCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/StepIndicator";
@@ -217,16 +217,16 @@ export default function AnalyzeStep() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col bg-white">
+      <div className="flex min-h-screen flex-col aurora-bg">
         <StepIndicator currentStep={2} />
         <div className="flex flex-1 flex-col items-center justify-center px-6">
           <div className="mb-2 text-lg font-semibold text-red-500">识别失败</div>
-          <p className="mb-6 text-center text-sm text-gray-500">{error}</p>
+          <p className="mb-6 text-center text-sm text-slate-400">{error}</p>
           <div className="flex items-center gap-3">
-            <Button onClick={() => window.location.reload()} variant="outline">
+            <Button onClick={() => window.location.reload()} variant="outline" className="bg-white/5 text-white border-white/20 hover:bg-white/10 hover:text-white">
               重试识别
             </Button>
-            <Button onClick={() => setLocation("/create/upload")} variant="outline">
+            <Button onClick={() => setLocation("/create/upload")} variant="outline" className="bg-white/5 text-white border-white/20 hover:bg-white/10 hover:text-white">
               返回上传
             </Button>
           </div>
@@ -237,24 +237,24 @@ export default function AnalyzeStep() {
 
   if (analyzing) {
     return (
-      <div className="flex min-h-screen flex-col bg-white">
+      <div className="flex min-h-screen flex-col aurora-bg">
         <StepIndicator currentStep={2} />
-        <div className="flex-1 px-4 pb-6 pt-4">
+        <div className="flex-1 px-4 pb-6 pt-4 relative z-10">
           <div className="mb-4">
-            <h2 className="text-xl font-bold text-gray-900">AI 视觉识别</h2>
-            <p className="mt-0.5 text-sm text-gray-400">正在识别产品品类与结构特征</p>
+            <h2 className="text-xl font-bold text-white">AI 视觉识别</h2>
+            <p className="mt-0.5 text-sm text-slate-300">正在识别产品品类与结构特征</p>
           </div>
-
-          <div className="mb-4">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
-              <span className="text-sm font-medium text-gray-700">识别进度</span>
+          
+          <div className="mb-4 glass-panel rounded-2xl p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+              <span className="text-sm font-medium text-white">识别进度</span>
             </div>
-            <div className="space-y-1.5 pl-4">
+            <div className="space-y-2 pl-4">
               {RECOGNITION_STEPS.map((step) => (
-                <div key={step} className="flex items-center gap-2 text-sm text-gray-400">
-                  <div className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-gray-200 animate-spin">
-                    <div className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                <div key={step} className="flex items-center gap-3 text-sm text-slate-300">
+                  <div className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-slate-600 animate-spin">
+                    <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                   </div>
                   {step}
                 </div>
@@ -262,21 +262,34 @@ export default function AnalyzeStep() {
             </div>
           </div>
 
-          <div className="relative mb-5 flex h-36 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a1628] via-[#0d2040] to-[#0a1628]">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-32 w-32 animate-ping rounded-full border border-cyan-500/20" style={{ animationDuration: "3s" }} />
-              <div className="absolute h-24 w-24 rounded-full border border-cyan-400/30" />
-              <div className="absolute h-16 w-16 rounded-full border border-cyan-300/40" />
+          <div className="relative mb-5 flex h-[340px] items-center justify-center overflow-hidden rounded-[32px] glass-panel border-cyan-500/10 shadow-[0_0_40px_rgba(6,182,212,0.15)] transition-all">
+            {/* 扫描线动画 */}
+            <div className="scanner-line h-1.5 opacity-80"></div>
+            
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {/* Gemini Blobs behind the image */}
+              <div className="absolute flex items-center justify-center w-full h-full opacity-70">
+                <div className="gemini-blob gemini-blob-1"></div>
+                <div className="gemini-blob gemini-blob-2"></div>
+                <div className="gemini-blob gemini-blob-3"></div>
+              </div>
+
+              <div className="h-[240px] w-[240px] animate-[ping_4s_ease-in-out_infinite] rounded-full border border-cyan-400/30" />
+              <div className="absolute h-40 w-40 rounded-full border border-cyan-400/40 shadow-[0_0_30px_rgba(34,211,238,0.2)]" />
+              <div className="absolute h-28 w-28 rounded-full border border-cyan-300/50" />
             </div>
-            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
-            <div className="absolute left-2 top-2 h-4 w-4 rounded-tl border-l-2 border-t-2 border-cyan-400/60" />
-            <div className="absolute right-2 top-2 h-4 w-4 rounded-tr border-r-2 border-t-2 border-cyan-400/60" />
-            <div className="absolute bottom-2 left-2 h-4 w-4 rounded-bl border-b-2 border-l-2 border-cyan-400/60" />
-            <div className="absolute bottom-2 right-2 h-4 w-4 rounded-br border-b-2 border-r-2 border-cyan-400/60" />
+            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent pointer-events-none" />
+            
+            {/* 角标 */}
+            <div className="absolute left-3 top-3 h-6 w-6 rounded-tl-lg border-l-2 border-t-2 border-cyan-400/60" />
+            <div className="absolute right-3 top-3 h-6 w-6 rounded-tr-lg border-r-2 border-t-2 border-cyan-400/60" />
+            <div className="absolute bottom-3 left-3 h-6 w-6 rounded-bl-lg border-b-2 border-l-2 border-cyan-400/60" />
+            <div className="absolute bottom-3 right-3 h-6 w-6 rounded-br-lg border-b-2 border-r-2 border-cyan-400/60" />
+            
             {firstImageUrl ? (
-              <img src={firstImageUrl} alt="产品" className="relative z-10 h-24 w-24 object-contain drop-shadow-lg" />
+              <img src={firstImageUrl} alt="产品" className="relative z-10 h-64 w-64 md:h-72 md:w-72 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.25)] mix-blend-normal" />
             ) : (
-              <Cpu className="relative z-10 h-12 w-12 text-cyan-400/60" />
+              <Cpu className="relative z-10 h-24 w-24 text-cyan-400/90 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)]" />
             )}
           </div>
         </div>
@@ -289,49 +302,55 @@ export default function AnalyzeStep() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col aurora-bg">
       <StepIndicator currentStep={2} />
-      <div className="flex-1 px-4 pb-6 pt-4">
+      <div className="flex-1 px-4 pb-6 pt-4 relative z-10">
         <div className="mb-4">
-          <h2 className="text-xl font-bold text-gray-900">AI 视觉识别</h2>
-          <p className="mt-0.5 text-sm text-gray-400">正在识别产品品类与结构特征</p>
+          <h2 className="text-xl font-bold text-white">AI 视觉识别</h2>
+          <p className="mt-0.5 text-sm text-slate-300">正在识别产品品类与结构特征</p>
         </div>
 
-        <div className="mb-4">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-green-400" />
-            <span className="text-sm font-medium text-gray-700">识别进度</span>
+        <div className="mb-4 glass-panel rounded-2xl p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+            <span className="text-sm font-medium text-white">识别进度</span>
           </div>
-          <div className="space-y-1.5 pl-4">
+          <div className="space-y-2 pl-4">
             {RECOGNITION_STEPS.map((step) => (
-              <div key={step} className="flex items-center gap-2 text-sm text-gray-700">
-                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-500" />
+              <div key={step} className="flex items-center gap-3 text-sm text-slate-200">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-cyan-400" />
                 {step}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="relative mb-5 flex h-36 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a1628] via-[#0d2040] to-[#0a1628]">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-32 w-32 rounded-full border border-cyan-500/20" />
-            <div className="absolute h-24 w-24 rounded-full border border-cyan-400/30" />
-            <div className="absolute h-16 w-16 rounded-full border border-cyan-300/40" />
+        <div className="relative mb-5 flex h-[340px] items-center justify-center overflow-hidden rounded-[32px] glass-panel border-cyan-500/10 shadow-[0_0_40px_rgba(6,182,212,0.1)] transition-all">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+             {/* Dimmer Gemini Blobs for finished state */}
+              <div className="absolute flex items-center justify-center w-full h-full opacity-30">
+                <div className="gemini-blob gemini-blob-1"></div>
+                <div className="gemini-blob gemini-blob-2"></div>
+                <div className="gemini-blob gemini-blob-3"></div>
+              </div>
+            <div className="h-[200px] w-[200px] rounded-full border border-cyan-500/20" />
+            <div className="absolute h-36 w-36 rounded-full border border-cyan-400/30" />
+            <div className="absolute h-24 w-24 rounded-full border border-cyan-300/40" />
           </div>
-          <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
-          <div className="absolute left-2 top-2 h-4 w-4 rounded-tl border-l-2 border-t-2 border-cyan-400/60" />
-          <div className="absolute right-2 top-2 h-4 w-4 rounded-tr border-r-2 border-t-2 border-cyan-400/60" />
-          <div className="absolute bottom-2 left-2 h-4 w-4 rounded-bl border-b-2 border-l-2 border-cyan-400/60" />
-          <div className="absolute bottom-2 right-2 h-4 w-4 rounded-br border-b-2 border-r-2 border-cyan-400/60" />
+          <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent pointer-events-none" />
+          <div className="absolute left-3 top-3 h-6 w-6 rounded-tl-lg border-l-2 border-t-2 border-cyan-400/60" />
+          <div className="absolute right-3 top-3 h-6 w-6 rounded-tr-lg border-r-2 border-t-2 border-cyan-400/60" />
+          <div className="absolute bottom-3 left-3 h-6 w-6 rounded-bl-lg border-b-2 border-l-2 border-cyan-400/60" />
+          <div className="absolute bottom-3 right-3 h-6 w-6 rounded-br-lg border-b-2 border-r-2 border-cyan-400/60" />
           {firstImageUrl ? (
-            <img src={firstImageUrl} alt="产品" className="relative z-10 h-24 w-24 object-contain drop-shadow-lg" />
+            <img src={firstImageUrl} alt="产品" className="relative z-10 h-64 w-64 md:h-72 md:w-72 object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.2)] mix-blend-normal" />
           ) : (
-            <Cpu className="relative z-10 h-12 w-12 text-cyan-400/60" />
+            <Cpu className="relative z-10 h-24 w-24 text-cyan-400/60" />
           )}
         </div>
 
-        <div className="mb-2">
-          <p className="mb-1 text-sm text-gray-500">识别结果</p>
+        <div className="mb-2 glass-panel rounded-2xl p-4">
+          <p className="mb-2 text-sm text-slate-400">识别结果</p>
           <div className="mb-3 flex items-center justify-between">
             {editingName ? (
               <div className="mr-2 flex flex-1 items-center gap-2">
@@ -339,9 +358,9 @@ export default function AnalyzeStep() {
                   autoFocus
                   value={editedName}
                   onChange={(event) => setEditedName(event.target.value)}
-                  className="min-w-0 flex-1 border-b-2 border-blue-400 bg-transparent text-lg font-bold text-gray-900 outline-none"
+                  className="min-w-0 flex-1 border-b-2 border-cyan-400 bg-transparent text-lg font-bold text-white outline-none placeholder:text-slate-500"
                 />
-                <button onClick={commitEditedName} className="text-green-500 hover:text-green-600">
+                <button onClick={commitEditedName} className="text-cyan-400 hover:text-cyan-300">
                   <Check className="h-4 w-4" />
                 </button>
                 <button
@@ -349,14 +368,14 @@ export default function AnalyzeStep() {
                     setEditedName(result.product_name);
                     setEditingName(false);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-slate-400 hover:text-slate-300"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
-                <span className="text-lg font-bold text-gray-900">
+                <span className="text-lg font-bold text-white tracking-wide">
                   {editedName || result.product_name}
                 </span>
                 <button
@@ -364,7 +383,7 @@ export default function AnalyzeStep() {
                     setEditedName(editedName || result.product_name);
                     setEditingName(true);
                   }}
-                  className="text-gray-400 transition-colors hover:text-blue-500"
+                  className="text-slate-400 transition-colors hover:text-cyan-400"
                   title="修改产品名称"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -372,7 +391,7 @@ export default function AnalyzeStep() {
               </div>
             )}
             {topCandidate && !editingName && (
-              <span className="shrink-0 rounded-full bg-green-500 px-2.5 py-0.5 text-xs font-semibold text-white">
+              <span className="shrink-0 rounded-full bg-cyan-900/60 border border-cyan-500/30 px-2.5 py-1 text-xs font-semibold text-cyan-300">
                 置信度 {Math.round(topCandidate.confidence)}%
               </span>
             )}
@@ -405,11 +424,11 @@ export default function AnalyzeStep() {
           )}
         </div>
 
-        <div className="mb-4 rounded-2xl bg-gray-50 p-4">
-          <p className="mb-2 text-sm font-semibold text-gray-800">确认产品类别</p>
+        <div className="mb-4 rounded-2xl glass-panel border-white/10 p-5 shadow-lg">
+          <p className="mb-2 text-sm font-semibold text-slate-200">确认产品类别</p>
 
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="mb-1 w-full rounded-lg border-gray-200 bg-white text-sm">
+            <SelectTrigger className="mb-2 w-full rounded-xl border-white/10 bg-black/40 text-sm text-slate-100 hover:bg-black/60 focus:ring-cyan-500">
               <SelectValue placeholder="选择产品类型" />
             </SelectTrigger>
             <SelectContent>
@@ -421,29 +440,29 @@ export default function AnalyzeStep() {
             </SelectContent>
           </Select>
 
-          <p className="mb-3 text-xs text-gray-400">
+          <p className="mb-4 text-xs text-cyan-400/80">
             AI 建议：{result.category || "其他"}，您可以确认或修改
           </p>
 
           {result.supplement_image_recommendations.length > 0 && (
-            <div className="mb-3">
-              <p className="mb-2 text-xs font-medium text-gray-500">建议补传以下图片：</p>
-              <div className="space-y-2">
+            <div className="mb-4">
+              <p className="mb-2 text-xs font-medium text-slate-400">建议补传以下图片：</p>
+              <div className="space-y-3">
                 {result.supplement_image_recommendations
                   .slice()
                   .sort((a, b) => a.priority - b.priority)
                   .map((item, index) => (
-                    <div key={`${item.slot_type}-${item.image_kind || "base"}-${index}`} className="rounded-xl border border-green-100 bg-white p-3">
+                    <div key={`${item.slot_type}-${item.image_kind || "base"}-${index}`} className="rounded-xl border border-white/5 bg-black/20 p-3.5">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-gray-900">{item.label}</div>
-                          <div className="mt-1 text-xs text-gray-500">{item.reason}</div>
+                          <div className="text-sm font-semibold text-slate-200">{item.label}</div>
+                          <div className="mt-1 text-xs text-slate-400 leading-relaxed">{item.reason}</div>
                         </div>
-                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">
+                        <span className="rounded-full bg-cyan-900/40 border border-cyan-500/20 px-2 py-0.5 text-[11px] font-medium text-cyan-300 shrink-0">
                           P{item.priority}
                         </span>
                       </div>
-                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                      <div className="mt-3 space-y-1.5 text-xs text-slate-300">
                         {item.upload_goal && <p>补图目标：{item.upload_goal}</p>}
                         {item.must_show && <p>必须拍到：{item.must_show}</p>}
                         {item.framing_hint && <p>构图建议：{item.framing_hint}</p>}
@@ -456,15 +475,15 @@ export default function AnalyzeStep() {
           )}
 
           {result.suggestions.length > 0 && (
-            <div className="mb-3">
-              <p className="mb-1.5 text-xs text-gray-400">补充说明：</p>
-              <ul className="space-y-1">
+            <div className="mb-4 bg-black/20 rounded-xl p-3 border border-white/5">
+              <p className="mb-2 text-xs text-slate-400">补充说明：</p>
+              <ul className="space-y-1.5">
                 {result.suggestions.map((suggestion, index) => (
                   <li
                     key={`${suggestion}-${index}`}
-                    className="flex items-center gap-2 text-xs text-gray-600"
+                    className="flex items-start gap-2 text-xs text-slate-300 leading-relaxed"
                   >
-                    <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-green-400" />
+                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-cyan-500/60 shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
                     {suggestion}
                   </li>
                 ))}
@@ -478,13 +497,13 @@ export default function AnalyzeStep() {
               onClick={handleConfirmAndNext}
               disabled={!selectedCategory}
               variant="outline"
-              className="h-9 flex-1 rounded-lg border-gray-200 bg-white text-sm text-gray-700 disabled:opacity-50"
+              className="h-11 flex-1 rounded-xl border-white/10 bg-white/5 text-sm text-slate-200 hover:bg-white/10 hover:text-white disabled:opacity-50"
             >
               确认
             </Button>
             <Button
               size="sm"
-              className="h-9 flex-1 rounded-lg bg-green-500 text-sm text-white hover:bg-green-600"
+              className="h-11 flex-1 rounded-xl bg-cyan-600/80 text-sm text-white hover:bg-cyan-500 transition-colors shadow-lg shadow-cyan-900/50"
               onClick={handleSupplementImages}
             >
               补充图片
@@ -492,10 +511,50 @@ export default function AnalyzeStep() {
           </div>
         </div>
 
+        {/* DEV INFO BLOCK */}
+        {(import.meta.env.DEV || localStorage.getItem("dev_debug") === "1") && ((result.risk_flags?.length ?? 0) > 0 || result.selling_point_entities || result.evidence_scores) && (
+          <div className="mb-4 rounded-2xl glass-panel border-purple-500/30 p-5 shadow-lg bg-purple-900/10">
+            <h3 className="mb-3 text-sm font-bold text-purple-400 flex items-center gap-2">
+               <AlertCircle className="w-4 h-4" /> 内部调试 / 开发数据
+            </h3>
+            
+            {result.risk_flags && result.risk_flags.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs text-slate-400 mb-1.5">风险提示 (Risk Flags):</p>
+                <div className="flex flex-wrap gap-2">
+                  {result.risk_flags.map((rf, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded bg-red-900/40 border border-red-500/30 text-[11px] text-red-300">
+                      {rf}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {result.selling_point_entities && (
+              <div className="mb-3">
+                <p className="text-xs text-slate-400 mb-1.5">卖点实体解析 (Selling Point Entities):</p>
+                <pre className="text-[10px] text-slate-300 bg-black/40 p-2 rounded max-h-32 overflow-auto custom-scrollbar border border-white/5">
+                  {JSON.stringify(result.selling_point_entities, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {result.evidence_scores && (
+               <div>
+                <p className="text-xs text-slate-400 mb-1.5">数据支撑置信区间 (Evidence Scores):</p>
+                <pre className="text-[10px] text-slate-300 bg-black/40 p-2 rounded max-h-32 overflow-auto custom-scrollbar border border-white/5 whitespace-pre-wrap">
+                   {JSON.stringify(result.evidence_scores, null, 2)}
+                </pre>
+               </div>
+            )}
+          </div>
+        )}
+
         <Button
           onClick={handleConfirmAndNext}
           disabled={!selectedCategory}
-          className="h-12 w-full rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 text-base font-semibold text-white shadow-lg hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50"
+          className="sci-fi-button h-14 w-full text-base font-bold tracking-wider"
         >
           下一步
         </Button>

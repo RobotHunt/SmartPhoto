@@ -78,6 +78,13 @@ export interface VersionSummary {
   version_no: number;
   asset_count: number;
   ready_count: number;
+  created_at?: string | null;
+  job_type?: string | null;
+  is_partial?: boolean;
+  cover_asset_id?: string | null;
+  cover_thumbnail_url?: string | null;
+  missing_slot_ids?: string[];
+  missing_panel_ids?: string[];
 }
 
 export interface SessionResultAsset {
@@ -93,6 +100,9 @@ export interface SessionResultAsset {
   version_no?: number;
   width?: number;
   height?: number;
+  carry_forward?: boolean;
+  source_version_no?: number | null;
+  fidelity_validation_status?: string | null;
 }
 
 export interface SessionResults {
@@ -124,6 +134,9 @@ export interface PromptPreviewItem {
   role_label?: string | null;
   display_order: number;
   copy_blocks: MainGalleryCopyBlocks;
+  risk_flags?: string[];
+  selling_point_binding?: Record<string, any> | null;
+  truth_contract?: Record<string, any> | null;
 }
 
 export interface PromptPreviewData {
@@ -226,6 +239,9 @@ function normalizeSessionResults(data: any): SessionResults {
     version_no: typeof item?.version_no === 'number' ? item.version_no : undefined,
     width: typeof item?.width === 'number' ? item.width : undefined,
     height: typeof item?.height === 'number' ? item.height : undefined,
+    carry_forward: Boolean(item?.carry_forward),
+    source_version_no: typeof item?.source_version_no === 'number' ? item.source_version_no : null,
+    fidelity_validation_status: item?.fidelity_validation_status ?? null,
   }));
 
   return {
@@ -239,6 +255,13 @@ function normalizeSessionResults(data: any): SessionResults {
       version_no: Number(summary?.version_no || 0),
       asset_count: Number(summary?.asset_count || 0),
       ready_count: Number(summary?.ready_count || 0),
+      created_at: summary?.created_at ?? null,
+      job_type: summary?.job_type ?? null,
+      is_partial: Boolean(summary?.is_partial),
+      cover_asset_id: summary?.cover_asset_id ?? null,
+      cover_thumbnail_url: summary?.cover_thumbnail_url ?? null,
+      missing_slot_ids: asArray<string>(summary?.missing_slot_ids),
+      missing_panel_ids: asArray<string>(summary?.missing_panel_ids),
     })),
     summary: {
       total_count: Number(data?.summary?.total_count || assets.length),

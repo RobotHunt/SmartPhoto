@@ -4,12 +4,13 @@ import { useLocation } from "wouter";
 import { Link } from "wouter";
 import {
   Search, MoreHorizontal, ImageIcon,
-  Home, FolderOpen, User
+  Home, FolderOpen, User, PackageOpen
 } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useToast } from "@/hooks/use-toast";
 import { createPortal } from "react-dom";
 import { getSessionHistory, type SessionRecord } from "@/lib/localUser";
+import { Button } from "@/components/ui/button";
 
 // ── 筛选标签 ──────────────────────────────────────────────
 const FILTER_TABS = ["全部", "平台", "图片类型", "风格", "品牌"];
@@ -50,15 +51,15 @@ function AssetCard({ record }: { record: SessionRecord }) {
   ];
 
   return (
-    <div className="bg-white rounded-2xl p-3.5 mb-3 shadow-sm">
+    <div className="glass-panel text-slate-100 rounded-[24px] p-4 mx-4 md:mx-auto max-w-2xl mb-4 border border-white/10 shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]">
       {/* 顶部：日期 + 三点菜单 */}
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-semibold text-slate-800">{formatDate(record.created_at)}</span>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-semibold text-slate-200">{formatDate(record.created_at)}</span>
         <div className="relative">
           <button
             ref={btnRef}
             onClick={openMenu}
-            className="text-slate-400 hover:text-slate-600 active:scale-95 transition-all p-0.5"
+            className="text-slate-400 hover:text-white active:scale-95 transition-all p-0.5"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
@@ -71,7 +72,7 @@ function AssetCard({ record }: { record: SessionRecord }) {
               >
                 <button
                   onClick={() => { setMenuOpen(false); handleDownload(); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 active:bg-slate-100"
+                  className="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-white/5 active:bg-white/10"
                 >
                   批量下载
                 </button>
@@ -83,17 +84,17 @@ function AssetCard({ record }: { record: SessionRecord }) {
       </div>
 
       {/* 平台 & 步骤信息行 */}
-      <p className="text-xs text-slate-400 mb-2.5">
+      <p className="text-xs text-slate-400 mb-3">
         平台：{record.platform || "未知"} &middot; {record.last_step || "未知步骤"}
       </p>
 
       {/* 标签行 */}
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar mb-2.5">
-        <span className="flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-blue-500 text-white">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-3">
+        <span className="flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-cyan-900/40 text-cyan-400 border border-cyan-500/30">
           {record.product_name || "未命名"}
         </span>
         {record.image_count > 0 && (
-          <span className="flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-slate-100 text-slate-600">
+          <span className="flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-white/5 text-slate-300 border border-white/10">
             {record.image_count} 张图片
           </span>
         )}
@@ -104,12 +105,12 @@ function AssetCard({ record }: { record: SessionRecord }) {
         {thumbs.map((img, idx) => (
           <div
             key={idx}
-            className="flex-1 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center relative"
+            className="flex-1 rounded-xl overflow-hidden bg-black/40 border border-white/5 flex items-center justify-center relative"
           >
             {img ? (
               <img src={img} alt="" className="w-full h-full object-cover" />
             ) : (
-              <ImageIcon className="w-5 h-5 text-slate-300" />
+              <ImageIcon className="w-5 h-5 text-slate-600" />
             )}
             {/* 最后一张显示 +N 角标 */}
             {idx === 2 && record.image_count > 3 && (
@@ -125,14 +126,14 @@ function AssetCard({ record }: { record: SessionRecord }) {
       <div className="flex gap-2">
         <button
           onClick={() => toast({ title: "功能开发中", description: "查看全部图片功能即将上线" })}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-slate-300 hover:bg-white/10 active:bg-white/20 transition-colors"
         >
           查看全部
           <span className="text-slate-400">&rsaquo;</span>
         </button>
         <button
           onClick={handleDownload}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-slate-300 hover:bg-white/10 active:bg-white/20 transition-colors"
         >
           下载
           <span className="text-base leading-none">↓</span>
@@ -153,17 +154,19 @@ export default function History() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 px-6">
-        <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-2">
-          <FolderOpen className="w-8 h-8 text-blue-400" />
+        <div className="text-center py-20 glass-panel border-white/10 rounded-3xl mx-4">
+          <PackageOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-200 mb-2">暂无历史记录</h2>
+          <p className="text-slate-400 mb-8 max-w-sm mx-auto">
+            您还没有生成过任何商品图片，快去体验一下强大的 AI 视觉创作吧。
+          </p>
+          <Button
+            onClick={() => setLocation("/")}
+            className="sci-fi-button px-8 py-6 rounded-full text-lg shadow-[0_0_15px_rgba(56,189,248,0.3)]"
+          >
+            开始创作
+          </Button>
         </div>
-        <h2 className="text-lg font-semibold text-slate-900">登录后查看资产</h2>
-        <p className="text-sm text-slate-500 text-center">登录账号，自动保存你的设计资产，避免图片丢失</p>
-        <a
-          href={getLoginUrl()}
-          className="mt-2 px-8 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-full transition-colors"
-        >
-          登录 / 注册
-        </a>
       </div>
     );
   }
@@ -184,9 +187,9 @@ export default function History() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      {/* 顶部标题栏 */}
-      <div className="bg-white px-4 pt-5 pb-3 sticky top-0 z-10 shadow-sm">
+    <div className="min-h-screen aurora-bg flex flex-col">
+      {/* 顶部导航 */}
+      <div className="sticky top-0 z-50 glass-panel border-b border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.2)] pl-8 pr-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center">
@@ -195,7 +198,25 @@ export default function History() {
             <h1 className="text-base font-bold text-slate-900">我的资产</h1>
           </div>
           <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-            {user?.nickname?.[0]?.toUpperCase() ?? "S"}
+            <h1 className="ml-4 text-lg md:text-xl font-bold text-white tracking-wide">
+              历史创作
+            </h1>
+          </div>
+          <div className="flex gap-2">
+            <div className="bg-black/40 backdrop-blur-md rounded-2xl p-1 border border-white/10 hidden md:flex min-w-[200px]">
+              {(["create", "history"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${
+                    tab === "history"
+                      ? "bg-cyan-500 text-white shadow-md shadow-cyan-500/20"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -242,7 +263,7 @@ export default function History() {
       </div>
 
       {/* 底部导航 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex z-20">
+      <div className="fixed bottom-0 left-0 right-0 glass-panel border-t border-slate-200/50 flex z-20">
         <Link
           href="/"
           className="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-slate-400 hover:text-slate-600"

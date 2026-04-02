@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { sessionAPI, jobAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { DetailStepIndicator } from "./DetailStepIndicator";
+import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,7 @@ const MODULE_CONFIG: ModuleConfig[] = [
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     label: "产品展示",
-    styleTag: "主图展示",
+    styleTag: "全景展示",
     styleDesc: "产品全景·品质感",
     extractContent: (copy) => {
       const lines: string[] = [];
@@ -73,7 +74,7 @@ const MODULE_CONFIG: ModuleConfig[] = [
       if (name) lines.push(`产品名称: ${name}`);
       if (cat) lines.push(`产品品类: ${cat}`);
       const scene = copy.hero_scene || "";
-      if (scene) lines.push(`主图场景: ${scene}`);
+      if (scene) lines.push(`核心场景: ${scene}`);
       return lines;
     },
   },
@@ -368,45 +369,33 @@ export default function CopywritingStep() {
   // ── render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <DetailStepIndicator currentStep={1} />
+    <div className="min-h-screen aurora-bg bg-black flex flex-col pt-8 sm:pt-12">
+      <div className="w-full max-w-5xl mx-auto px-4 relative z-10 w-full pb-28">
+        <DetailStepIndicator currentStep={1} />
 
       {/* ── Loading state ─────────────────────────────────────────────── */}
       {loading && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-            <Loader2 className="w-9 h-9 text-blue-600 animate-spin" />
-          </div>
-          <p className="text-base font-semibold text-slate-700">
-            AI 正在生成详情页执行方案...
-          </p>
-          <div className="space-y-1.5 text-center">
-            <p className="text-xs text-slate-400 animate-pulse">
-              正在分析产品信息与卖点...
-            </p>
-            <p className="text-xs text-slate-400 animate-pulse">
-              正在生成六大模块内容...
-            </p>
-          </div>
-        </div>
+        <GenerationWaitingUI kind="analysis" progress={0} stage="正在生成专属策略" />
       )}
 
       {/* ── Error state ───────────────────────────────────────────────── */}
       {!loading && error && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
-          <p className="text-sm text-slate-500">{error}</p>
-          <div className="flex items-center gap-3">
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 py-32 h-[50vh]">
+          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl backdrop-blur-md">
+            <p className="text-base font-bold tracking-wide text-red-400">{error}</p>
+          </div>
+          <div className="flex items-center gap-4">
             <Button
               onClick={() => setLocation("/create/generate")}
-              variant="outline"
+              className="px-6 h-12 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-slate-300 rounded-xl font-bold tracking-widest font-sm"
             >
               返回上一页
             </Button>
             <Button
               onClick={forceRegenerateCopy}
-              className="bg-blue-500 hover:bg-blue-600 text-white"
+              className="px-6 h-12 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.5)] font-bold tracking-widest font-sm"
             >
-              重新生成
+              重新连接引擎
             </Button>
           </div>
         </div>
@@ -414,23 +403,26 @@ export default function CopywritingStep() {
 
       {/* ── Content ───────────────────────────────────────────────────── */}
       {!loading && !error && (
-        <div className="flex-1 overflow-y-auto pb-20">
-          {/* ── White header bar ─────────────────────────────────────── */}
-          <div className="bg-white border-b px-4 py-3">
-            <h1 className="text-base font-bold text-slate-900">AI已生成详情页执行方案</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              根据商品图已生成平台规则，AI已为您规划可直接生成的详情页内容。
-            </p>
-          </div>
-
-          {/* ── Yellow "生产流程" badge ──────────────────────────────── */}
-          <div className="bg-white border-b px-4 py-2 flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-yellow-400 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-              <Zap className="w-3 h-3" />
-              生产流程
-              <ChevronRight className="w-3 h-3" />
+        <div className="flex-1 w-full pb-10">
+          <div className="glass-panel border-white/10 rounded-2xl p-6 sm:p-8 mb-8 mt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-1.5 h-6 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]"></div>
+                  <h1 className="text-xl font-bold tracking-widest text-slate-100">AI 执行策略已生成</h1>
+                </div>
+                <p className="text-sm font-medium tracking-wide text-slate-400 pl-4">
+                  根据商品分析与参数提取，已为您规划核心卖点。
+                </p>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-auto bg-cyan-950/30 border border-cyan-500/20 text-cyan-400 text-xs font-bold px-4 py-2 rounded-xl">
+                <Zap className="w-3.5 h-3.5" />
+                标准流程
+              </div>
             </div>
           </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* ── Module cards (only show modules with content) ──────── */}
             {orderedModules.map((mod) => {
@@ -444,89 +436,92 @@ export default function CopywritingStep() {
               const bodyLines = content.slice(1);
 
               return (
-                <div
-                  key={mod.key}
-                  className="bg-white border-b"
-                >
-                  {/* 模块编号标题 */}
-                  <div className="px-4 py-2.5 flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-700">{mod.label}</span>
-                  </div>
-
-                  {/* 内容区：文案 */}
-                  <div className="px-4 pb-3">
-                    <div className="w-full">
-                      {/* 标题文案 */}
-                      {titleLine && (
-                        <div className={`${mod.bgColor} rounded-lg px-3 py-2 mb-2`}>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <Icon className={`w-3.5 h-3.5 ${mod.color} shrink-0`} />
-                            <span className={`text-xs font-semibold ${mod.color}`}>{mod.label}</span>
-                          </div>
-                          <p className="text-sm font-medium text-slate-800 leading-snug">{titleLine}</p>
-                        </div>
-                      )}
-                      {/* 正文内容 */}
-                      {bodyLines.length > 0 && (
-                        <div className="space-y-0.5">
-                          {bodyLines.map((line, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
-                              <span className="mt-0.5 shrink-0 text-slate-300">&bull;</span>
-                              <span className="leading-relaxed">{line.replace(/^[•·\-\*]\s*/, "")}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                <div key={mod.key} className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl flex flex-col h-full hover:border-cyan-500/30 transition-all group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${mod.bgColor.replace('50', '950/40')} border ${mod.bgColor.replace('bg-', 'border-').replace('50', '500/20')}`}>
+                        <Icon className={`w-4 h-4 ${mod.color.replace('600', '400')}`} />
+                      </div>
+                      <span className="text-base font-bold tracking-wider text-slate-100 group-hover:text-white transition-colors">{mod.label}</span>
+                    </div>
+                    <div className="px-2.5 py-1 rounded border border-white/10 bg-white/5 text-[10px] text-slate-400 uppercase tracking-widest">
+                      Module
                     </div>
                   </div>
-
-                  {/* 风格标签行 */}
-                  <div className="px-4 pb-3 flex items-center gap-2">
-                    <span className="text-xs text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full cursor-pointer hover:bg-blue-100">
-                      {mod.styleTag}
-                    </span>
-                    <span className="text-xs text-slate-500">{mod.styleDesc}</span>
-                    <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
+                  
+                  <div className="flex-1 space-y-3">
+                    {titleLine && (
+                      <div className="bg-black/30 border border-white/5 rounded-xl px-4 py-3 mb-3">
+                        <p className="text-sm font-bold tracking-wide text-slate-200 leading-snug">{titleLine}</p>
+                      </div>
+                    )}
+                    
+                    {bodyLines.length > 0 && (
+                      <div className="space-y-3 px-2">
+                        {bodyLines.map((line, i) => (
+                          <div key={i} className="flex items-start gap-2.5 text-sm text-slate-300">
+                            <div className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${mod.bgColor.replace('bg-', 'bg-').replace('50', '400')} shadow-[0_0_5px_currentColor]`}></div>
+                            <span className="leading-relaxed font-medium tracking-wide">{line.replace(/^[•·\-\*]\s*/, "")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold tracking-wider text-cyan-400 bg-cyan-950/40 border border-cyan-500/20 px-2 py-1 rounded-md">
+                        {mod.styleTag}
+                      </span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-500">{mod.styleDesc}</span>
                   </div>
                 </div>
               );
             })}
+          </div>
 
-          {/* ── Footer text ─────────────────────────────────────────── */}
-          <div className="px-4 py-1.5 text-xs text-slate-400 text-center">
-            AI 预计生成：6-8 张详情图
+          {/* Footer stats */}
+          <div className="mt-10 px-4 py-3 flex items-center justify-center">
+            <div className="px-4 py-1.5 bg-black/40 border border-white/10 rounded-full">
+               <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                 已完成基于商品图片的参数提取与卖点生成
+               </span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Bottom fixed bar ──────────────────────────────────────────── */}
+      {/* Button dock */}
       {!loading && !error && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-3 flex items-center gap-2 z-50">
-          <Button
-            variant="outline"
-            onClick={handleModify}
-            className="flex items-center gap-1.5 text-sm px-4"
-          >
-            <Edit2 className="w-4 h-4" />
-            修改内容
-          </Button>
-          <Button
-            onClick={handleGenerateAll}
-            className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white font-bold text-sm flex items-center justify-center gap-1.5"
-          >
-            <Zap className="w-4 h-4" />
-            生成全部详情图
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleShare}
-            className="shrink-0"
-          >
-            <Share2 className="w-4 h-4" />
-          </Button>
+        <div className="fixed bottom-0 left-0 right-0 bg-[#050914]/80 backdrop-blur-xl border-t border-white/10 p-4 flex justify-center z-50">
+          <div className="w-full max-w-4xl flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={handleModify}
+              className="h-14 px-6 bg-white/5 border-white/10 hover:bg-white/10 text-slate-300 hover:text-white rounded-2xl tracking-widest text-sm font-bold shadow-lg"
+            >
+              <Edit2 className="w-4 h-4 mr-2" />
+              调整方案
+            </Button>
+            <Button
+              onClick={handleGenerateAll}
+              className="sci-fi-button flex-1 h-14 bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-widest text-base rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2"
+            >
+              <Zap className="w-5 h-5 fill-white/80 shrink-0" />
+              确认卖点，继续生成
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleShare}
+              className="h-14 w-14 border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-cyan-400 rounded-2xl shrink-0 transition-colors shadow-lg"
+            >
+              <Share2 className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       )}
-    </div>
+      </div></div>
   );
 }

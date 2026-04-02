@@ -7,6 +7,7 @@ import { sessionAPI } from "@/lib/api";
 import { resolveGenerationStageText } from "@/lib/generationStatus";
 
 import { DetailStepIndicator } from "./DetailStepIndicator";
+import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 
 type DetailPlanItem = {
   slot_id?: string;
@@ -163,131 +164,140 @@ export default function DetailConfirmStep() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <DetailStepIndicator currentStep={2} />
+    <div className="min-h-screen aurora-bg flex flex-col pt-8 sm:pt-12">
+      <div className="w-full max-w-5xl mx-auto px-4 relative z-10 w-full pb-28">
+        <DetailStepIndicator currentStep={2} />
 
-      {phase === "loading" && (
-        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          <p className="mt-4 text-sm text-slate-500">{loadingText}</p>
-        </div>
-      )}
+        {phase === "loading" && (
+          <GenerationWaitingUI kind="detail" progress={0} stage="正在配置详情图方案" />
+        )}
 
-      {phase === "error" && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
-            <AlertCircle className="w-7 h-7 text-red-500" />
-          </div>
-          <div>
-            <p className="text-base font-semibold text-slate-900">详情图方案加载失败</p>
-            <p className="text-sm text-slate-500 mt-1 break-words">{error}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleBack}
-              className="px-4 py-2 rounded-full border border-slate-200 text-sm text-slate-600 hover:bg-slate-50"
-            >
-              返回文案页
-            </button>
-          </div>
-        </div>
-      )}
-
-      {phase === "planning" && (
-        <>
-          {/* Status bar */}
-          <div className="bg-white border-b px-4 py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-blue-500" />
-              <span className="text-sm font-semibold text-slate-800">
-                已规划 {cards.length} 个详情模块
-              </span>
+        {phase === "error" && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-6 py-32 h-[50vh]">
+            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl backdrop-blur-md">
+              <p className="text-base font-bold tracking-wide text-red-400">{error || "详情图方案加载失败"}</p>
             </div>
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded-full px-2.5 py-1 transition"
-            >
-              <RefreshCw className="w-3 h-3" />
-              返回文案页
-            </button>
-          </div>
-
-          {/* Watermark notice */}
-          <p className="px-4 py-2 text-xs text-amber-600 bg-amber-50 border-b border-amber-100">
-            确认后将进入付费环节，付费后 AI 才会开始生成无水印高清详情图。
-          </p>
-
-          {/* Scrollable planning cards */}
-          <div className="flex-1 overflow-y-auto pb-32 px-4 pt-4 space-y-4">
-            {cards.map((card, index) => (
-              <div
-                key={card.id}
-                className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleBack}
+                className="px-6 h-12 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-slate-300 rounded-xl font-bold tracking-widest text-sm transition-colors"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-xs font-medium text-blue-500">模块 {index + 1}</div>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-900">{card.label}</h3>
-                  </div>
+                返回文案页
+              </button>
+            </div>
+          </div>
+        )}
+
+        {phase === "planning" && (
+          <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Header info */}
+            <div className="glass-panel border-white/10 rounded-2xl p-6 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-1.5 h-6 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]"></div>
+                  <h1 className="text-xl font-bold tracking-widest text-slate-100">
+                    已规划 {cards.length} 个详情模块
+                  </h1>
                 </div>
+                <p className="text-sm font-medium tracking-wide text-slate-400 pl-4">
+                  确认后将进入结账环节，支付完成后 AI 将生成极清无水印的详情图资产。
+                </p>
+              </div>
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-cyan-400 border border-white/10 bg-white/5 rounded-xl px-4 py-2 transition self-start sm:self-auto"
+              >
+                <RefreshCw className="w-4 h-4" />
+                重新配置
+              </button>
+            </div>
 
-                <p className="mt-3 text-sm leading-6 text-slate-600">{card.description}</p>
-
-                {card.tags.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {card.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {card.copyHighlights.length > 0 && (
-                  <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
-                    <div className="text-xs font-medium text-slate-500">重点文案</div>
-                    <div className="mt-2 space-y-2">
-                      {card.copyHighlights.map((line) => (
-                        <div key={line} className="text-sm text-slate-700">
-                          {line}
-                        </div>
-                      ))}
+            {/* Scrollable planning cards grid */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {cards.map((card, index) => (
+                <div
+                  key={card.id}
+                  className="glass-panel border-white/10 rounded-2xl p-6 shadow-xl flex flex-col h-full hover:border-cyan-500/30 transition-all group"
+                >
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest bg-cyan-950/40 border border-cyan-500/20 px-2 py-0.5 rounded">
+                          模块 {index + 1}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-100 group-hover:text-white transition-colors">
+                        {card.label}
+                      </h3>
                     </div>
                   </div>
-                )}
 
-                {card.layoutNotes && (
-                  <div className="mt-4 text-xs leading-6 text-slate-500">
-                    布局说明：{card.layoutNotes}
-                  </div>
-                )}
+                  <p className="text-sm leading-relaxed text-slate-400 font-medium mb-5 flex-1">
+                    {card.description}
+                  </p>
 
-                {card.originNote && (
-                  <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-700">
-                    {card.originNote}
+                  <div className="space-y-4">
+                    {card.copyHighlights.length > 0 && (
+                      <div className="rounded-xl border border-white/5 bg-black/40 p-4">
+                         <div className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">核心文案</div>
+                         <div className="space-y-2">
+                           {card.copyHighlights.map((line, i) => (
+                             <div key={i} className="flex items-start gap-2 text-sm text-slate-300">
+                               <div className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.8)]"></div>
+                               <span className="leading-relaxed font-medium">{line}</span>
+                             </div>
+                           ))}
+                         </div>
+                      </div>
+                    )}
+
+                    {card.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {card.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-medium text-slate-300"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {card.layoutNotes && (
+                      <div className="text-xs leading-relaxed text-slate-500 font-medium">
+                        布局说明: <span className="text-slate-400">{card.layoutNotes}</span>
+                      </div>
+                    )}
+
+                    {card.originNote && (
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium leading-relaxed text-amber-200/80">
+                        {card.originNote}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+              ))}
+            </div>
+
+            {/* Bottom Sticky Action Area */}
+            <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#050914]/80 backdrop-blur-xl border-t border-white/10 p-4 flex justify-center">
+              <div className="w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="hidden sm:block">
+                  <span className="text-sm font-bold text-slate-300">共 {cards.length} 个独立高转化模块</span>
+                </div>
+                <button
+                  onClick={handleGoToPayment}
+                  className="sci-fi-button w-full sm:w-auto px-10 h-14 bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-widest text-base rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2 transition-all"
+                >
+                  确认方案并继续
+                  <CheckCircle2 className="w-5 h-5 ml-1 opacity-80" />
+                </button>
               </div>
-            ))}
+            </div>
           </div>
-
-          {/* Fixed bottom CTA - navigate to payment, not direct generation */}
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t shadow-lg px-4 py-3">
-            <button
-              onClick={handleGoToPayment}
-              className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-base font-bold bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-200 transition"
-            >
-              确认方案，前往支付
-            </button>
-            <p className="text-center text-xs text-slate-400 mt-1.5">
-              共 {cards.length} 个模块，付费后开始生成无水印高清详情图
-            </p>
-          </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }

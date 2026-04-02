@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { AlertCircle, FileText, Link as LinkIcon, Pencil, Plus, Upload, X } from "lucide-react";
+import { AlertCircle, FileText, Link as LinkIcon, Pencil, Plus, Upload, X, ChevronLeft } from "lucide-react";
 
 import { StepIndicator } from "@/components/StepIndicator";
 import { Button } from "@/components/ui/button";
@@ -645,10 +645,10 @@ export default function GenerateStep() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mb-4" />
-          <p className="text-slate-500 text-sm">{loadingMessage}</p>
+      <div className="min-h-screen aurora-bg flex items-center justify-center p-4">
+        <div className="text-center glass-panel px-10 py-16 rounded-[32px] border border-cyan-500/20 shadow-[0_0_30px_rgba(6,182,212,0.1)]">
+          <div className="inline-block animate-[spin_2s_linear_infinite] rounded-full h-12 w-12 border-b-2 border-t-2 border-cyan-400 mb-6 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
+          <p className="text-cyan-300 text-sm tracking-wide font-medium">{loadingMessage}</p>
         </div>
       </div>
     );
@@ -656,11 +656,11 @@ export default function GenerateStep() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="text-center">
-          <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <p className="text-slate-700 text-sm mb-4">{loadError}</p>
-          <Button onClick={() => setLocation("/create/upload")} variant="outline">
+      <div className="min-h-screen aurora-bg flex items-center justify-center p-4">
+        <div className="text-center glass-panel px-8 py-16 rounded-[32px] max-w-lg border border-red-500/20">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-slate-300 text-sm mb-6">{loadError}</p>
+          <Button onClick={() => setLocation("/create/upload")} className="sci-fi-button">
             返回上传步骤
           </Button>
         </div>
@@ -669,58 +669,58 @@ export default function GenerateStep() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen aurora-bg flex flex-col items-center">
       <StepIndicator currentStep={3} />
 
-      <div className="max-w-2xl mx-auto py-4 px-4">
-        <div className="mb-3">
-          <h1 className="text-xl font-bold text-slate-900">AI 正在自动生成参数</h1>
+      <div className="w-full max-w-4xl py-6 px-4">
+        <div className="mb-6 flex items-center justify-center sm:justify-start">
+          <h1 className="text-2xl font-bold text-white tracking-wide">AI 正在自动生成参数</h1>
         </div>
 
-        <div className="border border-slate-200 rounded-xl p-3 mb-3 bg-white shadow-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-              <FileText className="w-4 h-4 text-slate-500" />
+        <div className="glass-panel border-white/10 rounded-2xl p-5 mb-5 shadow-xl transition-all">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-cyan-900/40 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+              <FileText className="w-4 h-4 text-cyan-400" />
             </div>
-            <span className="font-semibold text-slate-900 text-sm">
+            <span className="font-bold tracking-wide text-slate-200 text-base">
               自动识别产品参数
-              <span className="ml-1.5 text-xs font-normal text-slate-400">（可选）</span>
+              <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-white/10 px-1.5 py-0.5 rounded">可选</span>
             </span>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap mb-2">
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isExtracting}
-              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 font-bold tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-cyan-900/20 px-3 py-1.5 rounded-lg border border-cyan-500/20"
             >
               {isExtracting ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                   <span>提取中...</span>
                 </>
               ) : (
                 <>
-                  <Upload className="w-3.5 h-3.5" />
+                  <Upload className="w-4 h-4" />
                   <span>上传说明书 / 产品参数图</span>
                 </>
               )}
             </button>
-            <span className="text-slate-300 text-xs">|</span>
-            <span className="text-xs text-slate-400">支持图片/PDF格式</span>
-            <svg className="w-3.5 h-3.5 text-slate-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            <span className="text-slate-600 text-xs px-2">|</span>
+            <span className="text-xs text-slate-400 flex-1">支持图/PDF。一次性精准识别大段内容参数及优势</span>
+            <svg className="w-4 h-4 text-cyan-500/50 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
             </svg>
           </div>
           <input ref={fileInputRef} type="file" accept="image/*,.pdf" multiple onChange={handleFileUpload} className="hidden" />
 
           {paramAttachments.length > 0 && (
-            <div className="mt-3 space-y-2">
+            <div className="mt-4 space-y-2">
               {paramAttachments.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg">
-                  <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="text-sm text-slate-700 flex-1 truncate">{item.name}</span>
-                  <button onClick={() => handleDeleteAttachment(item.id)} className="p-1 hover:bg-slate-200 rounded">
-                    <X className="w-3.5 h-3.5 text-slate-400" />
+                <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
+                  <FileText className="w-4 h-4 text-cyan-500 flex-shrink-0" />
+                  <span className="text-sm text-slate-200 font-medium flex-1 truncate">{item.name}</span>
+                  <button onClick={() => handleDeleteAttachment(item.id)} className="p-1.5 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-lg transition-colors">
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ))}
@@ -728,74 +728,88 @@ export default function GenerateStep() {
           )}
         </div>
 
-        <div className="border border-slate-200 rounded-xl p-4 mb-3 bg-white shadow-sm">
-          <h3 className="font-semibold text-slate-900 text-sm mb-3">选择主图首图场景</h3>
-          <Input
-            type="text"
-            list="theme-options"
-            value={selectedTheme}
-            onChange={(e) => {
-              setSelectedTheme(e.target.value);
-              sessionStorage.setItem("selectedTheme", e.target.value);
-            }}
-            placeholder="选择或输入主题场景"
-            className="w-full"
-          />
-          <datalist id="theme-options">
-            {availableThemes.map((theme) => (
-              <option key={theme} value={theme} />
-            ))}
-          </datalist>
-          <p className="text-xs text-slate-400 mt-2">AI建议：{availableThemes.slice(0, 3).join(" · ")}</p>
-        </div>
+        <div className="grid md:grid-cols-2 gap-5 mb-5 w-full">
+          <div className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl flex flex-col transition-all h-full">
+            <div className="flex items-center gap-2 mb-4">
+               <div className="w-2 h-6 bg-cyan-500 rounded-full"></div>
+               <h3 className="font-bold tracking-wide text-slate-100 text-base">选择主图首图场景</h3>
+            </div>
+            
+            <Input
+              type="text"
+              list="theme-options"
+              value={selectedTheme}
+              onChange={(e) => {
+                setSelectedTheme(e.target.value);
+                sessionStorage.setItem("selectedTheme", e.target.value);
+              }}
+              placeholder="选择或输入主题场景"
+              className="w-full bg-black/30 border-white/10 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-500/50 mb-4 h-12"
+            />
+            <datalist id="theme-options">
+              {availableThemes.map((theme) => (
+                <option key={theme} value={theme} />
+              ))}
+            </datalist>
+            <div className="mt-auto pt-2">
+               <p className="text-xs text-slate-400 bg-cyan-900/20 border border-cyan-500/20 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+                 <span className="font-bold text-cyan-400">AI建议</span> 
+                 {availableThemes.slice(0, 3).join(" · ")}
+               </p>
+            </div>
+          </div>
 
-        <div className="border border-slate-200 rounded-xl p-4 mb-3 bg-white shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-slate-900 text-sm">核心卖点</h3>
-            <button
-              onClick={() => setEditingPoints(!editingPoints)}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-            >
-              <Pencil className="w-3 h-3" />
-              {editingPoints ? "完成" : "修改"}
-              {!editingPoints && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>}
-            </button>
-          </div>
-          <div className="space-y-2">
-            {sellingPoints.map((point) => (
-              <div key={point.id} className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                {editingPoints ? (
-                  <Input
-                    value={point.text}
-                    onChange={(e) => setSellingPoints((prev) => prev.map((item) => (item.id === point.id ? { ...item, text: e.target.value } : item)))}
-                    className="h-7 text-xs flex-1"
-                  />
-                ) : (
-                  <span className="text-sm text-slate-700">{point.text}</span>
-                )}
-                {editingPoints && (
-                  <button onClick={() => setSellingPoints((prev) => prev.filter((item) => item.id !== point.id))} className="p-0.5 hover:bg-slate-100 rounded">
-                    <X className="w-3 h-3 text-slate-400" />
-                  </button>
-                )}
+          {/* 核心卖点 block now adjacent in the grid */}
+          <div className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                 <div className="w-2 h-6 bg-indigo-500 rounded-full"></div>
+                 <h3 className="font-bold tracking-wide text-slate-100 text-base">核心卖点</h3>
               </div>
-            ))}
-          </div>
-          {editingPoints ? (
-            <div className="flex gap-2 mt-3">
-              <Input
-                value={newPointText}
-                onChange={(e) => setNewPointText(e.target.value)}
-                placeholder="输入新卖点"
-                className="h-7 text-xs flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newPointText.trim()) {
-                    setSellingPoints((prev) => [...prev, { id: `point-${Date.now()}`, text: newPointText.trim() }]);
-                    setNewPointText("");
-                  }
-                }}
-              />
+              <button
+                onClick={() => setEditingPoints(!editingPoints)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                {editingPoints ? "完成修改" : "修改内容"}
+                {!editingPoints && <ChevronLeft className="w-3.5 h-3.5 rotate-180" />}
+              </button>
+            </div>
+            <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              {sellingPoints.map((point) => (
+                <div key={point.id} className="flex items-start gap-3 group">
+                  <div className="w-2 h-2 mt-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                  {editingPoints ? (
+                    <Input
+                      value={point.text}
+                      onChange={(e) => setSellingPoints((prev) => prev.map((item) => (item.id === point.id ? { ...item, text: e.target.value } : item)))}
+                      className="h-9 text-sm flex-1 bg-black/30 border-white/10 text-slate-200 focus-visible:ring-cyan-500/50"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium text-slate-300 leading-relaxed mt-0.5">{point.text}</span>
+                  )}
+                  {editingPoints && (
+                    <button onClick={() => setSellingPoints((prev) => prev.filter((item) => item.id !== point.id))} className="p-2 opacity-60 hover:opacity-100 hover:bg-red-500/20 text-red-400 rounded-lg transition-all mt-0.5">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {editingPoints ? (
+              <div className="flex gap-2 mt-4 pt-3 border-t border-white/10">
+                <Input
+                  value={newPointText}
+                  onChange={(e) => setNewPointText(e.target.value)}
+                  placeholder="输入新卖点"
+                  className="h-10 text-sm flex-1 bg-cyan-950/20 border-cyan-500/30 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-500"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newPointText.trim()) {
+                      setSellingPoints((prev) => [...prev, { id: `point-${Date.now()}`, text: newPointText.trim() }]);
+                      setNewPointText("");
+                    }
+                  }}
+                />
               <button
                 onClick={() => {
                   if (newPointText.trim()) {
@@ -803,52 +817,54 @@ export default function GenerateStep() {
                     setNewPointText("");
                   }
                 }}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded-lg"
+                className="px-3 py-1.5 text-xs font-bold tracking-wide bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
               >
                 添加
               </button>
             </div>
           ) : (
-            <button onClick={() => setEditingPoints(true)} className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600 transition-colors">
+            <button onClick={() => setEditingPoints(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors">
               <Plus className="w-3.5 h-3.5" />
-              添加卖点
+              添加额外卖点
             </button>
           )}
         </div>
+        </div>
 
-        <div className="border border-slate-200 rounded-xl p-4 mb-3 bg-white shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-slate-900 text-sm">核心参数</h3>
+        <div className="glass-panel border-white/10 rounded-2xl p-5 mb-5 shadow-xl transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+               <div className="w-2 h-6 bg-pink-500 rounded-full"></div>
+               <h3 className="font-bold tracking-wide text-slate-100 text-base">核心参数</h3>
+            </div>
             <button
               onClick={() => setEditingParams(!editingParams)}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
             >
-              <Pencil className="w-3 h-3" />
-              {editingParams ? "完成" : "修改"}
-              {!editingParams && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>}
+              <Pencil className="w-3.5 h-3.5" />
+              {editingParams ? "完成修改" : "修改参数"}
+              {!editingParams && <ChevronLeft className="w-3.5 h-3.5 rotate-180" />}
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
             {params.map((param) => (
-              <div key={param.id} className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 w-20 flex-shrink-0 flex items-center gap-1 truncate">
-                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
+              <div key={param.id} className="flex items-center gap-3">
+                <span className="text-xs font-bold tracking-widest text-slate-500 w-24 flex-shrink-0 flex items-center gap-1.5 truncate">
+                  <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
                   {param.label}
                 </span>
                 {editingParams ? (
                   <Input
                     value={param.value}
                     onChange={(e) => setParams((prev) => prev.map((item) => (item.id === param.id ? { ...item, value: e.target.value } : item)))}
-                    className="h-7 text-xs flex-1"
+                    className="h-8 text-sm flex-1 bg-black/30 border-white/10 text-slate-200 focus-visible:ring-cyan-500/50"
                   />
                 ) : (
-                  <span className="text-sm font-medium text-slate-800">{param.value}</span>
+                  <span className="text-sm font-medium text-slate-200">{param.value}</span>
                 )}
                 {editingParams && (
-                  <button onClick={() => setParams((prev) => prev.filter((item) => item.id !== param.id))} className="p-0.5 hover:bg-slate-100 rounded">
-                    <X className="w-3 h-3 text-slate-400" />
+                  <button onClick={() => setParams((prev) => prev.filter((item) => item.id !== param.id))} className="p-1 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-lg transition-colors">
+                    <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
@@ -856,196 +872,204 @@ export default function GenerateStep() {
           </div>
           <button
             onClick={() => setParams((prev) => [...prev, { id: `param-${Date.now()}`, label: "参数", value: "" }])}
-            className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600 transition-colors"
+            className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             添加参数
           </button>
         </div>
 
-        <div className="border border-slate-200 rounded-xl p-4 mb-3 bg-white shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-slate-900 text-sm">产品优势</h3>
-            <button
-              onClick={() => setEditingAdvantages(!editingAdvantages)}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-            >
-              <Pencil className="w-3 h-3" />
-              {editingAdvantages ? "完成" : "修改"}
-              {!editingAdvantages && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>}
-            </button>
-          </div>
-          <div className="space-y-2">
-            {advantages.map((item) => (
-              <div key={item.id} className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                {editingAdvantages ? (
-                  <Input
-                    value={item.text}
-                    onChange={(e) => setAdvantages((prev) => prev.map((current) => (current.id === item.id ? { ...current, text: e.target.value } : current)))}
-                    className="h-7 text-xs flex-1"
-                  />
-                ) : (
-                  <span className="text-sm text-slate-700">{item.text}</span>
-                )}
-                {editingAdvantages && (
-                  <button onClick={() => setAdvantages((prev) => prev.filter((current) => current.id !== item.id))} className="p-0.5 hover:bg-slate-100 rounded">
-                    <X className="w-3 h-3 text-slate-400" />
-                  </button>
-                )}
+        <div className="grid md:grid-cols-2 gap-5 mb-5 w-full">
+          <div className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                 <div className="w-2 h-6 bg-purple-500 rounded-full"></div>
+                 <h3 className="font-bold tracking-wide text-slate-100 text-base">产品优势</h3>
               </div>
-            ))}
-          </div>
-          {editingAdvantages ? (
-            <div className="flex gap-2 mt-3">
-              <Input
-                value={newAdvantageText}
-                onChange={(e) => setNewAdvantageText(e.target.value)}
-                placeholder="输入产品优势描述"
-                className="h-7 text-xs flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newAdvantageText.trim()) {
-                    setAdvantages((prev) => [...prev, { id: `advantage-${Date.now()}`, text: newAdvantageText.trim() }]);
-                    setNewAdvantageText("");
-                  }
-                }}
-              />
               <button
-                onClick={() => {
-                  if (newAdvantageText.trim()) {
-                    setAdvantages((prev) => [...prev, { id: `advantage-${Date.now()}`, text: newAdvantageText.trim() }]);
-                    setNewAdvantageText("");
-                  }
-                }}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded-lg"
+                onClick={() => setEditingAdvantages(!editingAdvantages)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
               >
-                添加
+                <Pencil className="w-3.5 h-3.5" />
+                {editingAdvantages ? "完成修改" : "修改优势"}
+                {!editingAdvantages && <ChevronLeft className="w-3.5 h-3.5 rotate-180" />}
               </button>
             </div>
-          ) : (
-            <button onClick={() => setEditingAdvantages(true)} className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600 transition-colors">
-              <Plus className="w-3.5 h-3.5" />
-              添加优势
-            </button>
-          )}
-        </div>
-
-        <div className="border border-slate-200 rounded-xl p-4 mb-3 bg-white shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-slate-900 text-sm">
-              功能展示
-              <span className="ml-1.5 text-xs font-normal text-slate-400">（可选）</span>
-            </h3>
-            <button
-              onClick={() => setEditingFeatures(!editingFeatures)}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-            >
-              <Pencil className="w-3 h-3" />
-              {editingFeatures ? "完成" : "修改"}
-              {!editingFeatures && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>}
-            </button>
-          </div>
-          <div className="space-y-2">
-            {featureTexts.map((item) => (
-              <div key={item.id} className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                {editingFeatures ? (
-                  <Input
-                    value={item.text}
-                    onChange={(e) => setFeatureTexts((prev) => prev.map((current) => (current.id === item.id ? { ...current, text: e.target.value } : current)))}
-                    className="h-7 text-xs flex-1"
-                  />
-                ) : (
-                  <span className="text-sm text-slate-700">{item.text}</span>
-                )}
-                {editingFeatures && (
-                  <button onClick={() => setFeatureTexts((prev) => prev.filter((current) => current.id !== item.id))} className="p-0.5 hover:bg-slate-100 rounded">
-                    <X className="w-3 h-3 text-slate-400" />
-                  </button>
-                )}
+            <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              {advantages.map((item) => (
+                <div key={item.id} className="flex items-start gap-3 group">
+                  <div className="w-2 h-2 mt-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.8)] flex-shrink-0" />
+                  {editingAdvantages ? (
+                    <Input
+                      value={item.text}
+                      onChange={(e) => setAdvantages((prev) => prev.map((current) => (current.id === item.id ? { ...current, text: e.target.value } : current)))}
+                      className="h-9 text-sm flex-1 bg-black/30 border-white/10 text-slate-200 focus-visible:ring-purple-500/50"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium text-slate-300 leading-relaxed mt-0.5">{item.text}</span>
+                  )}
+                  {editingAdvantages && (
+                    <button onClick={() => setAdvantages((prev) => prev.filter((current) => current.id !== item.id))} className="p-2 opacity-60 hover:opacity-100 hover:bg-red-500/20 text-red-400 rounded-lg transition-all mt-0.5">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {editingAdvantages ? (
+              <div className="flex gap-2 mt-4 pt-3 border-t border-white/10">
+                <Input
+                  value={newAdvantageText}
+                  onChange={(e) => setNewAdvantageText(e.target.value)}
+                  placeholder="输入产品优势描述"
+                  className="h-10 text-sm flex-1 bg-cyan-950/20 border-cyan-500/30 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-500"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newAdvantageText.trim()) {
+                      setAdvantages((prev) => [...prev, { id: `advantage-${Date.now()}`, text: newAdvantageText.trim() }]);
+                      setNewAdvantageText("");
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (newAdvantageText.trim()) {
+                      setAdvantages((prev) => [...prev, { id: `advantage-${Date.now()}`, text: newAdvantageText.trim() }]);
+                      setNewAdvantageText("");
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold tracking-wide bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
+                >
+                  添加
+                </button>
               </div>
-            ))}
+            ) : (
+              <button onClick={() => setEditingAdvantages(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors">
+                <Plus className="w-3.5 h-3.5" />
+                添加优势
+              </button>
+            )}
           </div>
-          {editingFeatures ? (
-            <div className="flex gap-2 mt-3">
-              <Input
-                value={newFeatureText}
-                onChange={(e) => setNewFeatureText(e.target.value)}
-                placeholder="输入功能描述"
-                className="h-7 text-xs flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newFeatureText.trim()) {
-                    setFeatureTexts((prev) => [...prev, { id: `feature-${Date.now()}`, text: newFeatureText.trim() }]);
-                    setNewFeatureText("");
-                  }
-                }}
-              />
+
+          <div className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                 <div className="w-2 h-6 bg-amber-500 rounded-full"></div>
+                 <h3 className="font-bold tracking-wide text-slate-100 text-base">
+                   功能展示
+                   <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-white/10 px-1.5 py-0.5 rounded">可选</span>
+                 </h3>
+              </div>
               <button
-                onClick={() => {
-                  if (newFeatureText.trim()) {
-                    setFeatureTexts((prev) => [...prev, { id: `feature-${Date.now()}`, text: newFeatureText.trim() }]);
-                    setNewFeatureText("");
-                  }
-                }}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded-lg"
+                onClick={() => setEditingFeatures(!editingFeatures)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
               >
-                添加
+                <Pencil className="w-3.5 h-3.5" />
+                {editingFeatures ? "完成修改" : "修改展示"}
+                {!editingFeatures && <ChevronLeft className="w-3.5 h-3.5 rotate-180" />}
               </button>
             </div>
-          ) : (
-            <button onClick={() => setEditingFeatures(true)} className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600 transition-colors">
-              <Plus className="w-3.5 h-3.5" />
-              添加功能
-            </button>
-          )}
+            <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              {featureTexts.map((item) => (
+                <div key={item.id} className="flex items-start gap-3 group">
+                  <div className="w-2 h-2 mt-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] flex-shrink-0" />
+                  {editingFeatures ? (
+                    <Input
+                      value={item.text}
+                      onChange={(e) => setFeatureTexts((prev) => prev.map((current) => (current.id === item.id ? { ...current, text: e.target.value } : current)))}
+                      className="h-9 text-sm flex-1 bg-black/30 border-white/10 text-slate-200 focus-visible:ring-amber-500/50"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium text-slate-300 leading-relaxed mt-0.5">{item.text}</span>
+                  )}
+                  {editingFeatures && (
+                    <button onClick={() => setFeatureTexts((prev) => prev.filter((current) => current.id !== item.id))} className="p-2 opacity-60 hover:opacity-100 hover:bg-red-500/20 text-red-400 rounded-lg transition-all mt-0.5">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {editingFeatures ? (
+              <div className="flex gap-2 mt-4 pt-3 border-t border-white/10">
+                <Input
+                  value={newFeatureText}
+                  onChange={(e) => setNewFeatureText(e.target.value)}
+                  placeholder="输入功能描述"
+                  className="h-10 text-sm flex-1 bg-cyan-950/20 border-cyan-500/30 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-500"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newFeatureText.trim()) {
+                      setFeatureTexts((prev) => [...prev, { id: `feature-${Date.now()}`, text: newFeatureText.trim() }]);
+                      setNewFeatureText("");
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (newFeatureText.trim()) {
+                      setFeatureTexts((prev) => [...prev, { id: `feature-${Date.now()}`, text: newFeatureText.trim() }]);
+                      setNewFeatureText("");
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold tracking-wide bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
+                >
+                  添加
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setEditingFeatures(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors">
+                <Plus className="w-3.5 h-3.5" />
+                添加功能
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="border border-slate-200 rounded-xl p-4 mb-6 bg-white shadow-sm">
-          <h3 className="font-semibold text-slate-900 text-sm mb-3">
+        <div className="glass-panel border-white/10 rounded-2xl p-5 mb-8 shadow-xl transition-all">
+          <h3 className="font-bold tracking-wide text-slate-100 text-base mb-4">
             添加参考内容
-            <span className="ml-1.5 text-xs font-normal text-slate-400">（可选）</span>
+            <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-white/10 px-1.5 py-0.5 rounded">可选</span>
           </h3>
-          <div className="flex gap-2 mb-3">
+          <div className="flex gap-3 mb-4">
             <Input
               value={referenceUrl}
               onChange={(e) => setReferenceUrl(e.target.value)}
               placeholder="输入竞品链接或参考页面URL"
-              className="flex-1 text-sm"
+              className="flex-1 bg-black/30 border-white/10 text-slate-100 placeholder:text-slate-500 h-11"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleAddReferenceUrl();
               }}
             />
-            <Button onClick={handleAddReferenceUrl} variant="outline" size="sm" className="flex-shrink-0">
-              <LinkIcon className="w-3.5 h-3.5 mr-1" />
+            <Button onClick={handleAddReferenceUrl} variant="outline" className="flex-shrink-0 h-11 border-white/20 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10">
+              <LinkIcon className="w-4 h-4 mr-2" />
               添加
             </Button>
           </div>
           <button
             onClick={() => referenceImageInputRef.current?.click()}
             disabled={isUploadingReferenceImages}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-dashed border-slate-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors text-sm text-slate-500 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-cyan-500/30 rounded-xl bg-cyan-950/20 hover:border-cyan-400 hover:bg-cyan-900/30 transition-all text-sm font-bold tracking-wide text-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Upload className="w-4 h-4" />
+            <Upload className="w-5 h-5" />
             {isUploadingReferenceImages ? "上传中..." : "上传参考图片（支持多张）"}
           </button>
           <input ref={referenceImageInputRef} type="file" accept="image/*" multiple onChange={handleAddReferenceImage} className="hidden" />
           {(referenceLinks.length > 0 || referenceImages.length > 0) && (
-            <div className="mt-3 space-y-2">
+            <div className="mt-4 space-y-2">
               {referenceLinks.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg">
-                  <LinkIcon className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                  <span className="text-sm text-slate-700 flex-1 truncate">{item.name}</span>
-                  <button onClick={() => setReferenceLinks((prev) => prev.filter((current) => current.id !== item.id))} className="p-1 hover:bg-slate-200 rounded">
-                    <X className="w-3.5 h-3.5 text-slate-400" />
+                <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
+                  <LinkIcon className="w-4 h-4 text-cyan-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-slate-200 flex-1 truncate">{item.name}</span>
+                  <button onClick={() => setReferenceLinks((prev) => prev.filter((current) => current.id !== item.id))} className="p-1.5 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-lg transition-colors">
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ))}
               {referenceImages.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg">
-                  <img src={item.content} alt={item.name} className="w-10 h-10 object-cover rounded flex-shrink-0" />
-                  <span className="text-sm text-slate-700 flex-1 truncate">{item.name}</span>
-                  <button onClick={() => handleDeleteReferenceImage(item)} className="p-1 hover:bg-slate-200 rounded">
-                    <X className="w-3.5 h-3.5 text-slate-400" />
+                <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
+                  <img src={item.content} alt={item.name} className="w-12 h-12 object-cover rounded shadow-md border border-white/10 flex-shrink-0" />
+                  <span className="text-sm font-medium text-slate-200 flex-1 truncate">{item.name}</span>
+                  <button onClick={() => handleDeleteReferenceImage(item)} className="p-1.5 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-lg transition-colors">
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ))}
@@ -1054,8 +1078,8 @@ export default function GenerateStep() {
         </div>
 
         {saveError && (
-          <div className="mb-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <div className="mb-4 flex items-center gap-3 text-sm text-red-400 bg-red-950/40 border border-red-500/30 rounded-xl px-4 py-3 backdrop-blur-sm">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
             <span>{saveError}</span>
           </div>
         )}
@@ -1063,11 +1087,11 @@ export default function GenerateStep() {
         <Button
           onClick={handleNext}
           disabled={isSaving}
-          className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-white text-base font-semibold rounded-xl shadow disabled:opacity-60"
+          className="sci-fi-button w-full h-14 text-base font-bold tracking-widest rounded-2xl shadow-lg disabled:opacity-50"
         >
           {isSaving ? (
-            <span className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <span className="flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               保存中...
             </span>
           ) : (
@@ -1079,10 +1103,10 @@ export default function GenerateStep() {
             sessionStorage.setItem("detail_flow_origin", "generate");
             setLocation("/create/copywriting");
           }}
-          className="w-full mt-3 flex items-center justify-center gap-1.5 text-sm text-slate-400 hover:text-blue-600 transition-colors"
+          className="w-full mt-5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide text-slate-400 hover:text-cyan-400 transition-colors"
         >
           <FileText className="w-4 h-4" />
-          直接生成详情文案
+          直接跑去生成详情文案
         </button>
       </div>
     </div>

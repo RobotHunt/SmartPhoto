@@ -1,4 +1,4 @@
-export type GenerationKind = "main" | "detail" | "hd";
+export type GenerationKind = "main" | "detail" | "hd" | "analysis";
 
 function containsChinese(text: string) {
   return /[\u4e00-\u9fff]/.test(text);
@@ -21,6 +21,16 @@ const TIPS_MAIN = [
   "精心处理每一处商品细节",
   "正在应用色彩增强算法",
   "最后打磨中，马上就好",
+];
+
+const TIPS_ANALYSIS = [
+  "AI 正在深度解析商品外观特征",
+  "正在智能提取核心参数与卖点",
+  "扫描视觉风格中，匹配爆款策略",
+  "即将推导最恰当的文案方向",
+  "AI 正在融合平台标准与产品优势",
+  "正在为你生成专属的策略矩阵",
+  "分析即将完成，最后整理中",
 ];
 
 const TIPS_DETAIL = [
@@ -50,6 +60,7 @@ function pickTip(tips: string[], rotation: number) {
 }
 
 export function getTips(kind: GenerationKind) {
+  if (kind === "analysis") return TIPS_ANALYSIS;
   if (kind === "detail") return TIPS_DETAIL;
   if (kind === "hd") return TIPS_HD;
   return TIPS_MAIN;
@@ -65,7 +76,7 @@ export function resolveGenerationStageText(
   if (!raw) {
     return {
       stage: "default",
-      title: kind === "detail" ? "正在生成详情图" : kind === "hd" ? "正在生成高清图" : "正在生成主图",
+      title: kind === "analysis" ? "正在提取参数与卖点" : kind === "detail" ? "正在生成详情图" : kind === "hd" ? "正在生成高清图" : "正在生成主图",
       description: pickTip(tips, 0),
       showProgress: true,
       tipRotation: 0,
@@ -73,9 +84,14 @@ export function resolveGenerationStageText(
   }
 
   if (containsChinese(raw)) {
+    let t = raw;
+    if (raw.includes("准备") || raw.includes("排队") || raw.includes("提交") || raw.includes("等待")) {
+      t = kind === "analysis" ? "正在提取分析特征" : kind === "detail" ? "正准备编排详情图" : kind === "hd" ? "正准备渲染高清图" : "正在生成主图";
+    }
+
     return {
       stage: raw,
-      title: raw,
+      title: t,
       description: pickTip(tips, 0),
       showProgress: true,
       tipRotation: 0,
@@ -89,11 +105,12 @@ export function resolveGenerationStageText(
     normalized.includes("pending") ||
     normalized.includes("wait")
   ) {
+    const t = kind === "analysis" ? "分析正在排队中" : kind === "detail" ? "详情图正在排队" : kind === "hd" ? "高清图渲染准备中" : "正在准备生成主图";
     return {
       stage: "preparing",
-      title: "任务准备中",
+      title: t,
       description: "正在为您分配 AI 资源，请稍候",
-      showProgress: false,
+      showProgress: true,
       tipRotation: 1,
     };
   }
@@ -114,7 +131,7 @@ export function resolveGenerationStageText(
   }
 
   if (normalized.includes("analysis") || normalized.includes("extract")) {
-    const t = kind === "detail" ? "正在准备详情图素材" : "正在分析素材";
+    const t = kind === "analysis" ? "正在深度分析素材" : kind === "detail" ? "正在准备详情图素材" : "正在分析素材";
     return {
       stage: "analyzing",
       title: t,
@@ -132,7 +149,7 @@ export function resolveGenerationStageText(
     normalized.includes("processing") ||
     normalized.includes("running")
   ) {
-    const t = kind === "detail" ? "正在生成详情图" : kind === "hd" ? "正在生成高清图" : "正在生成主图";
+    const t = kind === "analysis" ? "正在提取卖点" : kind === "detail" ? "正在生成详情图" : kind === "hd" ? "正在生成高清图" : "正在生成主图";
     return {
       stage: "generating",
       title: t,
@@ -195,18 +212,19 @@ export function resolveGenerationStageText(
     normalized.includes("dispatch") ||
     normalized.includes("start")
   ) {
+    const t = kind === "analysis" ? "分析任务已提交" : kind === "detail" ? "详情图任务已提交" : kind === "hd" ? "高清图生成已启动" : "主图生成任务已提交";
     return {
       stage: "submitted",
-      title: "任务已提交",
+      title: t,
       description: "AI 正在启动，请稍候",
-      showProgress: false,
+      showProgress: true,
       tipRotation: 0,
     };
   }
 
   return {
     stage: "default",
-    title: kind === "detail" ? "正在生成详情图" : kind === "hd" ? "正在生成高清图" : "正在生成主图",
+    title: kind === "analysis" ? "正在提取参数与卖点" : kind === "detail" ? "正在生成详情图" : kind === "hd" ? "正在生成高清图" : "正在生成主图",
     description: pickTip(tips, 0),
     showProgress: true,
     tipRotation: 0,

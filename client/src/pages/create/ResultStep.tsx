@@ -45,6 +45,9 @@ type ResultAssetView = {
   isRegenerating: boolean;
   editOpen: boolean;
   copy_blocks: MainGalleryCopyBlocks;
+  carry_forward?: boolean;
+  source_version_no?: number | null;
+  fidelity_validation_status?: string | null;
 };
 
 function normalizeGenerationError(error: any) {
@@ -118,6 +121,9 @@ function buildViewAssets(
     slot_id: asset.slot_id || "",
     isRegenerating: false,
     editOpen: false,
+    carry_forward: asset.carry_forward,
+    source_version_no: asset.source_version_no,
+    fidelity_validation_status: asset.fidelity_validation_status,
   }));
 }
 
@@ -607,7 +613,7 @@ export default function ResultStep() {
   if (generating) {
     const elapsedMs = Date.now() - generateStartRef.current;
     return (
-      <div className="min-h-screen bg-[#f5f6f8]">
+      <div className="min-h-screen aurora-bg">
         <StepIndicator currentStep={5} step5Label="生成图片" />
         <GenerationWaitingUI
           kind="main"
@@ -621,31 +627,31 @@ export default function ResultStep() {
   if (error && assets.length === 0) {
     const isCreditsError = error === "insufficient_credits";
     return (
-      <div className="min-h-screen bg-[#f5f6f8]">
+      <div className="min-h-screen aurora-bg">
         <StepIndicator currentStep={5} step5Label="生成图片" />
-        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-50">
+        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 relative z-10">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-950/40 border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
             <X className="h-10 w-10 text-red-400" />
           </div>
-          <h2 className="mb-2 text-lg font-bold text-slate-900">
+          <h2 className="mb-2 text-xl font-bold tracking-widest text-slate-100">
             {isCreditsError ? "额度不足" : "生成失败"}
           </h2>
-          <p className="mb-6 max-w-xs text-center text-sm text-slate-500">
+          <p className="mb-8 max-w-sm text-center text-sm font-medium tracking-wide text-slate-400">
             {isCreditsError
               ? "当前额度不足以完成本次生成，请稍后重试或联系后端补充联调额度。"
               : error}
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => setLocation("/create/strategy")}
-              className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-6 py-3 text-sm font-bold tracking-widest text-slate-300 transition hover:bg-white/10 hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
               返回上一页
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-sm text-blue-600 transition hover:bg-blue-50"
+              className="rounded-xl border border-cyan-500/30 bg-cyan-600/20 px-6 py-3 text-sm font-bold tracking-widest text-cyan-400 transition hover:bg-cyan-500/30 hover:text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
             >
               重试
             </button>
@@ -656,32 +662,55 @@ export default function ResultStep() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f6f8]">
+    <div className="min-h-screen aurora-bg">
       <StepIndicator currentStep={5} step5Label="生成图片" />
 
-      <div className="mx-auto max-w-lg px-4 pb-44 pt-4">
+      <div className="mx-auto w-full max-w-7xl px-4 pb-44 pt-4 md:pt-8 relative z-10">
         {/* --- Top status bar --- */}
         <div className="mb-1 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
               <Check className="h-3 w-3 stroke-[3] text-white" />
             </div>
-            <span className="text-sm font-bold text-slate-800">
+            <span className="text-sm font-bold text-slate-100">
               已生成 {assets.length} 张图片
             </span>
           </div>
           <button
             onClick={() => setLocation("/create/generate")}
-            className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:text-blue-600"
+            className="flex items-center gap-1 rounded-full border border-white/20 bg-black/40 backdrop-blur-md px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-blue-300 hover:text-white"
           >
             <RotateCcw className="h-3 w-3" />
             重新生成
           </button>
         </div>
-        <p className="mb-4 text-xs text-slate-400">预览图含水印，付费后生成高清清图</p>
+        <div className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <p className="text-xs text-slate-400 font-medium">✨ 提示：预览图含水印，付费后可获取高清无水印原图</p>
+            {availableVersions.length > 1 && (
+            <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-300">生成版本历史:</span>
+                <select
+                value={currentVersion || latestVersion || ""}
+                onChange={(e) => handleVersionChange(Number(e.target.value))}
+                className="rounded-lg border border-white/20 bg-black/40 backdrop-blur-md px-3 py-1.5 text-sm font-medium text-slate-200 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                {availableVersions.map((v) => {
+                    const vSum = versionSummaries.find((vs) => vs.version_no === v);
+                    const tag = v === latestVersion ? " (最新)" : "";
+                    const counts = vSum ? ` [${vSum.ready_count}/${vSum.asset_count}图]` : "";
+                    return (
+                    <option key={v} value={v}>
+                        Version {v}{tag}{counts}
+                    </option>
+                    );
+                })}
+                </select>
+            </div>
+            )}
+        </div>
 
-        {/* --- Image cards --- */}
-        <div className="space-y-3">
+        {/* --- Image grids --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
           {assets.map((asset) => {
             const isSelected = selected.has(asset.asset_id);
             const label = resolveAssetLabel(asset.role, asset.slot_id);
@@ -689,10 +718,10 @@ export default function ResultStep() {
             return (
               <div
                 key={asset.asset_id}
-                className={`overflow-hidden rounded-2xl bg-white transition-all ${
+                className={`overflow-hidden rounded-[24px] glass-panel transition-all ${
                   isSelected
-                    ? "shadow-md shadow-blue-100 ring-2 ring-blue-400"
-                    : "shadow-sm ring-1 ring-slate-100"
+                    ? "shadow-[0_0_15px_rgba(6,182,212,0.5)] border-2 border-cyan-400 translate-y-[-2px]"
+                    : "shadow-md shadow-black/40 border border-white/5 hover:border-cyan-500/30"
                 }`}
               >
                 {/* 1:1 image area */}
@@ -703,9 +732,12 @@ export default function ResultStep() {
                 >
                   {/* regenerating overlay */}
                   {asset.isRegenerating && (
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/50">
-                      <Loader2 className="h-8 w-8 animate-spin text-white" />
-                      <span className="text-sm font-medium text-white">重新生成中...</span>
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-cyan-500/30 blur-md rounded-full" />
+                        <Loader2 className="h-10 w-10 animate-spin text-cyan-400 relative" />
+                      </div>
+                      <span className="text-sm font-bold tracking-widest text-slate-200">重新生成中...</span>
                     </div>
                   )}
 
@@ -735,19 +767,44 @@ export default function ResultStep() {
                     <div
                       className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all ${
                         isSelected
-                          ? "border-blue-500 bg-blue-500"
-                          : "border-white/60 bg-white/80 backdrop-blur-sm"
+                          ? "border-cyan-400 bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]"
+                          : "border-white/20 bg-black/50 backdrop-blur-md"
                       }`}
                     >
                       {isSelected && <Check className="h-3 w-3 stroke-[3] text-white" />}
                     </div>
                   </div>
+
+                  {/* carry forward badge */}
+                  {asset.carry_forward && asset.source_version_no != null && (
+                    <div className="absolute top-3 left-3 z-20">
+                      <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
+                        沿用自 V{asset.source_version_no}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* fidelity badge */}
+                  {asset.fidelity_validation_status === 'passed' && (
+                    <div className="absolute bottom-3 left-3 z-20">
+                      <div className="rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-emerald-400 shadow-sm">
+                        保真通过
+                      </div>
+                    </div>
+                  )}
+                  {asset.fidelity_validation_status === 'failed' && (
+                    <div className="absolute bottom-3 left-3 z-20">
+                      <div className="rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-red-400 shadow-sm">
+                        保真受限
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Info row below image */}
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-600">
+                <div className="flex items-center justify-between px-4 py-3 bg-black/20 backdrop-blur-md">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm font-bold tracking-wide text-slate-300">
                       {productName} · {label}
                     </span>
                     <button
@@ -756,28 +813,28 @@ export default function ResultStep() {
                         toggleEditOpen(asset.asset_id);
                       }}
                       disabled={actionLocked}
-                      className="flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 px-3 py-1 text-xs font-bold tracking-wide text-cyan-400 transition hover:bg-cyan-900/60 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm"
                     >
                       <Pencil className="h-3 w-3" />
-                      编辑文字
+                      修改
                     </button>
                   </div>
                   <button
                     onClick={() => openRegenModal(asset.asset_id)}
                     disabled={actionLocked || asset.isRegenerating}
-                    className="flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 disabled:opacity-40"
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold tracking-wide text-slate-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40 shadow-sm"
                   >
                     <RefreshCw className="h-3 w-3" />
-                    重新生成
+                    重绘
                   </button>
                 </div>
 
                 {/* Expandable inline edit panel */}
                 {asset.editOpen && (
-                  <div className="border-t border-slate-100 bg-slate-50 px-3 pb-3 pt-2">
-                    <div className="space-y-2">
+                  <div className="border-t border-white/10 bg-black/40 backdrop-blur-md px-4 pb-4 pt-3">
+                    <div className="space-y-3">
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-400">
                           主标题
                         </label>
                         <input
@@ -787,11 +844,11 @@ export default function ResultStep() {
                             updateAssetText(asset.asset_id, "headline", e.target.value)
                           }
                           placeholder="输入主标题..."
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-400">
                           副标题
                         </label>
                         <input
@@ -801,11 +858,11 @@ export default function ResultStep() {
                             updateAssetText(asset.asset_id, "supporting", e.target.value)
                           }
                           placeholder="输入副标题..."
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-400">
                           佐证短句
                         </label>
                         <textarea
@@ -814,12 +871,12 @@ export default function ResultStep() {
                           onChange={(e) =>
                             updateAssetLineText(asset.asset_id, "proof_lines", e.target.value)
                           }
-                          placeholder={"每行一条，例如：\n通过质检认证\n核心参数可视化"}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                          placeholder={"每行一条"}
+                          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 resize-y"
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-400">
                           标签短句
                         </label>
                         <textarea
@@ -828,18 +885,18 @@ export default function ResultStep() {
                           onChange={(e) =>
                             updateAssetLineText(asset.asset_id, "matrix_lines", e.target.value)
                           }
-                          placeholder={"每行一条，例如：\n净化除湿二合一\n低噪运行"}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                          placeholder={"每行一条"}
+                          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 resize-y"
                         />
                       </div>
                     </div>
                     <button
                       onClick={() => saveAssetText(asset.asset_id)}
                       disabled={actionLocked}
-                      className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-bold tracking-widest text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_0_15px_rgba(6,182,212,0.3)]"
                     >
-                      <Check className="h-3.5 w-3.5" />
-                      保存文字
+                      <Check className="h-4 w-4" />
+                      应用文案重生
                     </button>
                   </div>
                 )}
@@ -851,21 +908,21 @@ export default function ResultStep() {
 
       {/* --- Bottom fixed bar --- */}
       <div className="fixed bottom-0 left-0 right-0 z-30">
-        <div className="border-t border-slate-100 bg-white px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-          <div className="mx-auto flex max-w-lg items-center gap-3">
-            <div className="min-w-0 flex-1">
+        <div className="border-t border-white/10 bg-[#050914]/80 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+          <div className="mx-auto flex max-w-5xl items-center gap-4">
+            <div className="min-w-0 flex-1 pl-2">
               {selectedCount > 0 ? (
                 <>
-                  <p className="text-sm font-semibold text-slate-900">
-                    已选择 <span className="text-blue-600">{selectedCount}</span> 张
+                  <p className="text-sm font-bold tracking-widest text-slate-100">
+                    已选择 <span className="text-cyan-400 font-black">{selectedCount}</span> 张
                   </p>
-                  <p className="truncate text-xs text-slate-400">
-                    确认后生成无水印高清图...
+                  <p className="truncate text-xs font-medium tracking-wide text-cyan-400/70 mt-0.5">
+                    确认后生成高分辨率无水印画质
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-slate-400">
-                  点击图片选择要生成高清版的图片
+                <p className="text-sm font-medium tracking-widest text-slate-500">
+                  点击图片选择要生成高清版的构图
                 </p>
               )}
             </div>
@@ -885,10 +942,10 @@ export default function ResultStep() {
                 setLocation("/create/payment");
               }}
               disabled={selectedCount === 0 || actionLocked}
-              className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200/50 transition active:scale-[0.98] disabled:from-slate-300 disabled:to-slate-400"
+              className="sci-fi-button flex items-center gap-2 rounded-2xl bg-cyan-600 px-8 py-3.5 text-base font-bold tracking-widest text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all active:scale-[0.98] disabled:bg-white/10 disabled:text-white/30 disabled:border-white/5 disabled:shadow-none"
             >
-              <Sparkles className="h-4 w-4" />
-              生成无水印高清图
+              <Sparkles className="h-5 w-5 fill-white/80" />
+              执行高清生成
             </button>
           </div>
         </div>

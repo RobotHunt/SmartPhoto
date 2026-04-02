@@ -79,23 +79,23 @@ export default function GenerationWaitingUI({
             : "已启动，请稍候";
 
   return (
-    <div className="flex flex-col items-center justify-center flex-1 px-4 py-8">
+    <div className="flex flex-col w-[calc(100%-2rem)] md:w-full mx-auto items-center justify-center flex-1 px-4 py-12 glass-panel rounded-[32px] my-8 md:my-16 max-w-md md:max-w-2xl text-slate-100 shadow-[0_0_40px_rgba(0,180,255,0.1)] border border-white/5 relative z-10">
       {/* Pulsing icon */}
       <div className="relative mb-5">
-        <div className="absolute inset-0 w-16 h-16 rounded-full bg-blue-400/20 animate-ping" />
-        <div className="relative w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-200">
-          <Sparkles className="w-8 h-8 text-white animate-pulse" />
+        <div className="absolute inset-0 w-16 h-16 rounded-full bg-cyan-400/20 animate-ping" />
+        <div className="relative w-16 h-16 bg-black/40 backdrop-blur-md rounded-full border-2 border-cyan-500/30 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+          <Sparkles className="w-8 h-8 text-cyan-400 animate-pulse" />
         </div>
       </div>
 
       {/* Title */}
-      <h2 className="text-lg font-bold text-slate-900 mb-1">{baseInfo.title}</h2>
+      <h2 className="text-lg font-bold text-white mb-1">{baseInfo.title}</h2>
 
       {/* Rotating tip (crossfade via key) */}
       <div className="h-10 flex items-center justify-center mb-5 overflow-hidden">
         <p
           key={tipIdx}
-          className="text-sm text-slate-500 text-center max-w-xs animate-in fade-in duration-500"
+          className="text-sm text-slate-400 text-center max-w-xs animate-in fade-in duration-500"
         >
           {currentTip}
         </p>
@@ -103,12 +103,14 @@ export default function GenerationWaitingUI({
 
       {/* Progress bar — always visible when showProgress */}
       {baseInfo.showProgress && (
-        <div className="w-full max-w-xs mb-2">
-          <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-blue-400 via-blue-500 to-emerald-500 h-full rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${dp}%` }}
-            />
+        <div className="w-full flex-col items-center flex" key="progress-sec">
+          <div className="w-full max-w-xs mb-2">
+            <div className="w-full bg-black/40 border border-white/10 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-600 via-cyan-400 to-teal-400 h-full rounded-full transition-all duration-700 ease-out shadow-[0_0_10px_rgba(34,211,238,0.5)]"
+                style={{ width: `${dp}%` }}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -121,14 +123,16 @@ export default function GenerationWaitingUI({
       {/* Emotional mode (≥ 10 s) */}
       {isEmotional && (
         <>
-          <div className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl max-w-xs">
-            <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-            <p className="text-xs text-blue-600 font-medium" key={`e-${tipIdx}`}>
+          <div className="mt-4 flex items-center gap-2 px-4 py-2 bg-black/30 backdrop-blur-sm border border-cyan-500/20 rounded-xl max-w-xs transition-opacity duration-500">
+            <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 opacity-80" />
+            <p className="text-xs text-cyan-100 font-medium tracking-wide" key={`e-${tipIdx}`}>
               {kind === "detail"
                 ? "AI 正在精心编排每一张详情图，确保版式与文案完美匹配"
                 : kind === "hd"
                   ? "AI 正在逐像素提升清晰度，为您呈现最真实的商品质感"
-                  : "AI 正在为您精心制作每一张主图，好作品值得等待"}
+                  : kind === "analysis"
+                    ? "AI 正在深度解析商品特征与数据，这需要一点时间"
+                    : "AI 正在为您精心制作每一张主图，好作品值得等待"}
             </p>
           </div>
 

@@ -177,3 +177,92 @@
 }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-[#0a0f1d]/60 backdrop-blur-3xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] transition-all duration-300;
+  }
+  .dark .glass-panel {
+    @apply bg-slate-900/70 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.2)] ring-1 ring-white/10;
+  }
+  
+  /* Gemini Voice Style Aurora Waves */
+  @keyframes aurora-bg {
+    0% { background-position: 50% 100%, 0% 100%; }
+    50% { background-position: 50% 100%, 100% 100%; }
+    100% { background-position: 50% 100%, 0% 100%; }
+  }
+  .aurora-bg {
+    @apply bg-[#050914] relative overflow-hidden text-slate-100 min-h-screen text-slate-200;
+  }
+  .aurora-bg::before {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: -20%;
+    right: -20%;
+    height: 60vh;
+    background: radial-gradient(ellipse at center, rgba(14, 165, 233, 0.25) 0%, rgba(59, 130, 246, 0.15) 30%, transparent 70%),
+                linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, rgba(139, 92, 246, 0.15) 50%, rgba(56, 189, 248, 0.1) 100%);
+    background-size: 100% 100%, 200% 100%;
+    filter: blur(80px);
+    animation: aurora-bg 15s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanner Animation */
+  @keyframes scanner-sweep {
+    0% { transform: translateY(0%); opacity: 0; }
+    5% { opacity: 1; }
+    45% { opacity: 1; transform: translateY(220px); }
+    50% { opacity: 0; transform: translateY(220px); }
+    55% { opacity: 0; transform: translateY(0%); }
+    60% { opacity: 1; transform: translateY(0%); }
+    95% { opacity: 1; transform: translateY(220px); }
+    100% { opacity: 0; transform: translateY(220px); }
+  }
+  .scanner-line {
+    @apply absolute left-0 right-0 h-1 z-20 pointer-events-none;
+    background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.8), rgba(255, 255, 255, 0.9), rgba(56, 189, 248, 0.8), transparent);
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.6), 0 0 30px rgba(56, 189, 248, 0.4);
+    animation: scanner-sweep 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  /* Gemini Blob Orchestration */
+  @keyframes blob-orbit {
+    0% { transform: scale(1) translate(0%, 0%) rotate(0deg); }
+    33% { transform: scale(1.1) translate(5%, -5%) rotate(120deg); }
+    66% { transform: scale(0.9) translate(-5%, 5%) rotate(240deg); }
+    100% { transform: scale(1) translate(0%, 0%) rotate(360deg); }
+  }
+  .gemini-blob {
+    @apply absolute rounded-full opacity-60 mix-blend-screen filter blur-2xl z-0 pointer-events-none;
+    animation: blob-orbit 8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .gemini-blob-1 {
+    @apply bg-cyan-500 w-[120%] h-[120%];
+    animation-duration: 6s;
+  }
+  .gemini-blob-2 {
+    @apply bg-blue-600 w-[110%] h-[110%];
+    animation-duration: 9s;
+    animation-delay: -2s;
+  }
+  .gemini-blob-3 {
+    @apply bg-indigo-500 w-[100%] h-[100%];
+    animation-duration: 7s;
+    animation-delay: -4s;
+  }
+
+  .sci-fi-button {
+    @apply relative overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-[0_0_15px_rgba(56,189,248,0.3)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(56,189,248,0.5)] hover:-translate-y-0.5 border border-white/10 active:translate-y-0 disabled:opacity-50 disabled:hover:shadow-none disabled:hover:translate-y-0 disabled:from-slate-700 disabled:to-slate-800 disabled:border-slate-600;
+  }
+  .sci-fi-button::after {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full transition-transform duration-1000 ease-in-out;
+  }
+  .sci-fi-button:not(:disabled):hover::after {
+    @apply translate-x-full;
+  }
+}

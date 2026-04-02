@@ -51,6 +51,9 @@ type PreviewImage = {
   isRegenerating: boolean;
   resolved_slot_id: string | null;
   copy_blocks: MainGalleryCopyBlocks;
+  carry_forward?: boolean;
+  source_version_no?: number | null;
+  fidelity_validation_status?: string | null;
 };
 
 type Phase = "loading" | "preview" | "hd-loading" | "hd-done";
@@ -75,6 +78,9 @@ function buildPreviewImages(
       isRegenerating: false,
       resolved_slot_id: resolved.slotId,
       copy_blocks: resolved.copyBlocks,
+      carry_forward: asset.carry_forward,
+      source_version_no: asset.source_version_no,
+      fidelity_validation_status: asset.fidelity_validation_status,
     };
   });
 }
@@ -297,53 +303,53 @@ export default function HDResultStep() {
   };
 
   const renderCopyEditor = (img: PreviewImage) => (
-    <div className="border-t border-slate-100 px-4 pb-4 pt-3 bg-slate-50">
-      <div className="space-y-2">
-        <div className="flex items-start gap-2">
-          <span className="text-xs text-slate-400 w-14 shrink-0 pt-2">主标题</span>
+    <div className="border-t border-white/5 p-5 bg-black/40">
+      <div className="space-y-3">
+        <div className="flex items-start gap-3">
+          <span className="text-xs font-bold tracking-widest text-slate-400 w-16 shrink-0 pt-2.5">主标题</span>
           <input
             value={img.copy_blocks.headline}
             onChange={(e) => updateText(img.id, "headline", e.target.value)}
-            className="flex-1 text-sm text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+            className="flex-1 text-sm text-slate-100 bg-[#050914] border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-medium placeholder-slate-600 shadow-inner"
             placeholder="输入主标题..."
           />
         </div>
-        <div className="flex items-start gap-2">
-          <span className="text-xs text-slate-400 w-14 shrink-0 pt-2">副标题</span>
+        <div className="flex items-start gap-3">
+          <span className="text-xs font-bold tracking-widest text-slate-400 w-16 shrink-0 pt-2.5">副标题</span>
           <input
             value={img.copy_blocks.supporting}
             onChange={(e) => updateText(img.id, "supporting", e.target.value)}
-            className="flex-1 text-sm text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+            className="flex-1 text-sm text-slate-100 bg-[#050914] border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-medium placeholder-slate-600 shadow-inner"
             placeholder="输入副标题..."
           />
         </div>
-        <div className="flex items-start gap-2">
-          <span className="text-xs text-slate-400 w-14 shrink-0 pt-2">佐证短句</span>
+        <div className="flex items-start gap-3">
+          <span className="text-xs font-bold tracking-widest text-slate-400 w-16 shrink-0 pt-2.5">佐证短句</span>
           <textarea
             rows={3}
             value={copyLinesToTextarea(img.copy_blocks.proof_lines)}
             onChange={(e) => updateLineText(img.id, "proof_lines", e.target.value)}
-            className="flex-1 text-sm text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+            className="flex-1 text-sm text-slate-100 bg-[#050914] border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-medium placeholder-slate-600 shadow-inner"
             placeholder={"每行一条，例如：\n通过质检认证\n核心参数可视化"}
           />
         </div>
-        <div className="flex items-start gap-2">
-          <span className="text-xs text-slate-400 w-14 shrink-0 pt-2">标签短句</span>
+        <div className="flex items-start gap-3">
+          <span className="text-xs font-bold tracking-widest text-slate-400 w-16 shrink-0 pt-2.5">标签短句</span>
           <textarea
             rows={3}
             value={copyLinesToTextarea(img.copy_blocks.matrix_lines)}
             onChange={(e) => updateLineText(img.id, "matrix_lines", e.target.value)}
-            className="flex-1 text-sm text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+            className="flex-1 text-sm text-slate-100 bg-[#050914] border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-medium placeholder-slate-600 shadow-inner"
             placeholder={"每行一条，例如：\n净化除湿二合一\n低噪运行"}
           />
         </div>
       </div>
       <button
         onClick={() => saveText(img.id)}
-        className="mt-3 w-full flex items-center justify-center gap-1.5 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-xl py-2 font-medium transition"
+        className="mt-5 w-full flex items-center justify-center gap-1.5 text-sm text-teal-300 font-bold tracking-widest bg-teal-900/30 border border-teal-500/30 hover:bg-teal-900/50 hover:text-teal-200 rounded-xl py-2.5 transition-all outline-none"
       >
         <Check className="w-4 h-4" />
-        保存文字
+        保存文字更改
       </button>
     </div>
   );
@@ -397,7 +403,7 @@ export default function HDResultStep() {
 
   if (phase === "loading") {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen aurora-bg z-0 relative flex flex-col">
         <StepIndicator currentStep={5} />
         <GenerationWaitingUI
           kind="main"
@@ -410,99 +416,126 @@ export default function HDResultStep() {
 
   if (phase === "preview") {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen aurora-bg flex flex-col pt-8">
         <StepIndicator currentStep={5} />
 
-        <div className="bg-white border-b px-4 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-blue-500" />
-            <span className="text-sm font-semibold text-slate-800">
-              已生成 {images.length} 张图片
-            </span>
-          </div>
-          <button
-            onClick={regenAll}
-            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded-full px-2.5 py-1 transition"
-          >
-            <RefreshCw className="w-3 h-3" />
-            重新生成
-          </button>
-        </div>
-        <p className="px-4 py-1.5 text-xs text-slate-400 bg-white border-b">
-          预览图含水印，付费后生成高清清图
-        </p>
-
-        <div className="flex-1 overflow-y-auto pb-28">
-          {images.map((img) => (
-            <div key={img.id} className="bg-white border-b">
-              <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
-                {img.isRegenerating && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                    <Loader2 className="w-8 h-8 text-white animate-spin" />
-                  </div>
-                )}
-                <img
-                  src={img.url}
-                  alt={img.type}
-                  className="w-full object-cover pointer-events-none"
-                  draggable={false}
-                  style={{ maxHeight: "400px" }}
-                />
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div
-                    className="text-white/25 font-bold text-xl select-none"
-                    style={{
-                      transform: "rotate(-30deg)",
-                      textShadow: "0 1px 4px rgba(0,0,0,0.4)",
-                      letterSpacing: "0.08em",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    AI电商做图 · 预览版
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between px-4 py-2">
-                <span className="text-sm text-slate-500">
-                  {img.product} · {img.type}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => toggleEdit(img.id)}
-                    className={`flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition ${
-                      img.editOpen
-                        ? "text-blue-700 border-blue-400 bg-blue-100"
-                        : "text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
-                    }`}
-                  >
-                    <Pencil className="w-3 h-3" />
-                    编辑文字
-                  </button>
-                  <button
-                    onClick={() => regenSingle(img.id)}
-                    className="flex items-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-full px-2.5 py-1 hover:bg-slate-50 transition"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    重新生成
-                  </button>
-                </div>
-              </div>
-
-              {img.editOpen && renderCopyEditor(img)}
+        <div className="w-full max-w-7xl mx-auto px-4 relative z-10 pb-36">
+          <div className="flex items-center justify-between gap-3 mb-6 bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold tracking-widest text-slate-100 mb-1">
+                已生成 <span className="text-cyan-400">{images.length}</span> 张图片
+              </span>
+              <span className="text-xs text-cyan-500/80 font-medium tracking-widest">
+                预览图含水印，付费后生成无水印高清原图
+              </span>
             </div>
-          ))}
-        </div>
+            <button
+              onClick={regenAll}
+              className="flex items-center gap-1 text-xs font-bold tracking-widest text-slate-300 hover:text-white bg-white/5 border border-white/10 rounded-full px-4 py-2 transition hover:bg-white/10"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              全部重新生成
+            </button>
+          </div>
 
-        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t shadow-lg px-4 py-3">
-          <button
-            onClick={goToPayment}
-            className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-base font-bold bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-200 transition"
-          >
-            <Sparkles className="w-5 h-5" />
-            生成无水印高清图
-          </button>
-          <p className="text-center text-xs text-slate-400 mt-1.5">共 {images.length} 张，确认后全部生成</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {images.map((img) => (
+              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.3)]">
+                <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
+                  {img.isRegenerating && (
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10">
+                      <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
+                    </div>
+                  )}
+                  <img
+                    src={img.url}
+                    alt={img.type}
+                    className="w-full aspect-square object-cover pointer-events-none"
+                    draggable={false}
+                  />
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div
+                      className="text-white/25 font-bold text-xl select-none"
+                      style={{
+                        transform: "rotate(-30deg)",
+                        textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+                        letterSpacing: "0.08em",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      AI电商做图 · 预览版
+                    </div>
+                  </div>
+
+                  {/* carry forward badge */}
+                  {img.carry_forward && img.source_version_no != null && (
+                    <div className="absolute top-3 left-3 z-20">
+                      <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
+                        沿用自 V{img.source_version_no}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* fidelity badge */}
+                  {img.fidelity_validation_status === 'passed' && (
+                    <div className="absolute bottom-3 left-3 z-20">
+                      <div className="rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-emerald-400 shadow-sm">
+                        保真通过
+                      </div>
+                    </div>
+                  )}
+                  {img.fidelity_validation_status === 'failed' && (
+                    <div className="absolute bottom-3 left-3 z-20">
+                      <div className="rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-red-400 shadow-sm">
+                        保真受限
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-black/30">
+                  <span className="text-sm font-bold tracking-widest text-slate-300">
+                    {img.product} · <span className="text-cyan-400">{img.type}</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleEdit(img.id)}
+                      className={`flex items-center gap-1.5 text-xs font-bold tracking-widest rounded-full px-3 py-1 transition shadow-sm ${
+                        img.editOpen
+                          ? "bg-cyan-900/60 text-cyan-300 border border-cyan-500/50"
+                          : "bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <Pencil className="w-3 h-3" />
+                      修改文案
+                    </button>
+                    <button
+                      onClick={() => regenSingle(img.id)}
+                      className="flex items-center gap-1 text-xs font-bold tracking-widest text-slate-300 border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white rounded-full px-3 py-1 transition shadow-sm"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      单独重绘
+                    </button>
+                  </div>
+                </div>
+
+                {img.editOpen && renderCopyEditor(img)}
+              </div>
+            ))}
+          </div>
+
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#050914]/80 backdrop-blur-xl border-t border-white/10 px-4 py-4 md:py-6 sm:px-12 flex justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+            <div className="w-full max-w-4xl flex flex-col items-center">
+              <button
+                onClick={goToPayment}
+                className="sci-fi-button w-full sm:w-[400px] h-14 rounded-[20px] flex items-center justify-center gap-2 text-base font-bold tracking-widest transition active:scale-95"
+              >
+                <Sparkles className="w-5 h-5" />
+                生成无水印高清图
+              </button>
+              <p className="text-center text-xs font-medium tracking-widest text-slate-400 mt-2">共 {images.length} 张，确认后全部生成</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -510,7 +543,7 @@ export default function HDResultStep() {
 
   if (phase === "hd-loading") {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen aurora-bg flex flex-col">
         <StepIndicator currentStep={5} />
         <GenerationWaitingUI
           kind="hd"
@@ -522,134 +555,173 @@ export default function HDResultStep() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen aurora-bg flex flex-col pt-8">
       <StepIndicator currentStep={5} />
 
-      <div className="bg-amber-50 border-b border-amber-100 px-4 py-2.5 flex items-center gap-2.5">
-        <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shrink-0">
-          <Crown className="w-3.5 h-3.5 text-white" />
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-bold text-amber-900">高清图生成成功！</p>
-          <p className="text-xs text-amber-600">无水印 · 可直接用于电商上架</p>
-        </div>
-      </div>
-
-      <div className="px-4 py-2 flex items-center gap-1.5 bg-white border-b">
-        <span className="text-sm font-semibold text-slate-700">高清图</span>
-        <span className="text-xs text-slate-400">共 {images.length} 张</span>
-      </div>
-
-      <div className="flex-1 overflow-y-auto pb-36">
-        {images.map((img) => (
-          <div key={img.id} className="bg-white border-b">
-            <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
-              {img.isRegenerating && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
-                </div>
-              )}
-              <img
-                src={img.url}
-                alt={img.type}
-                className="w-full object-cover pointer-events-none"
-                draggable={false}
-                style={{ maxHeight: "400px" }}
-              />
+      <div className="w-full max-w-7xl mx-auto px-4 relative z-10 pb-44">
+        {/* State Banner */}
+        <div className="glass-panel border-cyan-500/30 bg-cyan-950/20 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/20">
+              <Crown className="w-5 h-5 text-white" />
             </div>
-            <div className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-sm text-slate-500">
-                {img.product} · {img.type}
-              </span>
-              <button
-                onClick={() => toggleEdit(img.id)}
-                className={`flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition ${
-                  img.editOpen
-                    ? "text-blue-700 border-blue-400 bg-blue-100"
-                    : "text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
-                }`}
+            <div className="flex-1">
+              <p className="text-base font-bold tracking-widest text-cyan-50">高清图生成成功！</p>
+              <p className="text-xs font-medium tracking-widest text-cyan-300/80 mt-0.5">无水印真高清 · 可直接用于电商上架</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold tracking-widest text-slate-100">高清成片</span>
+            <span className="text-xs font-bold tracking-widest bg-white/10 px-2 py-0.5 rounded-md text-slate-300 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+              {images.length} 张
+            </span>
+          </div>
+        </div>
+
+        {/* --- Image grids --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {images.map((img) => (
+            <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.5)] transition hover:border-cyan-500/30">
+              <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
+                {img.isRegenerating && (
+                  <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10">
+                    <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                  </div>
+                )}
+                <img
+                  src={img.url}
+                  alt={img.type}
+                  className="w-full aspect-square object-cover pointer-events-none"
+                  draggable={false}
+                />
+
+                {/* carry forward badge */}
+                {img.carry_forward && img.source_version_no != null && (
+                  <div className="absolute top-3 left-3 z-20">
+                    <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
+                      沿用自 V{img.source_version_no}
+                    </div>
+                  </div>
+                )}
+
+                {/* fidelity badge */}
+                {img.fidelity_validation_status === 'passed' && (
+                  <div className="absolute bottom-3 left-3 z-20">
+                    <div className="rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-emerald-400 shadow-sm">
+                      保真通过
+                    </div>
+                  </div>
+                )}
+                {img.fidelity_validation_status === 'failed' && (
+                  <div className="absolute bottom-3 left-3 z-20">
+                    <div className="rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-red-400 shadow-sm">
+                      保真受限
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center justify-between p-4 bg-black/30">
+                <span className="text-sm font-bold tracking-widest text-slate-300">
+                  {img.product} · <span className="text-cyan-400">{img.type}</span>
+                </span>
+                <button
+                  onClick={() => toggleEdit(img.id)}
+                  className={`flex items-center gap-1.5 text-xs font-bold tracking-widest rounded-full px-3 py-1 transition shadow-sm ${
+                    img.editOpen
+                      ? "bg-cyan-900/60 text-cyan-300 border border-cyan-500/50"
+                      : "bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Pencil className="w-3 h-3" />
+                  修改文案
+                </button>
+              </div>
+              {img.editOpen && renderCopyEditor(img)}
+            </div>
+          ))}
+        </div>
+
+        {/* --- Bottom Actions Bar --- */}
+        <div className="fixed bottom-0 left-0 right-0 z-30 flex flex-col">
+          {!isAuthenticated && (
+            <div className="bg-[#050914]/90 backdrop-blur-xl border-t border-white/10 px-6 py-3 flex flex-wrap items-center justify-center gap-4 relative z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-cyan-900/30 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                  <CloudUpload className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold tracking-widest text-slate-200">登录账号，自动保存全部设计资产</p>
+                  <p className="text-[10px] font-medium tracking-widest text-slate-400 mt-0.5 text-cyan-500/80">避免高清原图丢失 终生可用</p>
+                </div>
+              </div>
+              <a
+                href={getLoginUrl()}
+                className="shrink-0 bg-transparent hover:bg-white/5 border border-cyan-500/30 text-cyan-400 text-xs font-bold tracking-widest px-4 py-2 rounded-xl transition"
               >
-                <Pencil className="w-3 h-3" />
-                编辑文字
+                立即登录注册
+              </a>
+            </div>
+          )}
+          
+          <div className="bg-[#050914]/90 backdrop-blur-xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] px-4 py-4 md:py-6 flex justify-center w-full z-10">
+            <div className="w-full max-w-4xl flex items-center gap-3 md:gap-4">
+              <button
+                className="flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold tracking-widest bg-white/5 border border-white/10 text-slate-200 hover:bg-white/10 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleDownload}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
+                ) : (
+                  <Download className="w-5 h-5" />
+                )}
+                一键下载高清图包
+              </button>
+              <button 
+                className="w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition"
+                onClick={() => setShowShareModal(true)}
+              >
+                <Share2 className="w-5 h-5" />
+              </button>
+              <button
+                className="flex-[1.5] h-14 rounded-2xl flex items-center justify-center gap-2 text-base font-bold tracking-widest sci-fi-button text-white shadow-md shadow-blue-500/20 transition active:scale-95"
+                onClick={goToDetailCopywriting}
+              >
+                <FileText className="w-5 h-5" />
+                继续生成详情图
               </button>
             </div>
-            {img.editOpen && renderCopyEditor(img)}
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30">
-        {!isAuthenticated && (
-          <div className="bg-white border-t border-slate-100 px-4 py-2 flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-              <CloudUpload className="w-4 h-4 text-blue-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-slate-800">登录账号，自动保存你的设计资产</p>
-              <p className="text-xs text-slate-400">避免图片丢失</p>
-            </div>
-            <a
-              href={getLoginUrl()}
-              className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+        {/* --- Share Modal --- */}
+        {showShareModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" onClick={() => setShowShareModal(false)}>
+            <div className="absolute inset-0 bg-[#050914]/80 backdrop-blur-md" />
+            <div
+              className="relative glass-panel rounded-3xl w-[90%] max-w-sm pb-8 pt-6 px-6 shadow-[0_0_50px_rgba(34,211,238,0.15)] border border-white/10"
+              onClick={(e) => e.stopPropagation()}
             >
-              登录 / 注册
-            </a>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-base font-bold tracking-widest text-slate-100 flex items-center gap-2"><Share2 className="w-4 h-4 text-cyan-400" />分享你的作品</h3>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-black/40 border border-white/10 hover:bg-white/10 text-slate-400 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <button
+                className="w-full h-12 rounded-xl bg-cyan-600/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 font-bold tracking-widest text-sm transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                onClick={copyShareLink}
+              >
+                一键复制专属链接
+              </button>
+            </div>
           </div>
         )}
-        <div className="bg-white border-t border-slate-100 shadow-lg px-4 py-2.5 flex gap-2">
-          <Button
-            size="lg"
-            variant="outline"
-            className="flex-1 text-slate-600 gap-1.5 border-slate-200"
-            onClick={handleDownload}
-            disabled={downloading}
-          >
-            {downloading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            一键下载
-          </Button>
-          <Button size="lg" variant="ghost" className="px-3 text-slate-500" onClick={() => setShowShareModal(true)}>
-            <Share2 className="w-4 h-4" />
-          </Button>
-          <Button
-            size="lg"
-            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white gap-1.5"
-            onClick={goToDetailCopywriting}
-          >
-            <FileText className="w-4 h-4" />
-            生成详情图
-          </Button>
-        </div>
       </div>
-
-      {showShareModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowShareModal(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="relative bg-white rounded-t-2xl w-full max-w-sm pb-8 pt-5 px-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-slate-900">选择分享方式</h3>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <button
-              className="w-full h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm transition-colors"
-              onClick={copyShareLink}
-            >
-              复制链接
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

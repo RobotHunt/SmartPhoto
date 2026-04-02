@@ -31,6 +31,9 @@ export interface AnalysisResult {
   scene_tags: string[];
   category_candidates: CandidateItem[];
   supplement_image_recommendations: SupplementRecommendation[];
+  risk_flags?: string[];
+  selling_point_entities?: Record<string, any>;
+  evidence_scores?: Record<string, any>;
 }
 
 function parseStringList(value: any): string[] {
@@ -94,6 +97,9 @@ export function parseAnalysisSnapshot(snapshot: any): AnalysisResult {
     scene_tags: parseStringList(snapshot?.scene_tags),
     category_candidates: categoryCandidates,
     supplement_image_recommendations: supplementRecommendations,
+    risk_flags: parseStringList(snapshot?.risk_flags),
+    selling_point_entities: typeof snapshot?.selling_point_entities === 'object' ? snapshot.selling_point_entities : undefined,
+    evidence_scores: typeof snapshot?.evidence_scores === 'object' ? snapshot.evidence_scores : undefined,
   };
 }
 

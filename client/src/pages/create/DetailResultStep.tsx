@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 import { useToast } from "@/hooks/use-toast";
 import { getLoginUrl } from "@/const";
-import { jobAPI, sessionAPI } from "@/lib/api";
+import { jobAPI, sessionAPI, type VersionSummary } from "@/lib/api";
 import { resolveGenerationStageText } from "@/lib/generationStatus";
 import { updateSessionRecord } from "@/lib/localUser";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +45,9 @@ type DetailPanel = {
   thumbnail_url?: string | null;
   display_order: number;
   version_no?: number;
+  carry_forward?: boolean;
+  source_version_no?: number | null;
+  fidelity_validation_status?: string | null;
   display_module_title?: string | null;
   display_module_kind?: string | null;
   display_module_intent?: string | null;
@@ -58,10 +61,14 @@ type DetailResultsPayload = {
   detail_latest_result_version: number;
   requested_version: number;
   available_versions: number[];
+  version_summaries: VersionSummary[];
+  expected_panel_ids?: string[];
+  missing_panel_ids?: string[];
   summary: {
     total_count: number;
     ready_count: number;
     panel_count: number;
+    expected_panel_count?: number;
   };
   panels: DetailPanel[];
 };
@@ -73,6 +80,9 @@ interface DetailImage {
   editOpen: boolean;
   isRegenerating: boolean;
   text: string;
+  carry_forward?: boolean;
+  source_version_no?: number | null;
+  fidelity_validation_status?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -112,6 +122,9 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
       thumbnail_url: panel?.thumbnail_url ?? null,
       display_order: Number(panel?.display_order ?? index),
       version_no: typeof panel?.version_no === "number" ? panel.version_no : undefined,
+      carry_forward: Boolean(panel?.carry_forward),
+      source_version_no: typeof panel?.source_version_no === "number" ? panel.source_version_no : null,
+      fidelity_validation_status: panel?.fidelity_validation_status ?? null,
     }))
     .sort((a: DetailPanel, b: DetailPanel) => a.display_order - b.display_order);
 
@@ -126,10 +139,14 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
     available_versions: Array.isArray(data?.available_versions)
       ? data.available_versions.map((item: any) => Number(item || 0)).filter(Boolean)
       : [],
+    version_summaries: Array.isArray(data?.version_summaries) ? data.version_summaries : [],
+    expected_panel_ids: Array.isArray(data?.expected_panel_ids) ? data.expected_panel_ids : [],
+    missing_panel_ids: Array.isArray(data?.missing_panel_ids) ? data.missing_panel_ids : [],
     summary: {
       total_count: Number(data?.summary?.total_count || sortedPanels.length),
       ready_count: Number(data?.summary?.ready_count || sortedPanels.length),
       panel_count: Number(data?.summary?.panel_count || sortedPanels.length),
+      expected_panel_count: Number(data?.summary?.expected_panel_count || sortedPanels.length),
     },
     panels: sortedPanels,
   };
@@ -241,6 +258,9 @@ export default function DetailResultStep() {
         editOpen: false,
         isRegenerating: false,
         text: panel.display_module_title || panel.panel_label || `详情图 ${index + 1}`,
+        carry_forward: panel.carry_forward,
+        source_version_no: panel.source_version_no,
+        fidelity_validation_status: panel.fidelity_validation_status,
       }))
     );
 
@@ -454,7 +474,7 @@ export default function DetailResultStep() {
   /* ================================================================ */
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen aurora-bg flex flex-col">
       <DetailStepIndicator currentStep={4} />
 
       {/* Loading phase */}
@@ -468,24 +488,24 @@ export default function DetailResultStep() {
 
       {/* Error phase */}
       {phase === "error" && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
-            <AlertCircle className="h-8 w-8 text-red-500" />
+        <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 relative z-10 text-center">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-950/40 border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+            <AlertCircle className="h-10 w-10 text-red-400" />
           </div>
           <div>
-            <p className="text-lg font-semibold text-slate-900">详情图生成失败</p>
-            <p className="mt-1 break-words text-sm text-slate-500">{error}</p>
+            <p className="mb-2 text-xl font-bold tracking-widest text-slate-100">详情图生成失败</p>
+            <p className="mb-8 max-w-sm text-center text-sm font-medium tracking-wide text-slate-400">{error}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => setLocation("/create/detail-confirm")}
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-6 py-3 text-sm font-bold tracking-widest text-slate-300 transition hover:bg-white/10 hover:text-white"
             >
               返回上一步
             </button>
             <button
               onClick={handleRetry}
-              className="rounded-full bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+              className="rounded-xl border border-cyan-500/30 bg-cyan-600/20 px-6 py-3 text-sm font-bold tracking-widest text-cyan-400 transition hover:bg-cyan-500/30 hover:text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
             >
               重试
             </button>
@@ -495,81 +515,154 @@ export default function DetailResultStep() {
 
       {/* Done phase */}
       {phase === "done" && (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col w-full max-w-7xl mx-auto px-4 md:px-8 mt-4">
           {/* success banner */}
-          <div className="bg-amber-50 border-b border-amber-100 px-4 py-2.5 flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shrink-0">
-              <Crown className="w-3.5 h-3.5 text-white" />
+          <div className="glass-panel border-cyan-500/30 bg-cyan-900/20 px-4 py-4 flex items-center gap-4 rounded-2xl mb-6 shadow-[0_0_15px_rgba(6,182,212,0.1)] relative z-10">
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(34,211,238,0.5)]">
+              <Crown className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-amber-900">详情图生成成功！</p>
-              <p className="text-xs text-amber-600">无水印 · 可直接用于电商上架</p>
+              <p className="text-base font-bold tracking-widest text-slate-100">详情图生成成功！</p>
+              <p className="text-sm font-medium text-cyan-400/80 tracking-wide mt-0.5">无水印 · 可直接用于电商上架</p>
             </div>
           </div>
 
-          {/* image count */}
-          <div className="px-4 py-2 flex items-center gap-1.5 bg-white border-b">
-            <span className="text-sm font-semibold text-slate-700">详情图</span>
-            <span className="text-xs text-slate-400">共 {images.length} 张</span>
+          {/* partial warning banner */}
+          {results?.missing_panel_ids && results.missing_panel_ids.length > 0 && (
+            <div className="glass-panel border-orange-500/30 bg-orange-900/20 px-4 py-3 flex items-center gap-3 rounded-2xl mb-6 shadow-[0_0_15px_rgba(249,115,22,0.1)] relative z-10">
+              <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-4 h-4 text-orange-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold tracking-widest text-orange-200">本版缺少 {results.missing_panel_ids.length} 个模块</p>
+                <p className="text-xs font-medium text-orange-400/80 tracking-wide mt-0.5">如果影响使用，可尝试重新生成以补全缺失的内容</p>
+              </div>
+            </div>
+          )}
+
+          {/* version select & image count */}
+          <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div className="flex items-center gap-3 pl-2">
+              <div className="w-1.5 h-5 bg-cyan-500 rounded-full shadow-[0_0_8px_#06b6d4]"></div>
+              <span className="text-base font-bold tracking-widest text-slate-100">长图分解列表</span>
+              <span className="text-xs font-medium bg-white/10 px-2 py-0.5 rounded text-cyan-300">{images.length} 块</span>
+            </div>
+            {results && results.available_versions.length > 1 && (
+            <div className="flex items-center gap-2">
+                <span className="text-sm font-bold tracking-wide text-slate-400">生成版本历史:</span>
+                <select
+                  value={currentVersion || results.detail_latest_result_version || ""}
+                  onChange={(e) => {
+                    setPhase("loading");
+                    setLoadingText(`正在加载 V${e.target.value}...`);
+                    setProgress(20);
+                    fetchDetailResults(Number(e.target.value)).then(() => {
+                      setPhase("done");
+                      setProgress(100);
+                    }).catch((err) => {
+                      setPhase("error");
+                      setError(err.message);
+                    });
+                  }}
+                  className="rounded-lg border border-white/20 bg-black/40 backdrop-blur-md px-3 py-1.5 text-sm font-bold tracking-wide text-slate-200 shadow-sm outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-500/50"
+                >
+                  {results.available_versions.map((v) => {
+                    const tag = v === results.detail_latest_result_version ? " (最新)" : "";
+                    const vSum = results.version_summaries?.find((vs) => vs.version_no === v);
+                    const counts = vSum ? ` [${vSum.ready_count}/${vSum.asset_count}图]` : "";
+                    return (
+                      <option key={v} value={v}>
+                        Version {v}{tag}{counts}
+                      </option>
+                    );
+                  })}
+                </select>
+            </div>
+            )}
           </div>
 
           {/* image list */}
-          <div className="flex-1 overflow-y-auto pb-36">
+          <div className="flex-1 pb-36 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 relative z-10">
             {images.map((img) => (
-              <div key={img.id} className="bg-white border-b">
+              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] shadow-md shadow-black/40 border border-white/5 hover:border-cyan-500/30 transition-all flex flex-col">
                 {/* image */}
                 <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
                   {img.isRegenerating ? (
-                    <div className="w-full flex items-center justify-center bg-slate-100" style={{ minHeight: "200px" }}>
-                      <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                    <div className="w-full flex items-center justify-center bg-black/30" style={{ minHeight: "200px" }}>
+                      <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
                     </div>
                   ) : (
                     <img
                       src={img.url}
                       alt={img.label}
-                      className="w-full object-cover pointer-events-none"
+                      className="w-full object-cover pointer-events-none rounded-t-[24px]"
                       draggable={false}
                       style={{ maxHeight: "400px" }}
                     />
                   )}
+
+                  {/* carry forward badge */}
+                  {img.carry_forward && img.source_version_no != null && (
+                    <div className="absolute top-3 left-3 z-20">
+                      <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
+                        沿用自 V{img.source_version_no}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* fidelity badge */}
+                  {img.fidelity_validation_status === 'passed' && (
+                    <div className="absolute bottom-3 left-3 z-20">
+                      <div className="rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-emerald-400 shadow-sm">
+                        保真通过
+                      </div>
+                    </div>
+                  )}
+                  {img.fidelity_validation_status === 'failed' && (
+                    <div className="absolute bottom-3 left-3 z-20">
+                      <div className="rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-red-400 shadow-sm">
+                        保真受限
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* bottom action row */}
-                <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-sm text-slate-500">{productType} · {img.label}</span>
+                <div className="flex items-center justify-between px-4 py-3 bg-black/20 backdrop-blur-md">
+                  <span className="text-sm font-bold tracking-wide text-slate-300">{productType} · {img.label}</span>
                   <button
                     onClick={() => toggleEdit(img.id)}
-                    className={`flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition
+                    className={`flex items-center gap-1.5 text-xs font-bold tracking-wide shadow-sm rounded-full px-3 py-1 border transition
                       ${img.editOpen
-                        ? "text-blue-700 border-blue-400 bg-blue-100"
-                        : "text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                        ? "text-cyan-400 border-cyan-500/50 bg-cyan-900/60"
+                        : "text-cyan-400 border-cyan-500/30 bg-cyan-950/40 hover:bg-cyan-900/60"
                       }`}
                   >
                     <Pencil className="w-3 h-3" />
-                    编辑文字
+                    修改
                   </button>
                 </div>
 
                 {/* edit panel */}
                 {img.editOpen && (
-                  <div className="border-t border-slate-100 px-4 pb-4 pt-3 bg-slate-50">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400 w-14 shrink-0">标注文字</span>
+                  <div className="border-t border-white/10 px-4 pb-4 pt-3 bg-black/40 backdrop-blur-md">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold tracking-widest text-slate-400 w-14 shrink-0">标注文字</span>
                         <input
                           value={img.text}
                           onChange={(e) => updateText(img.id, e.target.value)}
-                          className="flex-1 text-sm text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                          className="flex-1 text-sm bg-black/30 border border-white/10 text-slate-200 rounded-xl px-3 py-2 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
                           placeholder="输入标注文字"
                         />
                       </div>
                     </div>
                     <button
                       onClick={() => saveText(img.id)}
-                      className="mt-3 w-full flex items-center justify-center gap-1.5 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-xl py-2 font-medium transition"
+                      className="mt-4 w-full flex items-center justify-center gap-1.5 text-sm font-bold tracking-widest text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl py-2.5 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)]"
                     >
                       <Check className="w-4 h-4" />
-                      保存文字
+                      保存修改
                     </button>
                   </div>
                 )}
@@ -581,34 +674,39 @@ export default function DetailResultStep() {
           <div className="fixed bottom-0 left-0 right-0 z-30">
             {/* login prompt (hidden when logged in) */}
             {!isAuthenticated && (
-              <div className="bg-white border-t border-slate-100 px-4 py-2 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                  <CloudUpload className="w-4 h-4 text-blue-500" />
+              <div className="bg-[#050914] border-t border-white/5 px-4 py-2 flex items-center justify-center">
+                <div className="max-w-5xl w-full flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                    <CloudUpload className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold tracking-widest text-slate-200">登录后可云端保存资料与历史</p>
+                    <p className="text-xs font-medium tracking-wide text-slate-500">当前数据仅保存在浏览器内</p>
+                  </div>
+                  <a
+                    href={getLoginUrl()}
+                    className="shrink-0 bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 text-xs font-bold tracking-widest px-4 py-2 rounded-xl transition-all"
+                  >
+                    前往登录
+                  </a>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-800">登录后可保存本地资料与历史记录</p>
-                  <p className="text-xs text-slate-400">数据保存在当前浏览器</p>
-                </div>
-                <a
-                  href={getLoginUrl()}
-                  className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
-                >
-                  登录 / 注册
-                </a>
               </div>
             )}
             {/* action buttons */}
-            <div className="bg-white border-t border-slate-100 shadow-lg px-4 py-2.5 flex gap-2">
-              <Button size="lg" variant="outline" className="flex-1 text-slate-600 gap-1.5 border-slate-200" onClick={handleDownloadAll} disabled={downloading}>
-                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                一键下载
-              </Button>
-              <Button size="lg" variant="ghost" className="px-3 text-slate-500" onClick={() => setShareOpen(true)}>
-                <Share2 className="w-4 h-4" />
-              </Button>
-              <Button size="lg" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white gap-1.5" onClick={() => setBrandOpen(true)}>
-                记住品牌风格
-              </Button>
+            <div className="border-t border-white/10 bg-[#050914]/80 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+              <div className="max-w-5xl w-full mx-auto flex gap-3">
+                <Button size="lg" className="flex-1 text-slate-300 font-bold tracking-widest bg-white/5 border border-white/10 hover:bg-white/10 rounded-2xl h-14" onClick={handleDownloadAll} disabled={downloading}>
+                  {downloading ? <Loader2 className="w-5 h-5 animate-spin mr-1" /> : <Download className="w-5 h-5 mr-1" />}
+                  一键打包下载
+                </Button>
+                <Button size="icon" variant="outline" className="h-14 w-14 border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-cyan-400 rounded-2xl shrink-0 transition-colors shadow-lg" onClick={() => setShareOpen(true)}>
+                  <Share2 className="w-5 h-5" />
+                </Button>
+                <Button size="lg" className="sci-fi-button flex-[1.5] bg-cyan-600 font-bold tracking-widest text-base shadow-[0_0_20px_rgba(6,182,212,0.4)] rounded-2xl h-14 gap-2 text-white" onClick={() => setBrandOpen(true)}>
+                  <Crown className="w-5 h-5 fill-white/50" />
+                  保存品牌风格
+                </Button>
+              </div>
             </div>
           </div>
         </div>
