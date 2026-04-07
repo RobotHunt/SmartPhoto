@@ -444,6 +444,38 @@ export default function AnalyzeStep() {
             AI 建议：{result.category || "其他"}，您可以确认或修改
           </p>
 
+          {(result.expected_components?.length || result.confusion_pairs?.length) ? (
+            <div className="mb-4 bg-orange-900/20 border border-orange-500/30 rounded-xl p-3">
+              <p className="text-xs font-bold text-orange-400 mb-2 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" /> 类目物理规律强化校验
+              </p>
+              {result.expected_components && result.expected_components.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-[10px] text-slate-400 mb-1">预期识别件：</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.expected_components.map((comp, idx) => (
+                      <span key={idx} className="bg-orange-500/10 border border-orange-500/20 text-orange-300 text-[10px] px-2 py-0.5 rounded-full font-medium">
+                        {comp}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {result.confusion_pairs && result.confusion_pairs.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-slate-400 mb-1">易混淆组件特征：</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.confusion_pairs.map((pair, idx) => (
+                      <span key={idx} className="bg-red-500/10 border border-red-500/20 text-red-300 text-[10px] px-2 py-0.5 rounded-full font-medium">
+                        {pair[0]} <span className="text-slate-500 mx-0.5">vs</span> {pair[1]}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {result.supplement_image_recommendations.length > 0 && (
             <div className="mb-4">
               <p className="mb-2 text-xs font-medium text-slate-400">建议补传以下图片：</p>

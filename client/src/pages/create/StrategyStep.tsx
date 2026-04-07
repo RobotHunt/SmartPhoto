@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { AlertCircle, Check, Loader2, Pause, Play, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { jobAPI, sessionAPI } from "@/lib/api";
+import { jobAPI, sessionAPI, platformAPI } from "@/lib/api";
 import { resolveAssetLabel } from "@/lib/assetLabels";
 import { useToast } from "@/hooks/use-toast";
 import GenerationWaitingUI from "@/components/GenerationWaitingUI";
@@ -48,6 +48,7 @@ export default function StrategyStep() {
   const [countdown, setCountdown] = useState(5);
   const [isAutoStart, setIsAutoStart] = useState(true);
   const [strategyPreview, setStrategyPreview] = useState<Record<string, any> | null>(null);
+  const [expressionModes, setExpressionModes] = useState<any[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +134,23 @@ export default function StrategyStep() {
       setLocation("/create/result");
     }
   }, [countdown, error, isAutoStart, loading, setLocation]);
+
+  useEffect(() => {
+    if (!strategyPreview) return;
+    const platform = String(strategyPreview?.platform_strategy || "").replace(/\s*主图标准\s*$/, "").trim() || sessionStorage.getItem("selectedPlatform") || "全部";
+    
+    let cancelled = false;
+    platformAPI.getExpressionModes(platform).then((data: any) => {
+      if (cancelled) return;
+      let parsed: any[] = [];
+      if (Array.isArray(data)) parsed = data;
+      else if (data?.modes && Array.isArray(data.modes)) parsed = data.modes;
+      else if (data?.data && Array.isArray(data.data)) parsed = data.data;
+      setExpressionModes(parsed);
+    }).catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [strategyPreview]);
 
   const assetPlan = useMemo(
     () => (Array.isArray(strategyPreview?.asset_plan) ? strategyPreview?.asset_plan : []),
@@ -300,6 +318,27 @@ export default function StrategyStep() {
                 <div className="text-sm leading-relaxed text-orange-200/80">{strategyData.platformTips}</div>
               </div>
             </div>
+
+            {expressionModes.length > 0 && (
+              <div className="flex items-start gap-4 rounded-2xl bg-black/40 border border-indigo-500/30 p-4 sm:col-span-2 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-900/30 border border-indigo-500/20">
+                  <Check className="h-3 w-3 text-indigo-500" />
+                </div>
+                <div>
+                  <div className="mb-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">可选表达形态</div>
+                  <div className="flex flex-wrap gap-2">
+                    {expressionModes.map((mode, i) => {
+                      const txt = typeof mode === "string" ? mode : mode?.mode_name || mode?.label || mode?.mode || mode?.id || JSON.stringify(mode);
+                      return (
+                        <span key={i} className="px-2 py-1 rounded-md text-[10px] font-bold tracking-widest bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
+                          {txt}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 border-t border-white/10 pt-4">

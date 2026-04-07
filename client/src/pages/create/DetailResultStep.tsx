@@ -13,6 +13,8 @@ import {
   Share2,
   Sparkles,
   X,
+  History,
+  MessageSquare,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,11 @@ import { jobAPI, sessionAPI, type VersionSummary } from "@/lib/api";
 import { resolveGenerationStageText } from "@/lib/generationStatus";
 import { updateSessionRecord } from "@/lib/localUser";
 import { useAuth } from "@/contexts/AuthContext";
+import { QualityBadge } from "@/components/QualityBadge";
+import { FailedAssetCard } from "@/components/FailedAssetCard";
+import { AssetHistoryDrawer } from "@/components/AssetHistoryDrawer";
+import { AssetFeedbackModal } from "@/components/AssetFeedbackModal";
+import { useQualityPolling } from "@/hooks/useQualityPolling";
 
 import { DetailStepIndicator } from "./DetailStepIndicator";
 
@@ -48,10 +55,12 @@ type DetailPanel = {
   carry_forward?: boolean;
   source_version_no?: number | null;
   fidelity_validation_status?: string | null;
-  display_module_title?: string | null;
-  display_module_kind?: string | null;
   display_module_intent?: string | null;
   display_tags?: string[] | null;
+  status?: string;
+  quality_status?: string;
+  quality_scores?: Record<string, any> | null;
+  failure_reason?: string | null;
 };
 
 type DetailResultsPayload = {
@@ -79,10 +88,13 @@ interface DetailImage {
   url: string;
   editOpen: boolean;
   isRegenerating: boolean;
-  text: string;
   carry_forward?: boolean;
   source_version_no?: number | null;
   fidelity_validation_status?: string | null;
+  status?: string;
+  quality_status?: string;
+  quality_scores?: Record<string, any> | null;
+  failure_reason?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -121,10 +133,13 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
       image_url: String(panel?.image_url || panel?.thumbnail_url || ""),
       thumbnail_url: panel?.thumbnail_url ?? null,
       display_order: Number(panel?.display_order ?? index),
-      version_no: typeof panel?.version_no === "number" ? panel.version_no : undefined,
       carry_forward: Boolean(panel?.carry_forward),
       source_version_no: typeof panel?.source_version_no === "number" ? panel.source_version_no : null,
       fidelity_validation_status: panel?.fidelity_validation_status ?? null,
+      status: panel?.status ?? null,
+      quality_status: panel?.quality_status ?? "unchecked",
+      quality_scores: panel?.quality_scores ?? null,
+      failure_reason: panel?.failure_reason ?? null,
     }))
     .sort((a: DetailPanel, b: DetailPanel) => a.display_order - b.display_order);
 
@@ -219,6 +234,9 @@ export default function DetailResultStep() {
   const [loadingText, setLoadingText] = useState("正在生成详情图...");
   const [error, setError] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
+  const [historyAssetId, setHistoryAssetId] = useState<string | null>(null);
+  const [feedbackAssetId, setFeedbackAssetId] = useState<string | null>(null);
+
   const generateStartRef = useRef(Date.now());
   const [downloading, setDownloading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -231,6 +249,7 @@ export default function DetailResultStep() {
 
   // UI state for image editing
   const [images, setImages] = useState<DetailImage[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   /* ---------------------------------------------------------------- */
   /*  API helpers                                                      */
@@ -261,6 +280,10 @@ export default function DetailResultStep() {
         carry_forward: panel.carry_forward,
         source_version_no: panel.source_version_no,
         fidelity_validation_status: panel.fidelity_validation_status,
+        status: panel.status,
+        quality_status: panel.quality_status,
+        quality_scores: panel.quality_scores,
+        failure_reason: panel.failure_reason,
       }))
     );
 
@@ -384,6 +407,11 @@ export default function DetailResultStep() {
     };
   }, [sessionId, setLocation, toast]);
 
+  const needsQualityPolling = images.some(img => img.quality_status === "pending_async_review");
+  useQualityPolling(needsQualityPolling, async () => {
+    await fetchDetailResults(currentVersion || undefined);
+  });
+
   /* ---------------------------------------------------------------- */
   /*  UI Handlers                                                      */
   /* ---------------------------------------------------------------- */
@@ -433,6 +461,23 @@ export default function DetailResultStep() {
   const saveText = (id: string) => {
     setImages((prev) => prev.map((img) => (img.id === id ? { ...img, editOpen: false } : img)));
     toast({ title: "文字已保存" });
+  };
+
+  const handleAssetRegenerate = async (id: string) => {
+    if (!sessionId || regenerating) return;
+    try {
+      setImages((prev) => prev.map((img) => (img.id === id ? { ...img, isRegenerating: true } : img)));
+      const response = await assetAPI.regenerate(id, "重新生成");
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id);
+      }
+      await fetchDetailResults(currentVersion);
+      toast({ title: "重新生成完成" });
+    } catch (err: any) {
+      toast({ title: "重新生成失败", description: err?.message || "请稍后重试。", variant: "destructive" });
+    } finally {
+      setImages((prev) => prev.map((img) => (img.id === id ? { ...img, isRegenerating: false } : img)));
+    }
   };
 
   const handleSaveBrand = () => {
@@ -548,15 +593,17 @@ export default function DetailResultStep() {
               <span className="text-xs font-medium bg-white/10 px-2 py-0.5 rounded text-cyan-300">{images.length} 块</span>
             </div>
             {results && results.available_versions.length > 1 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative z-50">
                 <span className="text-sm font-bold tracking-wide text-slate-400">生成版本历史:</span>
-                <select
-                  value={currentVersion || results.detail_latest_result_version || ""}
-                  onChange={(e) => {
+                <VersionSelector
+                  versions={results.available_versions}
+                  currentVersion={currentVersion || results.detail_latest_result_version || 0}
+                  summaries={results.version_summaries}
+                  onSelectVersion={(v) => {
                     setPhase("loading");
-                    setLoadingText(`正在加载 V${e.target.value}...`);
+                    setLoadingText(`正在加载 V${v}...`);
                     setProgress(20);
-                    fetchDetailResults(Number(e.target.value)).then(() => {
+                    fetchDetailResults(v).then(() => {
                       setPhase("done");
                       setProgress(100);
                     }).catch((err) => {
@@ -564,51 +611,62 @@ export default function DetailResultStep() {
                       setError(err.message);
                     });
                   }}
-                  className="rounded-lg border border-white/20 bg-black/40 backdrop-blur-md px-3 py-1.5 text-sm font-bold tracking-wide text-slate-200 shadow-sm outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-500/50"
-                >
-                  {results.available_versions.map((v) => {
-                    const tag = v === results.detail_latest_result_version ? " (最新)" : "";
-                    const vSum = results.version_summaries?.find((vs) => vs.version_no === v);
-                    const counts = vSum ? ` [${vSum.ready_count}/${vSum.asset_count}图]` : "";
-                    return (
-                      <option key={v} value={v}>
-                        Version {v}{tag}{counts}
-                      </option>
-                    );
-                  })}
-                </select>
+                />
             </div>
             )}
           </div>
 
           {/* image list */}
           <div className="flex-1 pb-36 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 relative z-10">
-            {images.map((img) => (
-              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] shadow-md shadow-black/40 border border-white/5 hover:border-cyan-500/30 transition-all flex flex-col">
+            {images.map((img) => {
+              if (!img.url && img.status === "failed") {
+                return (
+                  <div key={img.id} className="h-full w-full">
+                    <FailedAssetCard
+                      label={img.label}
+                      productName={productType}
+                      reason={img.failure_reason}
+                      onRetry={() => handleAssetRegenerate(img.id)}
+                      isRegenerating={img.isRegenerating}
+                    />
+                  </div>
+                );
+              }
+
+              return (
+              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] shadow-md shadow-black/40 border border-white/5 hover:border-cyan-500/50 transition-all flex flex-col group">
                 {/* image */}
-                <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
+                <div 
+                  className="relative select-none cursor-zoom-in" 
+                  onContextMenu={(e) => e.preventDefault()}
+                  onClick={() => setPreviewImage(img.url)}
+                >
                   {img.isRegenerating ? (
                     <div className="w-full flex items-center justify-center bg-black/30" style={{ minHeight: "200px" }}>
                       <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
                     </div>
                   ) : (
-                    <img
-                      src={img.url}
-                      alt={img.label}
-                      className="w-full object-cover pointer-events-none rounded-t-[24px]"
-                      draggable={false}
-                      style={{ maxHeight: "400px" }}
-                    />
+                    <>
+                      <img
+                        src={img.url}
+                        alt={img.label}
+                        className="w-full object-cover pointer-events-none rounded-t-[24px] transition-transform duration-700 group-hover:scale-[1.02]"
+                        draggable={false}
+                        style={{ maxHeight: "400px" }}
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-cyan-900/10 transition-colors pointer-events-none" />
+                    </>
                   )}
 
                   {/* carry forward badge */}
-                  {img.carry_forward && img.source_version_no != null && (
-                    <div className="absolute top-3 left-3 z-20">
+                  <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1.5">
+                    {img.carry_forward && img.source_version_no != null && (
                       <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
                         沿用自 V{img.source_version_no}
                       </div>
-                    </div>
-                  )}
+                    )}
+                    <QualityBadge status={img.quality_status} reason={img.failure_reason} />
+                  </div>
 
                   {/* fidelity badge */}
                   {img.fidelity_validation_status === 'passed' && (
@@ -630,17 +688,33 @@ export default function DetailResultStep() {
                 {/* bottom action row */}
                 <div className="flex items-center justify-between px-4 py-3 bg-black/20 backdrop-blur-md">
                   <span className="text-sm font-bold tracking-wide text-slate-300">{productType} · {img.label}</span>
-                  <button
-                    onClick={() => toggleEdit(img.id)}
-                    className={`flex items-center gap-1.5 text-xs font-bold tracking-wide shadow-sm rounded-full px-3 py-1 border transition
-                      ${img.editOpen
-                        ? "text-cyan-400 border-cyan-500/50 bg-cyan-900/60"
-                        : "text-cyan-400 border-cyan-500/30 bg-cyan-950/40 hover:bg-cyan-900/60"
-                      }`}
-                  >
-                    <Pencil className="w-3 h-3" />
-                    修改
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleEdit(img.id)}
+                      className={`flex items-center gap-1.5 text-xs font-bold tracking-wide shadow-sm rounded-full px-3 py-1 border transition
+                        ${img.editOpen
+                          ? "text-cyan-400 border-cyan-500/50 bg-cyan-900/60"
+                          : "text-cyan-400 border-cyan-500/30 bg-cyan-950/40 hover:bg-cyan-900/60"
+                        }`}
+                    >
+                      <Pencil className="w-3 h-3" />
+                      修改
+                    </button>
+                    <button
+                      onClick={() => setHistoryAssetId(img.id)}
+                      className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                      title="版本历史"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setFeedbackAssetId(img.id)}
+                      className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                      title="反馈质量"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* edit panel */}
@@ -667,7 +741,7 @@ export default function DetailResultStep() {
                   </div>
                 )}
               </div>
-            ))}
+            )})}
           </div>
 
           {/* fixed bottom: login bar + action buttons */}
@@ -824,6 +898,20 @@ export default function DetailResultStep() {
           </div>
         </div>
       )}
+
+      <AssetHistoryDrawer
+        assetId={historyAssetId || ""}
+        currentVersionNo={currentVersion ?? undefined}
+        open={!!historyAssetId}
+        onClose={() => setHistoryAssetId(null)}
+        onRestoreSuccess={() => fetchDetailResults(currentVersion || undefined)}
+      />
+
+      <AssetFeedbackModal
+        assetId={feedbackAssetId || ""}
+        open={!!feedbackAssetId}
+        onClose={() => setFeedbackAssetId(null)}
+      />
     </div>
   );
 }

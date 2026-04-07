@@ -10,8 +10,11 @@ import {
   Sparkles,
   Wand2,
   X,
+  History,
+  MessageSquare,
 } from "lucide-react";
 
+import { VersionSelector } from "@/components/VersionSelector";
 import { StepIndicator } from "@/components/StepIndicator";
 import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 import { resolveAssetLabel } from "@/lib/assetLabels";
@@ -34,6 +37,11 @@ import {
   textareaToCopyLines,
   upsertStrategyOverride,
 } from "@/lib/mainGalleryCopy";
+import { QualityBadge } from "@/components/QualityBadge";
+import { FailedAssetCard } from "@/components/FailedAssetCard";
+import { AssetHistoryDrawer } from "@/components/AssetHistoryDrawer";
+import { AssetFeedbackModal } from "@/components/AssetFeedbackModal";
+import { useQualityPolling } from "@/hooks/useQualityPolling";
 
 type ResultAssetView = {
   asset_id: string;
@@ -48,6 +56,10 @@ type ResultAssetView = {
   carry_forward?: boolean;
   source_version_no?: number | null;
   fidelity_validation_status?: string | null;
+  status?: string;
+  quality_status?: string;
+  quality_scores?: Record<string, any> | null;
+  failure_reason?: string | null;
 };
 
 function normalizeGenerationError(error: any) {
@@ -124,6 +136,10 @@ function buildViewAssets(
     carry_forward: asset.carry_forward,
     source_version_no: asset.source_version_no,
     fidelity_validation_status: asset.fidelity_validation_status,
+    status: asset.status,
+    quality_status: asset.quality_status,
+    quality_scores: asset.quality_scores,
+    failure_reason: asset.failure_reason,
   }));
 }
 
@@ -137,6 +153,8 @@ export default function ResultStep() {
   const [statusText, setStatusText] = useState("正在生成主图...");
   const [error, setError] = useState<string | null>(null);
   const generateStartRef = useRef(Date.now());
+  const [historyAssetId, setHistoryAssetId] = useState<string | null>(null);
+  const [feedbackAssetId, setFeedbackAssetId] = useState<string | null>(null);
 
   const [assets, setAssets] = useState<ResultAssetView[]>([]);
   const [promptPreviews, setPromptPreviews] = useState<PromptPreviewItem[]>([]);
@@ -150,6 +168,8 @@ export default function ResultStep() {
   const [regenModalOpen, setRegenModalOpen] = useState(false);
   const [regenTargetId, setRegenTargetId] = useState<string | null>(null);
   const [regenInstruction, setRegenInstruction] = useState("");
+  const [regenKeepElements, setRegenKeepElements] = useState("");
+  const [regenRemoveElements, setRegenRemoveElements] = useState("");
   const [regenLoading, setRegenLoading] = useState(false);
 
   const [editTextOpen, setEditTextOpen] = useState(false);
@@ -398,6 +418,11 @@ export default function ResultStep() {
     };
   }, [startOrRestoreResults]);
 
+  const needsQualityPolling = assets.some(a => a.quality_status === "pending_async_review");
+  useQualityPolling(needsQualityPolling, async () => {
+    await loadResults(currentVersion ?? undefined);
+  });
+
   const toggleSelect = (assetId: string) => {
     setSelected((previous) => {
       const next = new Set(previous);
@@ -410,6 +435,8 @@ export default function ResultStep() {
   const openRegenModal = (assetId: string) => {
     setRegenTargetId(assetId);
     setRegenInstruction("");
+    setRegenKeepElements("");
+    setRegenRemoveElements("");
     setRegenModalOpen(true);
     setTimeout(() => regenTextareaRef.current?.focus(), 120);
   };
@@ -433,7 +460,11 @@ export default function ResultStep() {
     }
   };
 
-  const handleRegen = async (assetId: string, instruction: string) => {
+  const handleRegen = async (
+    assetId: string,
+    instruction: string,
+    editConstraints?: { keep?: string[]; remove?: string[] }
+  ) => {
     setAssets((previous) =>
       previous.map((asset) =>
         asset.asset_id === assetId ? { ...asset, isRegenerating: true } : asset,
@@ -441,7 +472,7 @@ export default function ResultStep() {
     );
 
     try {
-      const response = await assetAPI.regenerate(assetId, instruction || "重新生成");
+      const response = await assetAPI.regenerate(assetId, instruction || "重新生成", editConstraints);
       if (response?.job_id) {
         await jobAPI.pollUntilDone(response.job_id);
       }
@@ -469,7 +500,20 @@ export default function ResultStep() {
     if (!regenTargetId) return;
     setRegenModalOpen(false);
     setRegenLoading(true);
-    await handleRegen(regenTargetId, regenInstruction);
+    
+    const constraints: { keep?: string[], remove?: string[] } = {};
+    const keeps = regenKeepElements.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    const removes = regenRemoveElements.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    
+    if (keeps.length > 0) constraints.keep = keeps;
+    if (removes.length > 0) constraints.remove = removes;
+    
+    await handleRegen(
+      regenTargetId, 
+      regenInstruction, 
+      Object.keys(constraints).length > 0 ? constraints : undefined
+    );
+    
     setRegenTargetId(null);
     setRegenLoading(false);
   };
@@ -687,24 +731,14 @@ export default function ResultStep() {
         <div className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <p className="text-xs text-slate-400 font-medium">✨ 提示：预览图含水印，付费后可获取高清无水印原图</p>
             {availableVersions.length > 1 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative z-50">
                 <span className="text-sm font-medium text-slate-300">生成版本历史:</span>
-                <select
-                value={currentVersion || latestVersion || ""}
-                onChange={(e) => handleVersionChange(Number(e.target.value))}
-                className="rounded-lg border border-white/20 bg-black/40 backdrop-blur-md px-3 py-1.5 text-sm font-medium text-slate-200 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                >
-                {availableVersions.map((v) => {
-                    const vSum = versionSummaries.find((vs) => vs.version_no === v);
-                    const tag = v === latestVersion ? " (最新)" : "";
-                    const counts = vSum ? ` [${vSum.ready_count}/${vSum.asset_count}图]` : "";
-                    return (
-                    <option key={v} value={v}>
-                        Version {v}{tag}{counts}
-                    </option>
-                    );
-                })}
-                </select>
+                <VersionSelector
+                  versions={availableVersions}
+                  currentVersion={currentVersion || latestVersion || 0}
+                  summaries={versionSummaries}
+                  onSelectVersion={(v: number) => handleVersionChange(v)}
+                />
             </div>
             )}
         </div>
@@ -715,10 +749,28 @@ export default function ResultStep() {
             const isSelected = selected.has(asset.asset_id);
             const label = resolveAssetLabel(asset.role, asset.slot_id);
 
+            if (!asset.image_url && asset.status === "failed") {
+              return (
+                <div key={asset.asset_id} className="h-full w-full">
+                  <FailedAssetCard
+                    label={label}
+                    productName={productName}
+                    reason={asset.failure_reason}
+                    onRetry={() => {
+                        // Pass assetId explicitly, though openRegenModal currently uses modal, 
+                        // maybe auto-trigger handleRegen directly so user doesn't have to fill instruction
+                        handleRegen(asset.asset_id, "重新生成");
+                    }}
+                    isRegenerating={asset.isRegenerating}
+                  />
+                </div>
+              );
+            }
+
             return (
               <div
                 key={asset.asset_id}
-                className={`overflow-hidden rounded-[24px] glass-panel transition-all ${
+                className={`overflow-hidden rounded-[24px] glass-panel transition-all flex flex-col ${
                   isSelected
                     ? "shadow-[0_0_15px_rgba(6,182,212,0.5)] border-2 border-cyan-400 translate-y-[-2px]"
                     : "shadow-md shadow-black/40 border border-white/5 hover:border-cyan-500/30"
@@ -775,14 +827,14 @@ export default function ResultStep() {
                     </div>
                   </div>
 
-                  {/* carry forward badge */}
-                  {asset.carry_forward && asset.source_version_no != null && (
-                    <div className="absolute top-3 left-3 z-20">
+                  <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1.5">
+                    {asset.carry_forward && asset.source_version_no != null && (
                       <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
                         沿用自 V{asset.source_version_no}
                       </div>
-                    </div>
-                  )}
+                    )}
+                    <QualityBadge status={asset.quality_status} reason={asset.failure_reason} />
+                  </div>
 
                   {/* fidelity badge */}
                   {asset.fidelity_validation_status === 'passed' && (
@@ -817,6 +869,28 @@ export default function ResultStep() {
                     >
                       <Pencil className="h-3 w-3" />
                       修改
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (actionLocked) return;
+                        setHistoryAssetId(asset.asset_id);
+                      }}
+                      disabled={actionLocked}
+                      className="flex items-center justify-center w-6 h-6 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition disabled:opacity-40 text-slate-300"
+                      title="版本历史"
+                    >
+                      <History className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (actionLocked) return;
+                        setFeedbackAssetId(asset.asset_id);
+                      }}
+                      disabled={actionLocked}
+                      className="flex items-center justify-center w-6 h-6 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition disabled:opacity-40 text-slate-300"
+                      title="反馈质量"
+                    >
+                      <MessageSquare className="h-3 w-3" />
                     </button>
                   </div>
                   <button
@@ -953,18 +1027,18 @@ export default function ResultStep() {
 
       {/* --- Regen modal (bottom-sheet) --- */}
       {regenModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => setRegenModalOpen(false)}
           />
-          <div className="relative w-full max-w-lg rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-2xl">
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+          <div className="relative w-full max-w-lg rounded-t-3xl bg-slate-900/95 backdrop-blur-xl border-t border-white/10 px-5 pb-8 pt-5 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] outline-none animate-in slide-in-from-bottom duration-300">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">重新生成</h3>
+              <h3 className="text-base font-bold tracking-widest text-slate-100">重新生成</h3>
               <button
                 onClick={() => setRegenModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 transition-colors hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -977,7 +1051,7 @@ export default function ResultStep() {
               value={regenInstruction}
               onChange={(event) => setRegenInstruction(event.target.value)}
               rows={5}
-              className="w-full rounded-2xl border border-blue-200 px-4 py-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-400"
+              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-slate-200 outline-none ring-0 transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
               placeholder="例如：背景更干净一些，产品更居中，去掉多余装饰..."
             />
             <div className="mt-3 flex flex-wrap gap-2">
@@ -989,22 +1063,50 @@ export default function ResultStep() {
                     onClick={() =>
                       setRegenInstruction((prev) => `${prev}${prev ? "；" : ""}${tag}`)
                     }
-                    className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-600 transition hover:bg-blue-100"
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10 hover:border-cyan-500/30 hover:text-cyan-300"
                   >
                     + {tag}
                   </button>
                 ),
               )}
             </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-2 block text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+                  保留元素 (逗号分隔)
+                </label>
+                <input
+                  type="text"
+                  value={regenKeepElements}
+                  onChange={(e) => setRegenKeepElements(e.target.value)}
+                  placeholder="例如：模特，包装"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+                  去除元素 (逗号分隔)
+                </label>
+                <input
+                  type="text"
+                  value={regenRemoveElements}
+                  onChange={(e) => setRegenRemoveElements(e.target.value)}
+                  placeholder="例如：背景阴影，反光"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                />
+              </div>
+            </div>
+
             <button
               onClick={confirmRegen}
               disabled={regenLoading}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 text-base font-bold text-white shadow-lg shadow-blue-200/50 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 py-3.5 text-base font-bold tracking-widest text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
             >
               {regenLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <Wand2 className="h-4 w-4" />
+                <Wand2 className="h-5 w-5" />
               )}
               确认，开始重新生成
             </button>
@@ -1014,18 +1116,18 @@ export default function ResultStep() {
 
       {/* --- Global edit modal (kept but hidden entry point) --- */}
       {globalEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => setGlobalEditOpen(false)}
           />
-          <div className="relative w-full max-w-lg rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-2xl">
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+          <div className="relative w-full max-w-lg rounded-t-3xl bg-slate-900/95 backdrop-blur-xl border-t border-white/10 px-5 pb-8 pt-5 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] outline-none animate-in slide-in-from-bottom duration-300">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">AI 整体优化</h3>
+              <h3 className="text-base font-bold tracking-widest text-slate-100">AI 整体优化</h3>
               <button
                 onClick={() => setGlobalEditOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 transition-colors hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1035,24 +1137,38 @@ export default function ResultStep() {
               value={globalInstruction}
               onChange={(event) => setGlobalInstruction(event.target.value)}
               rows={5}
-              className="w-full rounded-2xl border border-blue-200 px-4 py-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-400"
+              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-slate-200 outline-none ring-0 transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
               placeholder="例如：整体更高级一些，主图更聚焦产品，卖点文字更清晰"
             />
             <button
               onClick={startGlobalEdit}
               disabled={globalEditLoading}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-3.5 text-base font-bold text-white shadow-lg shadow-blue-200/50 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 py-3.5 text-base font-bold tracking-widest text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
             >
               {globalEditLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <Wand2 className="h-4 w-4" />
+                <Wand2 className="h-5 w-5" />
               )}
               开始整体优化
             </button>
           </div>
         </div>
       )}
+
+      <AssetHistoryDrawer
+        assetId={historyAssetId || ""}
+        currentVersionNo={currentVersion ?? undefined}
+        open={!!historyAssetId}
+        onClose={() => setHistoryAssetId(null)}
+        onRestoreSuccess={() => loadResults()}
+      />
+
+      <AssetFeedbackModal
+        assetId={feedbackAssetId || ""}
+        open={!!feedbackAssetId}
+        onClose={() => setFeedbackAssetId(null)}
+      />
     </div>
   );
 }

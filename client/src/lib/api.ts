@@ -103,6 +103,10 @@ export interface SessionResultAsset {
   carry_forward?: boolean;
   source_version_no?: number | null;
   fidelity_validation_status?: string | null;
+  quality_status?: string;
+  quality_scores?: Record<string, any> | null;
+  quality_review_job_id?: string | null;
+  failure_reason?: string | null;
 }
 
 export interface SessionResults {
@@ -242,6 +246,10 @@ function normalizeSessionResults(data: any): SessionResults {
     carry_forward: Boolean(item?.carry_forward),
     source_version_no: typeof item?.source_version_no === 'number' ? item.source_version_no : null,
     fidelity_validation_status: item?.fidelity_validation_status ?? null,
+    quality_status: item?.quality_status ?? "unchecked",
+    quality_scores: item?.quality_scores ?? null,
+    quality_review_job_id: item?.quality_review_job_id ?? null,
+    failure_reason: item?.failure_reason ?? null,
   }));
 
   return {
@@ -636,6 +644,9 @@ export const platformAPI = {
     const data = await apiFetch<any>('/platforms');
     return normalizePlatformList(data);
   },
+  async getExpressionModes(platformId: string) {
+    return apiFetch<any>(`/platforms/${platformId}/expression-modes`);
+  },
 };
 
 // ===== Job API =====
@@ -708,11 +719,38 @@ export const jobAPI = {
 
 // ===== Asset API =====
 export const assetAPI = {
-  regenerate(assetId: string, instruction: string) {
+  regenerate(
+    assetId: string, 
+    instruction: string,
+    editConstraints?: {
+      keep?: string[];
+      change?: Record<string, string>;
+      remove?: string[];
+    }
+  ) {
     return apiFetch(`/assets/${assetId}/regenerate`, {
       method: 'POST',
-      body: JSON.stringify({ instruction, keep_style_consistency: true }),
+      body: JSON.stringify({ 
+        instruction, 
+        keep_style_consistency: true,
+        ...(editConstraints ? { edit_constraints: editConstraints } : {})
+      }),
     });
+  },
+  submitFeedback(assetId: string, data: { rating: number; issue_tags?: string[]; comment?: string }) {
+    return apiFetch(`/assets/${assetId}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  getFeedback(assetId: string) {
+    return apiFetch<any>(`/assets/${assetId}/feedback`);
+  },
+  getHistory(assetId: string) {
+    return apiFetch<any>(`/assets/${assetId}/history`);
+  },
+  restore(assetId: string) {
+    return apiFetch<any>(`/assets/${assetId}/restore`, { method: 'POST' });
   },
 };
 

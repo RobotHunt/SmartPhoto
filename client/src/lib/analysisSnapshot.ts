@@ -34,6 +34,8 @@ export interface AnalysisResult {
   risk_flags?: string[];
   selling_point_entities?: Record<string, any>;
   evidence_scores?: Record<string, any>;
+  expected_components?: string[];
+  confusion_pairs?: Array<[string, string]>;
 }
 
 function parseStringList(value: any): string[] {
@@ -100,6 +102,8 @@ export function parseAnalysisSnapshot(snapshot: any): AnalysisResult {
     risk_flags: parseStringList(snapshot?.risk_flags),
     selling_point_entities: typeof snapshot?.selling_point_entities === 'object' ? snapshot.selling_point_entities : undefined,
     evidence_scores: typeof snapshot?.evidence_scores === 'object' ? snapshot.evidence_scores : undefined,
+    expected_components: parseStringList(snapshot?.expected_components),
+    confusion_pairs: Array.isArray(snapshot?.confusion_pairs) ? snapshot.confusion_pairs : undefined,
   };
 }
 

@@ -13,6 +13,8 @@ import {
   Sparkles,
   CheckCircle2,
   Download,
+  History,
+  MessageSquare,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,11 @@ import {
   upsertStrategyOverride,
 } from "@/lib/mainGalleryCopy";
 import { updateSessionRecord } from "@/lib/localUser";
+import { QualityBadge } from "@/components/QualityBadge";
+import { FailedAssetCard } from "@/components/FailedAssetCard";
+import { AssetHistoryDrawer } from "@/components/AssetHistoryDrawer";
+import { AssetFeedbackModal } from "@/components/AssetFeedbackModal";
+import { useQualityPolling } from "@/hooks/useQualityPolling";
 
 type PreviewImage = {
   id: string;
@@ -54,6 +61,10 @@ type PreviewImage = {
   carry_forward?: boolean;
   source_version_no?: number | null;
   fidelity_validation_status?: string | null;
+  status?: string;
+  quality_status?: string;
+  quality_scores?: Record<string, any> | null;
+  failure_reason?: string | null;
 };
 
 type Phase = "loading" | "preview" | "hd-loading" | "hd-done";
@@ -81,6 +92,10 @@ function buildPreviewImages(
       carry_forward: asset.carry_forward,
       source_version_no: asset.source_version_no,
       fidelity_validation_status: asset.fidelity_validation_status,
+      status: asset.status,
+      quality_status: asset.quality_status,
+      quality_scores: asset.quality_scores,
+      failure_reason: asset.failure_reason,
     };
   });
 }
@@ -98,7 +113,10 @@ export default function HDResultStep() {
   const [hdProgress, setHdProgress] = useState(0);
   const generateStartRef = useRef(Date.now());
   const [downloading, setDownloading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [historyAssetId, setHistoryAssetId] = useState<string | null>(null);
+  const [feedbackAssetId, setFeedbackAssetId] = useState<string | null>(null);
 
   const sessionId = sessionStorage.getItem("current_session_id") || "";
   const unlockedVersion =
@@ -194,6 +212,9 @@ export default function HDResultStep() {
       cancelled = true;
     };
   }, [loadImages, sessionId, toast]);
+
+  const needsQualityPolling = images.some(img => img.quality_status === "pending_async_review");
+  useQualityPolling(needsQualityPolling, async () => { await loadImages(); });
 
   const toggleEdit = (id: string) => {
     setImages((prev) =>
@@ -439,9 +460,28 @@ export default function HDResultStep() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {images.map((img) => (
-              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.3)]">
-                <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
+            {images.map((img) => {
+              if (!img.url && img.status === "failed") {
+                return (
+                  <div key={img.id} className="h-full w-full">
+                    <FailedAssetCard
+                      label={img.type}
+                      productName={img.product}
+                      reason={img.failure_reason}
+                      onRetry={() => regenSingle(img.id)}
+                      isRegenerating={img.isRegenerating}
+                    />
+                  </div>
+                );
+              }
+
+              return (
+              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.3)] hover:border-cyan-500/40 transition-all flex flex-col group">
+                <div 
+                  className="relative select-none cursor-zoom-in flex-1" 
+                  onContextMenu={(e) => e.preventDefault()}
+                  onClick={() => setPreviewImage(img.url)}
+                >
                   {img.isRegenerating && (
                     <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10">
                       <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
@@ -450,9 +490,10 @@ export default function HDResultStep() {
                   <img
                     src={img.url}
                     alt={img.type}
-                    className="w-full aspect-square object-cover pointer-events-none"
+                    className="w-full aspect-square object-cover pointer-events-none transition-transform duration-700 group-hover:scale-[1.02]"
                     draggable={false}
                   />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-cyan-900/10 pointer-events-none transition-colors" />
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                     <div
                       className="text-white/25 font-bold text-xl select-none"
@@ -468,13 +509,14 @@ export default function HDResultStep() {
                   </div>
 
                   {/* carry forward badge */}
-                  {img.carry_forward && img.source_version_no != null && (
-                    <div className="absolute top-3 left-3 z-20">
+                  <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1.5">
+                    {img.carry_forward && img.source_version_no != null && (
                       <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
                         沿用自 V{img.source_version_no}
                       </div>
-                    </div>
-                  )}
+                    )}
+                    <QualityBadge status={img.quality_status} reason={img.failure_reason} />
+                  </div>
 
                   {/* fidelity badge */}
                   {img.fidelity_validation_status === 'passed' && (
@@ -516,12 +558,26 @@ export default function HDResultStep() {
                       <RefreshCw className="w-3 h-3" />
                       单独重绘
                     </button>
+                    <button
+                      onClick={() => setHistoryAssetId(img.id)}
+                      className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                      title="版本历史"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setFeedbackAssetId(img.id)}
+                      className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                      title="反馈质量"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
 
                 {img.editOpen && renderCopyEditor(img)}
               </div>
-            ))}
+            )})}
           </div>
 
           <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#050914]/80 backdrop-blur-xl border-t border-white/10 px-4 py-4 md:py-6 sm:px-12 flex justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
@@ -581,29 +637,50 @@ export default function HDResultStep() {
 
         {/* --- Image grids --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {images.map((img) => (
-            <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.5)] transition hover:border-cyan-500/30">
-              <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
+          {images.map((img) => {
+            if (!img.url && img.status === "failed") {
+              return (
+                <div key={img.id} className="h-full w-full">
+                  <FailedAssetCard
+                    label={img.type}
+                    productName={img.product}
+                    reason={img.failure_reason}
+                    onRetry={() => regenSingle(img.id)}
+                    isRegenerating={img.isRegenerating}
+                  />
+                </div>
+              );
+            }
+
+            return (
+            <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.5)] transition hover:border-cyan-500/40 group flex flex-col">
+              <div 
+                className="relative select-none cursor-zoom-in flex-1" 
+                onContextMenu={(e) => e.preventDefault()}
+                onClick={() => setPreviewImage(img.url)}
+              >
                 {img.isRegenerating && (
-                  <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10">
+                  <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10 pointer-events-none">
                     <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
                   </div>
                 )}
                 <img
                   src={img.url}
                   alt={img.type}
-                  className="w-full aspect-square object-cover pointer-events-none"
+                  className="w-full aspect-square object-cover pointer-events-none transition-transform duration-700 group-hover:scale-[1.02]"
                   draggable={false}
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-cyan-900/10 pointer-events-none transition-colors" />
 
                 {/* carry forward badge */}
-                {img.carry_forward && img.source_version_no != null && (
-                  <div className="absolute top-3 left-3 z-20">
+                <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1.5">
+                  {img.carry_forward && img.source_version_no != null && (
                     <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
                       沿用自 V{img.source_version_no}
                     </div>
-                  </div>
-                )}
+                  )}
+                  <QualityBadge status={img.quality_status} reason={img.failure_reason} />
+                </div>
 
                 {/* fidelity badge */}
                 {img.fidelity_validation_status === 'passed' && (
@@ -636,10 +713,26 @@ export default function HDResultStep() {
                   <Pencil className="w-3 h-3" />
                   修改文案
                 </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setHistoryAssetId(img.id)}
+                    className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                    title="版本历史"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setFeedbackAssetId(img.id)}
+                    className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                    title="反馈质量"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
               {img.editOpen && renderCopyEditor(img)}
             </div>
-          ))}
+          )})}
         </div>
 
         {/* --- Bottom Actions Bar --- */}
@@ -721,7 +814,44 @@ export default function HDResultStep() {
             </div>
           </div>
         )}
+
+        {/* Lightbox Preview */}
+        {previewImage && (
+          <div 
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" 
+            onClick={() => setPreviewImage(null)}
+          >
+            <button 
+              className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white z-[110]"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewImage(null);
+              }}
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img 
+              src={previewImage} 
+              className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl cursor-zoom-out select-none animate-in zoom-in-95 duration-200" 
+              alt="大图预览" 
+            />
+          </div>
+        )}
       </div>
+
+      <AssetHistoryDrawer
+        assetId={historyAssetId || ""}
+        currentVersionNo={Number(unlockedVersion)}
+        open={!!historyAssetId}
+        onClose={() => setHistoryAssetId(null)}
+        onRestoreSuccess={() => loadImages()}
+      />
+
+      <AssetFeedbackModal
+        assetId={feedbackAssetId || ""}
+        open={!!feedbackAssetId}
+        onClose={() => setFeedbackAssetId(null)}
+      />
     </div>
   );
 }
