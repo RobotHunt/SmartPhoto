@@ -5,6 +5,38 @@ import { assetAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { QualityBadge } from "./QualityBadge";
 
+function HistoryThumbnail({ record }: { record: any }) {
+  const [errorSrc, setErrorSrc] = useState<string | null>(null);
+
+  const currentSrc = errorSrc === record.thumbnail_url && record.image_url 
+    ? record.image_url 
+    : record.thumbnail_url || record.image_url;
+
+  const isFailed = (errorSrc === record.thumbnail_url && !record.image_url) || 
+                   (errorSrc === record.image_url);
+
+  if (!currentSrc || isFailed) {
+    return (
+      <div className="w-20 h-20 shrink-0 rounded-xl border border-white/10 bg-black/50 flex items-center justify-center opacity-50">
+        <span className="text-[10px] text-slate-500 font-bold tracking-widest">
+          {isFailed ? "加载失败" : "无预览"}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-white/10 bg-black/50">
+      <img
+        src={currentSrc}
+        alt="thumbnail"
+        className="w-full h-full object-cover"
+        onError={() => setErrorSrc(currentSrc)}
+      />
+    </div>
+  );
+}
+
 export interface AssetHistoryDrawerProps {
   assetId: string;
   currentVersionNo?: number;
@@ -117,15 +149,7 @@ export function AssetHistoryDrawer({
                     } p-4 transition-all flex flex-col`}
                   >
                     <div className="flex items-start gap-4">
-                      {record.thumbnail_url || record.image_url ? (
-                        <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-white/10 bg-black/50">
-                          <img src={record.thumbnail_url || record.image_url} alt="thumbnail" className="w-full h-full object-cover" />
-                        </div>
-                      ) : (
-                        <div className="w-20 h-20 shrink-0 rounded-xl border border-white/10 bg-black/50 flex items-center justify-center opacity-50">
-                          <span className="text-[10px] text-slate-500 font-bold tracking-widest">无预览</span>
-                        </div>
-                      )}
+                      <HistoryThumbnail record={record} />
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1.5">

@@ -70,7 +70,7 @@ export function AssetFeedbackModal({ assetId, open, onClose }: AssetFeedbackModa
       setLoading(true);
       await assetAPI.submitFeedback(assetId, {
         rating: score,
-        issue_tags: score < 0 ? selectedCategories : [],
+        issue_tags: score === 1 ? selectedCategories : [],
         comment,
       });
       toast({ title: "反馈已提交", description: "感谢您的反馈！" });
@@ -110,9 +110,9 @@ export function AssetFeedbackModal({ assetId, open, onClose }: AssetFeedbackModa
           <div className="space-y-6">
             <div className="flex gap-4">
               <button
-                onClick={() => setScore(1)}
+                onClick={() => setScore(3)}
                 className={`flex-1 flex flex-col items-center justify-center py-4 rounded-2xl border transition-all ${
-                  score === 1
+                  score === 3
                     ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
                     : "border-white/10 bg-black/40 text-slate-400 hover:bg-white/5"
                 }`}
@@ -121,9 +121,9 @@ export function AssetFeedbackModal({ assetId, open, onClose }: AssetFeedbackModa
                 <span className="text-xs font-bold tracking-widest">满意</span>
               </button>
               <button
-                onClick={() => setScore(-1)}
+                onClick={() => setScore(1)}
                 className={`flex-1 flex flex-col items-center justify-center py-4 rounded-2xl border transition-all ${
-                  score === -1
+                  score === 1
                     ? "border-rose-500/50 bg-rose-500/20 text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.2)]"
                     : "border-white/10 bg-black/40 text-slate-400 hover:bg-white/5"
                 }`}
@@ -133,7 +133,7 @@ export function AssetFeedbackModal({ assetId, open, onClose }: AssetFeedbackModa
               </button>
             </div>
 
-            {score === -1 && (
+            {score === 1 && (
               <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
                 <div>
                   <label className="text-xs font-bold tracking-widest text-slate-400 mb-2 block">

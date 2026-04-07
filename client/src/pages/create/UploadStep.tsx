@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button";
 import { sessionAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { addSessionRecord } from "@/lib/localUser";
+import { ANALYSIS_SUPPLEMENT_LIST_KEY, type SupplementRecommendation } from "@/lib/analysisSnapshot";
 
-type SlotType = "front" | "angle45" | "side" | "extra_1" | "extra_2" | "extra_3";
+type SlotType = string;
 
 interface SlotDef {
   slotType: SlotType;
   label: string;
   displayOrder: number;
+  recommendation?: SupplementRecommendation;
 }
 
 interface SlotState {
@@ -119,16 +121,62 @@ export default function UploadStep() {
   const [sessionId, setSessionId] = useState<string | null>(() =>
     sessionStorage.getItem(SESSION_KEY),
   );
+  const [recommendations] = useState<SupplementRecommendation[]>(() => {
+    try {
+      const raw = sessionStorage.getItem(ANALYSIS_SUPPLEMENT_LIST_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const allSlotDefs = useMemo(() => {
+    const uniqueDefs = new Map<string, SlotDef>();
+    
+    // AI Recommendations go first
+    recommendations.forEach((rec, idx) => {
+      const st = rec.slot_type || `rec_${idx}`;
+      uniqueDefs.set(st, {
+        slotType: st,
+        label: rec.label || "补充图片",
+        displayOrder: -rec.priority || -1,
+        recommendation: rec,
+      });
+    });
+
+    // Fallback standard slots
+    SLOT_DEFS.forEach((def) => {
+      if (!uniqueDefs.has(def.slotType)) {
+        uniqueDefs.set(def.slotType, def);
+      }
+    });
+
+    return Array.from(uniqueDefs.values());
+  }, [recommendations]);
+
   const [slots, setSlots] = useState<Record<SlotType, SlotState>>(() => {
     const persisted = loadPersistedSlotIds();
     const initial = {} as Record<SlotType, SlotState>;
+    
     for (const def of SLOT_DEFS) {
-      initial[def.slotType] = {
-        imageId: persisted[def.slotType] ?? null,
-        previewUrl: null,
-        uploading: false,
-      };
+      initial[def.slotType] = { imageId: persisted[def.slotType] ?? null, previewUrl: null, uploading: false };
     }
+    
+    let raw: SupplementRecommendation[] = [];
+    try {
+      const str = sessionStorage.getItem(ANALYSIS_SUPPLEMENT_LIST_KEY);
+      if (str) raw = JSON.parse(str);
+    } catch {}
+    
+    raw.forEach((rec, idx) => {
+      const st = rec.slot_type || `rec_${idx}`;
+      initial[st] = { imageId: persisted[st] ?? null, previewUrl: null, uploading: false };
+    });
+
+    for (const key of Object.keys(persisted)) {
+      if (!initial[key]) initial[key] = { imageId: persisted[key], previewUrl: null, uploading: false };
+    }
+
     return initial;
   });
   const [navigating, setNavigating] = useState(false);
@@ -136,14 +184,14 @@ export default function UploadStep() {
   useEffect(() => {
     if (!sessionId) return;
 
-    const needsHydration = SLOT_DEFS.some((def) => {
+    const needsHydration = allSlotDefs.some((def) => {
       const slot = slots[def.slotType];
-      return !!slot.imageId && !slot.previewUrl;
+      return slot && !!slot.imageId && !slot.previewUrl;
     });
     if (!needsHydration) return;
 
     let cancelled = false;
-    const slotOrder = new Map(SLOT_DEFS.map((def) => [def.displayOrder, def.slotType]));
+    const slotOrder = new Map(allSlotDefs.map((def) => [def.displayOrder, def.slotType]));
 
     (async () => {
       try {
@@ -183,12 +231,12 @@ export default function UploadStep() {
 
   useEffect(() => {
     const map: Record<string, string> = {};
-    for (const def of SLOT_DEFS) {
-      const imageId = slots[def.slotType].imageId;
+    for (const def of allSlotDefs) {
+      const imageId = slots[def.slotType]?.imageId;
       if (imageId) map[def.slotType] = imageId;
     }
     persistSlotIds(map);
-  }, [slots]);
+  }, [allSlotDefs, slots]);
 
   const uploadFile = useCallback(
     async (file: File, slotType: SlotType, displayOrder: number) => {
@@ -317,7 +365,7 @@ export default function UploadStep() {
   );
 
   const handleStartAnalysis = useCallback(() => {
-    const hasImage = SLOT_DEFS.some((def) => !!slots[def.slotType].imageId);
+    const hasImage = allSlotDefs.some((def) => !!slots[def.slotType]?.imageId);
     if (!hasImage) {
       toast({
         title: "请先上传图片",
@@ -327,18 +375,103 @@ export default function UploadStep() {
       return;
     }
 
+    sessionStorage.removeItem(ANALYSIS_SUPPLEMENT_LIST_KEY);
     setNavigating(true);
     setLocation("/create/analyze");
-  }, [setLocation, slots, toast]);
+  }, [allSlotDefs, slots, toast, setLocation]);
 
   const hasAnyImage = useMemo(
-    () => SLOT_DEFS.some((def) => !!slots[def.slotType].imageId),
-    [slots],
+    () => allSlotDefs.some((def) => !!slots[def.slotType]?.imageId),
+    [allSlotDefs, slots],
   );
   const anyUploading = useMemo(
-    () => SLOT_DEFS.some((def) => slots[def.slotType].uploading),
-    [slots],
+    () => allSlotDefs.some((def) => slots[def.slotType]?.uploading),
+    [allSlotDefs, slots],
   );
+
+  const aiRecommendations = allSlotDefs.filter(d => !!d.recommendation);
+  const standardDefs = allSlotDefs.filter(d => !d.recommendation);
+
+  const renderSlot = (def: typeof allSlotDefs[0]) => {
+    const slot = slots[def.slotType];
+    const hasPreview = !!slot?.previewUrl;
+    const isRec = !!def.recommendation;
+
+    return (
+      <div key={def.slotType} className="relative">
+        {hasPreview ? (
+          <div className="relative flex aspect-square flex-col">
+            <div className={`relative h-full w-full overflow-hidden rounded-2xl border-2 ${isRec ? 'border-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'border-white/20'} bg-slate-800/50`}>
+              <img
+                src={slot.previewUrl!}
+                alt={def.label}
+                className="h-full w-full object-cover"
+              />
+              {slot.uploading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/80 border-t-transparent" />
+                </div>
+              )}
+              {isRec && (
+                <div className="absolute top-0 left-0 bg-orange-500/90 text-white text-[10px] px-2 py-0.5 rounded-br-lg font-bold tracking-widest backdrop-blur-md">
+                  AI 推荐
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => removeImage(def.slotType)}
+              disabled={slot.uploading}
+              className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600 disabled:opacity-50 z-10"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="absolute bottom-2 left-2 right-2 rounded-lg bg-black/70 backdrop-blur-sm px-2 py-1 text-center text-xs text-white border border-white/10">
+              {def.label}
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => triggerFileInput(def.slotType, def.displayOrder)}
+            onDrop={(event) => handleDrop(event, def.slotType, def.displayOrder)}
+            onDragOver={(event) => event.preventDefault()}
+            className={`flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition relative overflow-hidden group ${
+              isRec 
+                ? 'border-orange-500/60 bg-orange-950/20 hover:border-orange-400 hover:bg-orange-900/30' 
+                : 'border-slate-600 bg-slate-900/40 hover:border-cyan-500/50 hover:bg-cyan-950/30'
+            }`}
+          >
+            {isRec && (
+              <div className="absolute top-0 left-0 bg-orange-500/90 text-white text-[10px] px-2 py-0.5 rounded-br-lg font-bold tracking-widest z-10">
+                AI 推荐
+              </div>
+            )}
+            
+            <CloudUpload className={`mb-2 h-8 w-8 ${isRec ? 'text-orange-400/80 group-hover:text-orange-400' : 'text-slate-500 group-hover:text-cyan-400'}`} strokeWidth={1.5} />
+            <div className={`px-2 text-center text-sm font-bold tracking-widest mb-1 ${isRec ? 'text-orange-300' : 'text-slate-300'}`}>
+              {def.label}
+            </div>
+            
+            {isRec && def.recommendation && (
+              <div className="px-3 mt-1 w-full flex flex-col gap-1 text-[10px]">
+                {def.recommendation.must_show && (
+                  <div className="bg-orange-500/10 border border-orange-500/20 text-orange-200/90 px-1.5 py-0.5 rounded truncate w-full text-center" title={`必拍: ${def.recommendation.must_show}`}>
+                    必拍: {def.recommendation.must_show}
+                  </div>
+                )}
+                {def.recommendation.framing_hint && (
+                  <div className="bg-cyan-500/10 border border-cyan-500/20 text-cyan-200/90 px-1.5 py-0.5 rounded truncate w-full text-center" title={`构图: ${def.recommendation.framing_hint}`}>
+                    构图: {def.recommendation.framing_hint}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen aurora-bg">
@@ -352,57 +485,25 @@ export default function UploadStep() {
           </div>
         </div>
 
+        {aiRecommendations.length > 0 && (
+          <div className="glass-panel border-orange-500/20 rounded-3xl p-6 md:p-8 mb-6 shadow-[0_0_30px_rgba(249,115,22,0.05)] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 blur-[80px] pointer-events-none rounded-full" />
+            <h2 className="text-lg font-bold text-orange-400 tracking-widest mb-4 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+              AI 智能缺图推荐
+            </h2>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 relative z-10">
+              {aiRecommendations.map(renderSlot)}
+            </div>
+          </div>
+        )}
+
         <div className="glass-panel border-white/10 rounded-3xl p-6 md:p-8 mb-8 shadow-xl">
+          {aiRecommendations.length > 0 && (
+            <h2 className="text-sm font-bold text-slate-400 tracking-widest mb-4">常规视角补充</h2>
+          )}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {SLOT_DEFS.map((def) => {
-              const slot = slots[def.slotType];
-              const hasPreview = !!slot.previewUrl;
-
-              return (
-                <div key={def.slotType} className="relative">
-                  {hasPreview ? (
-                    <div className="relative aspect-square">
-                      <div className="h-full w-full overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-800/50">
-                        <img
-                          src={slot.previewUrl!}
-                          alt={def.label}
-                          className="h-full w-full object-cover"
-                        />
-                        {slot.uploading && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/80 border-t-transparent" />
-                          </div>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={() => removeImage(def.slotType)}
-                        disabled={slot.uploading}
-                        className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600 disabled:opacity-50"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-
-                      <div className="absolute bottom-2 left-2 right-2 rounded-lg bg-black/60 px-2 py-1 text-center text-xs text-white">
-                        {def.label}
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      onClick={() => triggerFileInput(def.slotType, def.displayOrder)}
-                      onDrop={(event) => handleDrop(event, def.slotType, def.displayOrder)}
-                      onDragOver={(event) => event.preventDefault()}
-                      className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 text-slate-500 transition hover:border-blue-400 hover:bg-slate-50"
-                    >
-                      <CloudUpload className="mb-3 h-12 w-12 text-slate-400" strokeWidth={1.5} />
-                      <div className="px-2 text-center text-sm font-medium text-slate-700">
-                        {def.label}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {standardDefs.map(renderSlot)}
           </div>
 
           <div className="mt-8 text-center text-sm text-slate-400">
@@ -419,7 +520,10 @@ export default function UploadStep() {
           </Button>
 
           <button
-            onClick={() => setLocation("/")}
+            onClick={() => {
+              sessionStorage.removeItem(ANALYSIS_SUPPLEMENT_LIST_KEY);
+              setLocation("/");
+            }}
             className="mt-4 flex w-full items-center justify-center gap-1 text-sm text-slate-400 transition hover:text-slate-600"
           >
             <ChevronLeft className="h-4 w-4" />

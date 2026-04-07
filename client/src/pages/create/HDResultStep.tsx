@@ -139,7 +139,7 @@ export default function HDResultStep() {
     if (!sessionId) return [];
 
     const [results, promptPreviewRes, overrideRes] = await Promise.all([
-      sessionAPI.getResults(sessionId, Number(unlockedVersion)),
+      sessionAPI.getResults(sessionId),
       sessionAPI.previewPrompts(sessionId, { include_latest_assets: true }).catch(() => null),
       sessionAPI.getStrategyOverrides(sessionId).catch(() => null),
     ]);
@@ -150,13 +150,29 @@ export default function HDResultStep() {
 
     const selectedRaw = sessionStorage.getItem("selected_asset_ids");
     const selectedIds: string[] | null = selectedRaw ? JSON.parse(selectedRaw) : null;
-    const list = selectedIds ? all.filter((img) => selectedIds.includes(img.id)) : all;
+
+    setImages((prev) => {
+      const activeSlotIds = new Set(prev.map((img) => img.slot_id).filter(Boolean));
+      let list = all;
+      if (prev.length === 0 && selectedIds) {
+        list = all.filter((img) => selectedIds.includes(img.id));
+      } else if (prev.length > 0) {
+        list = all.filter((img) => activeSlotIds.has(img.slot_id));
+      }
+
+      return list.map((nextImg) => {
+        const oldImg = prev.find((o) => o.slot_id === nextImg.slot_id);
+        if (oldImg) {
+          return { ...nextImg, editOpen: oldImg.editOpen, isRegenerating: oldImg.isRegenerating };
+        }
+        return nextImg;
+      });
+    });
 
     setPromptPreviews(prompts);
     setStrategyOverrides(overrides);
-    setImages(list);
-    return list;
-  }, [productName, sessionId, unlockedVersion]);
+    return [];
+  }, [productName, sessionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,9 +272,12 @@ export default function HDResultStep() {
 
   const regenerateImage = useCallback(
     async (id: string, instruction: string) => {
-      setImages((prev) =>
-        prev.map((img) => (img.id === id ? { ...img, isRegenerating: true } : img)),
-      );
+      let targetSlotId = "";
+      setImages((prev) => {
+        const target = prev.find(img => img.id === id);
+        if (target) targetSlotId = target.slot_id;
+        return prev.map((img) => (img.id === id ? { ...img, isRegenerating: true } : img));
+      });
       try {
         const { job_id } = await assetAPI.regenerate(id, instruction || "重新生成");
         await jobAPI.pollUntilDone(job_id);
@@ -271,7 +290,7 @@ export default function HDResultStep() {
         toast({ title: "重新生成失败", description: err.message, variant: "destructive" });
       } finally {
         setImages((prev) =>
-          prev.map((img) => (img.id === id ? { ...img, isRegenerating: false } : img)),
+          prev.map((img) => (img.slot_id === targetSlotId ? { ...img, isRegenerating: false } : img)),
         );
       }
     },
@@ -308,7 +327,7 @@ export default function HDResultStep() {
     }
 
     setImages((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, editOpen: false } : item)),
+      prev.map((item) => (item.id === id ? { ...item, editOpen: false, isRegenerating: true } : item)),
     );
 
     try {
@@ -421,6 +440,46 @@ export default function HDResultStep() {
       toast({ title: "复制失败", variant: "destructive" });
     }
   };
+
+  const renderModals = () => (
+    <>
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" 
+          onClick={() => setPreviewImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white z-[110]"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewImage(null);
+            }}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img 
+            src={previewImage} 
+            className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl cursor-zoom-out select-none animate-in zoom-in-95 duration-200" 
+            alt="大图预览" 
+          />
+        </div>
+      )}
+
+      <AssetHistoryDrawer
+        assetId={historyAssetId || ""}
+        currentVersionNo={Number(unlockedVersion)}
+        open={!!historyAssetId}
+        onClose={() => setHistoryAssetId(null)}
+        onRestoreSuccess={() => loadImages()}
+      />
+
+      <AssetFeedbackModal
+        assetId={feedbackAssetId || ""}
+        open={!!feedbackAssetId}
+        onClose={() => setFeedbackAssetId(null)}
+      />
+    </>
+  );
 
   if (phase === "loading") {
     return (
@@ -593,6 +652,7 @@ export default function HDResultStep() {
             </div>
           </div>
         </div>
+        {renderModals()}
       </div>
     );
   }
@@ -814,44 +874,8 @@ export default function HDResultStep() {
             </div>
           </div>
         )}
-
-        {/* Lightbox Preview */}
-        {previewImage && (
-          <div 
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" 
-            onClick={() => setPreviewImage(null)}
-          >
-            <button 
-              className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white z-[110]"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPreviewImage(null);
-              }}
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <img 
-              src={previewImage} 
-              className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl cursor-zoom-out select-none animate-in zoom-in-95 duration-200" 
-              alt="大图预览" 
-            />
-          </div>
-        )}
+        {renderModals()}
       </div>
-
-      <AssetHistoryDrawer
-        assetId={historyAssetId || ""}
-        currentVersionNo={Number(unlockedVersion)}
-        open={!!historyAssetId}
-        onClose={() => setHistoryAssetId(null)}
-        onRestoreSuccess={() => loadImages()}
-      />
-
-      <AssetFeedbackModal
-        assetId={feedbackAssetId || ""}
-        open={!!feedbackAssetId}
-        onClose={() => setFeedbackAssetId(null)}
-      />
     </div>
   );
 }

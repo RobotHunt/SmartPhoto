@@ -540,7 +540,7 @@ export const sessionAPI = {
     });
   },
   async getResults(sessionId: string, version?: number) {
-    const qs = version ? `?version=${version}` : '';
+    const qs = version ? `?version=${version}&_t=${Date.now()}` : `?_t=${Date.now()}`;
     const data = await apiFetch<any>(`/sessions/${sessionId}/results${qs}`);
     return normalizeSessionResults(data);
   },
