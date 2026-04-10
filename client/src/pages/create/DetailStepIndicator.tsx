@@ -12,7 +12,7 @@ export function DetailStepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 | 
   const [, setLocation] = useLocation();
 
   return (
-    <div className="w-full bg-[#050914]/80 backdrop-blur-md border-b border-white/10 px-4 py-3 sticky top-0 z-50">
+    <div className="w-full bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 py-3 sticky top-0 z-50">
       <div className="flex items-center justify-center gap-1">
         {DETAIL_STEPS.map((step, index) => {
           const done = step.id < currentStep;
@@ -26,10 +26,10 @@ export function DetailStepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 | 
                   onClick={() => clickable && setLocation(step.path)}
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-[0_0_10px_rgba(6,182,212,0.1)] ${
                     done
-                      ? "bg-cyan-600 text-white cursor-pointer hover:bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.4)]"
+                      ? "bg-cyan-600 text-white cursor-pointer hover:bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.2)]"
                       : active
-                      ? "bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.6)] ring-2 ring-cyan-400/30"
-                      : "bg-slate-800 text-slate-400 border border-white/10"
+                      ? "bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.3)] ring-2 ring-cyan-100"
+                      : "bg-slate-100 text-slate-500 border border-slate-200"
                   }`}
                 >
                   {done ? <Check className="w-3.5 h-3.5" /> : step.id}
@@ -38,10 +38,10 @@ export function DetailStepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 | 
                   onClick={() => clickable && setLocation(step.path)}
                   className={`text-[10px] font-medium whitespace-nowrap transition-all ${
                     active
-                      ? "text-cyan-300 font-bold"
+                      ? "text-cyan-600 font-bold"
                       : done
-                      ? "text-cyan-400 cursor-pointer hover:text-cyan-300"
-                      : "text-slate-400"
+                      ? "text-cyan-600 cursor-pointer hover:text-cyan-500"
+                      : "text-slate-500"
                   }`}
                 >
                   {step.label}
@@ -50,7 +50,7 @@ export function DetailStepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 | 
               {index < DETAIL_STEPS.length - 1 && (
                 <div
                   className={`w-10 h-[2px] mb-4 rounded-full transition-all ${
-                    done ? "bg-cyan-500" : "bg-slate-800"
+                    done ? "bg-cyan-500" : "bg-slate-200"
                   }`}
                 />
               )}

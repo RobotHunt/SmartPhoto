@@ -646,9 +646,9 @@ export default function GenerateStep() {
   if (isLoading) {
     return (
       <div className="min-h-screen aurora-bg flex items-center justify-center p-4">
-        <div className="text-center glass-panel px-10 py-16 rounded-[32px] border border-cyan-500/20 shadow-[0_0_30px_rgba(6,182,212,0.1)]">
-          <div className="inline-block animate-[spin_2s_linear_infinite] rounded-full h-12 w-12 border-b-2 border-t-2 border-cyan-400 mb-6 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
-          <p className="text-cyan-300 text-sm tracking-wide font-medium">{loadingMessage}</p>
+        <div className="text-center glass-panel px-10 py-16 rounded-[32px] border border-blue-200 shadow-sm">
+          <div className="inline-block animate-[spin_2s_linear_infinite] rounded-full h-12 w-12 border-b-2 border-t-2 border-blue-400 mb-6 drop-shadow-sm" />
+          <p className="text-blue-600 text-sm tracking-wide font-medium">{loadingMessage}</p>
         </div>
       </div>
     );
@@ -659,7 +659,7 @@ export default function GenerateStep() {
       <div className="min-h-screen aurora-bg flex items-center justify-center p-4">
         <div className="text-center glass-panel px-8 py-16 rounded-[32px] max-w-lg border border-red-500/20">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-slate-300 text-sm mb-6">{loadError}</p>
+          <p className="text-slate-600 text-sm mb-6">{loadError}</p>
           <Button onClick={() => setLocation("/create/upload")} className="sci-fi-button">
             返回上传步骤
           </Button>
@@ -674,28 +674,28 @@ export default function GenerateStep() {
 
       <div className="w-full max-w-4xl py-6 px-4">
         <div className="mb-6 flex items-center justify-center sm:justify-start">
-          <h1 className="text-2xl font-bold text-white tracking-wide">AI 正在自动生成参数</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-wide">AI 正在自动生成参数</h1>
         </div>
 
-        <div className="glass-panel border-white/10 rounded-2xl p-5 mb-5 shadow-xl transition-all">
+        <div className="glass-panel border-slate-200 rounded-2xl p-5 mb-5 shadow-xl transition-all">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-cyan-900/40 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
-              <FileText className="w-4 h-4 text-cyan-400" />
+            <div className="w-8 h-8 rounded-lg bg-blue-100 border border-blue-200 flex items-center justify-center flex-shrink-0">
+              <FileText className="w-4 h-4 text-blue-600" />
             </div>
-            <span className="font-bold tracking-wide text-slate-200 text-base">
+            <span className="font-bold tracking-wide text-slate-700 text-base">
               自动识别产品参数
-              <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-white/10 px-1.5 py-0.5 rounded">可选</span>
+              <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-slate-200 px-1.5 py-0.5 rounded">可选</span>
             </span>
           </div>
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isExtracting}
-              className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 font-bold tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-cyan-900/20 px-3 py-1.5 rounded-lg border border-cyan-500/20"
+              className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-600 font-bold tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200"
             >
               {isExtracting ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                   <span>提取中...</span>
                 </>
               ) : (
@@ -706,8 +706,8 @@ export default function GenerateStep() {
               )}
             </button>
             <span className="text-slate-600 text-xs px-2">|</span>
-            <span className="text-xs text-slate-400 flex-1">支持图/PDF。一次性精准识别大段内容参数及优势</span>
-            <svg className="w-4 h-4 text-cyan-500/50 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="text-xs text-slate-500 flex-1">支持图/PDF。一次性精准识别大段内容参数及优势</span>
+            <svg className="w-4 h-4 text-blue-500/50 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
             </svg>
           </div>
@@ -716,9 +716,9 @@ export default function GenerateStep() {
           {paramAttachments.length > 0 && (
             <div className="mt-4 space-y-2">
               {paramAttachments.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
-                  <FileText className="w-4 h-4 text-cyan-500 flex-shrink-0" />
-                  <span className="text-sm text-slate-200 font-medium flex-1 truncate">{item.name}</span>
+                <div key={item.id} className="flex items-center gap-3 p-3 bg-white/80 border border-slate-200 rounded-xl">
+                  <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <span className="text-sm text-slate-700 font-medium flex-1 truncate">{item.name}</span>
                   <button onClick={() => handleDeleteAttachment(item.id)} className="p-1.5 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-lg transition-colors">
                     <X className="w-4 h-4" />
                   </button>
@@ -729,10 +729,10 @@ export default function GenerateStep() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-5 mb-5 w-full">
-          <div className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl flex flex-col transition-all h-full">
+          <div className="glass-panel border-slate-200 rounded-2xl p-5 shadow-xl flex flex-col transition-all h-full">
             <div className="flex items-center gap-2 mb-4">
-               <div className="w-2 h-6 bg-cyan-500 rounded-full"></div>
-               <h3 className="font-bold tracking-wide text-slate-100 text-base">选择主图首图场景</h3>
+               <div className="w-2 h-6 bg-blue-500 rounded-full"></div>
+               <h3 className="font-bold tracking-wide text-slate-900 text-base">选择主图首图场景</h3>
             </div>
             
             <Input
@@ -744,7 +744,7 @@ export default function GenerateStep() {
                 sessionStorage.setItem("selectedTheme", e.target.value);
               }}
               placeholder="选择或输入主题场景"
-              className="w-full bg-black/30 border-white/10 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-500/50 mb-4 h-12"
+              className="w-full bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 focus-visible:ring-blue-500/50 mb-4 h-12"
             />
             <datalist id="theme-options">
               {availableThemes.map((theme) => (
@@ -752,23 +752,23 @@ export default function GenerateStep() {
               ))}
             </datalist>
             <div className="mt-auto pt-2">
-               <p className="text-xs text-slate-400 bg-cyan-900/20 border border-cyan-500/20 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-                 <span className="font-bold text-cyan-400">AI建议</span> 
+               <p className="text-xs text-slate-500 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+                 <span className="font-bold text-blue-600">AI建议</span> 
                  {availableThemes.slice(0, 3).join(" · ")}
                </p>
             </div>
           </div>
 
           {/* 核心卖点 block now adjacent in the grid */}
-          <div className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
+          <div className="glass-panel border-slate-200 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                  <div className="w-2 h-6 bg-indigo-500 rounded-full"></div>
-                 <h3 className="font-bold tracking-wide text-slate-100 text-base">核心卖点</h3>
+                 <h3 className="font-bold tracking-wide text-slate-900 text-base">核心卖点</h3>
               </div>
               <button
                 onClick={() => setEditingPoints(!editingPoints)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 {editingPoints ? "完成修改" : "修改内容"}
@@ -778,15 +778,15 @@ export default function GenerateStep() {
             <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
               {sellingPoints.map((point) => (
                 <div key={point.id} className="flex items-start gap-3 group">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                  <div className="w-2 h-2 mt-2 rounded-full bg-blue-400 shadow-sm flex-shrink-0" />
                   {editingPoints ? (
                     <Input
                       value={point.text}
                       onChange={(e) => setSellingPoints((prev) => prev.map((item) => (item.id === point.id ? { ...item, text: e.target.value } : item)))}
-                      className="h-9 text-sm flex-1 bg-black/30 border-white/10 text-slate-200 focus-visible:ring-cyan-500/50"
+                      className="h-9 text-sm flex-1 bg-slate-50 border-slate-300 text-slate-900 focus-visible:ring-blue-500/50"
                     />
                   ) : (
-                    <span className="text-sm font-medium text-slate-300 leading-relaxed mt-0.5">{point.text}</span>
+                    <span className="text-sm font-medium text-slate-600 leading-relaxed mt-0.5">{point.text}</span>
                   )}
                   {editingPoints && (
                     <button onClick={() => setSellingPoints((prev) => prev.filter((item) => item.id !== point.id))} className="p-2 opacity-60 hover:opacity-100 hover:bg-red-500/20 text-red-400 rounded-lg transition-all mt-0.5">
@@ -797,12 +797,12 @@ export default function GenerateStep() {
               ))}
             </div>
             {editingPoints ? (
-              <div className="flex gap-2 mt-4 pt-3 border-t border-white/10">
+              <div className="flex gap-2 mt-4 pt-3 border-t border-slate-200">
                 <Input
                   value={newPointText}
                   onChange={(e) => setNewPointText(e.target.value)}
                   placeholder="输入新卖点"
-                  className="h-10 text-sm flex-1 bg-cyan-950/20 border-cyan-500/30 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-500"
+                  className="h-10 text-sm flex-1 bg-blue-50 border-blue-300 text-slate-900 placeholder:text-slate-500 focus-visible:ring-blue-500"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && newPointText.trim()) {
                       setSellingPoints((prev) => [...prev, { id: `point-${Date.now()}`, text: newPointText.trim() }]);
@@ -817,13 +817,13 @@ export default function GenerateStep() {
                     setNewPointText("");
                   }
                 }}
-                className="px-3 py-1.5 text-xs font-bold tracking-wide bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
+                className="px-3 py-1.5 text-xs font-bold tracking-wide bg-blue-600 hover:bg-blue-500 text-slate-900 rounded-lg shadow-sm transition-all"
               >
                 添加
               </button>
             </div>
           ) : (
-            <button onClick={() => setEditingPoints(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors">
+            <button onClick={() => setEditingPoints(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
               <Plus className="w-3.5 h-3.5" />
               添加额外卖点
             </button>
@@ -831,15 +831,15 @@ export default function GenerateStep() {
         </div>
         </div>
 
-        <div className="glass-panel border-white/10 rounded-2xl p-5 mb-5 shadow-xl transition-all">
+        <div className="glass-panel border-slate-200 rounded-2xl p-5 mb-5 shadow-xl transition-all">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
                <div className="w-2 h-6 bg-pink-500 rounded-full"></div>
-               <h3 className="font-bold tracking-wide text-slate-100 text-base">核心参数</h3>
+               <h3 className="font-bold tracking-wide text-slate-900 text-base">核心参数</h3>
             </div>
             <button
               onClick={() => setEditingParams(!editingParams)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900"
             >
               <Pencil className="w-3.5 h-3.5" />
               {editingParams ? "完成修改" : "修改参数"}
@@ -857,10 +857,10 @@ export default function GenerateStep() {
                   <Input
                     value={param.value}
                     onChange={(e) => setParams((prev) => prev.map((item) => (item.id === param.id ? { ...item, value: e.target.value } : item)))}
-                    className="h-8 text-sm flex-1 bg-black/30 border-white/10 text-slate-200 focus-visible:ring-cyan-500/50"
+                    className="h-8 text-sm flex-1 bg-slate-50 border-slate-300 text-slate-900 focus-visible:ring-blue-500/50"
                   />
                 ) : (
-                  <span className="text-sm font-medium text-slate-200">{param.value}</span>
+                  <span className="text-sm font-medium text-slate-700">{param.value}</span>
                 )}
                 {editingParams && (
                   <button onClick={() => setParams((prev) => prev.filter((item) => item.id !== param.id))} className="p-1 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-lg transition-colors">
@@ -872,7 +872,7 @@ export default function GenerateStep() {
           </div>
           <button
             onClick={() => setParams((prev) => [...prev, { id: `param-${Date.now()}`, label: "参数", value: "" }])}
-            className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors"
+            className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             添加参数
@@ -880,15 +880,15 @@ export default function GenerateStep() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-5 mb-5 w-full">
-          <div className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
+          <div className="glass-panel border-slate-200 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                  <div className="w-2 h-6 bg-purple-500 rounded-full"></div>
-                 <h3 className="font-bold tracking-wide text-slate-100 text-base">产品优势</h3>
+                 <h3 className="font-bold tracking-wide text-slate-900 text-base">产品优势</h3>
               </div>
               <button
                 onClick={() => setEditingAdvantages(!editingAdvantages)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 {editingAdvantages ? "完成修改" : "修改优势"}
@@ -898,15 +898,15 @@ export default function GenerateStep() {
             <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
               {advantages.map((item) => (
                 <div key={item.id} className="flex items-start gap-3 group">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.8)] flex-shrink-0" />
+                  <div className="w-2 h-2 mt-2 rounded-full bg-purple-400  flex-shrink-0" />
                   {editingAdvantages ? (
                     <Input
                       value={item.text}
                       onChange={(e) => setAdvantages((prev) => prev.map((current) => (current.id === item.id ? { ...current, text: e.target.value } : current)))}
-                      className="h-9 text-sm flex-1 bg-black/30 border-white/10 text-slate-200 focus-visible:ring-purple-500/50"
+                      className="h-9 text-sm flex-1 bg-slate-50 border-slate-300 text-slate-900 focus-visible:ring-purple-500/50"
                     />
                   ) : (
-                    <span className="text-sm font-medium text-slate-300 leading-relaxed mt-0.5">{item.text}</span>
+                    <span className="text-sm font-medium text-slate-600 leading-relaxed mt-0.5">{item.text}</span>
                   )}
                   {editingAdvantages && (
                     <button onClick={() => setAdvantages((prev) => prev.filter((current) => current.id !== item.id))} className="p-2 opacity-60 hover:opacity-100 hover:bg-red-500/20 text-red-400 rounded-lg transition-all mt-0.5">
@@ -917,12 +917,12 @@ export default function GenerateStep() {
               ))}
             </div>
             {editingAdvantages ? (
-              <div className="flex gap-2 mt-4 pt-3 border-t border-white/10">
+              <div className="flex gap-2 mt-4 pt-3 border-t border-slate-200">
                 <Input
                   value={newAdvantageText}
                   onChange={(e) => setNewAdvantageText(e.target.value)}
                   placeholder="输入产品优势描述"
-                  className="h-10 text-sm flex-1 bg-cyan-950/20 border-cyan-500/30 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-500"
+                  className="h-10 text-sm flex-1 bg-blue-50 border-blue-300 text-slate-900 placeholder:text-slate-500 focus-visible:ring-blue-500"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && newAdvantageText.trim()) {
                       setAdvantages((prev) => [...prev, { id: `advantage-${Date.now()}`, text: newAdvantageText.trim() }]);
@@ -937,31 +937,31 @@ export default function GenerateStep() {
                       setNewAdvantageText("");
                     }
                   }}
-                  className="px-3 py-1.5 text-xs font-bold tracking-wide bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
+                  className="px-3 py-1.5 text-xs font-bold tracking-wide bg-blue-600 hover:bg-blue-500 text-slate-900 rounded-lg shadow-sm transition-all"
                 >
                   添加
                 </button>
               </div>
             ) : (
-              <button onClick={() => setEditingAdvantages(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors">
+              <button onClick={() => setEditingAdvantages(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
                 <Plus className="w-3.5 h-3.5" />
                 添加优势
               </button>
             )}
           </div>
 
-          <div className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
+          <div className="glass-panel border-slate-200 rounded-2xl p-5 shadow-xl transition-all h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                  <div className="w-2 h-6 bg-amber-500 rounded-full"></div>
-                 <h3 className="font-bold tracking-wide text-slate-100 text-base">
+                 <h3 className="font-bold tracking-wide text-slate-900 text-base">
                    功能展示
-                   <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-white/10 px-1.5 py-0.5 rounded">可选</span>
+                   <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-slate-200 px-1.5 py-0.5 rounded">可选</span>
                  </h3>
               </div>
               <button
                 onClick={() => setEditingFeatures(!editingFeatures)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 {editingFeatures ? "完成修改" : "修改展示"}
@@ -971,15 +971,15 @@ export default function GenerateStep() {
             <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
               {featureTexts.map((item) => (
                 <div key={item.id} className="flex items-start gap-3 group">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] flex-shrink-0" />
+                  <div className="w-2 h-2 mt-2 rounded-full bg-amber-400  flex-shrink-0" />
                   {editingFeatures ? (
                     <Input
                       value={item.text}
                       onChange={(e) => setFeatureTexts((prev) => prev.map((current) => (current.id === item.id ? { ...current, text: e.target.value } : current)))}
-                      className="h-9 text-sm flex-1 bg-black/30 border-white/10 text-slate-200 focus-visible:ring-amber-500/50"
+                      className="h-9 text-sm flex-1 bg-slate-50 border-slate-300 text-slate-900 focus-visible:ring-amber-500/50"
                     />
                   ) : (
-                    <span className="text-sm font-medium text-slate-300 leading-relaxed mt-0.5">{item.text}</span>
+                    <span className="text-sm font-medium text-slate-600 leading-relaxed mt-0.5">{item.text}</span>
                   )}
                   {editingFeatures && (
                     <button onClick={() => setFeatureTexts((prev) => prev.filter((current) => current.id !== item.id))} className="p-2 opacity-60 hover:opacity-100 hover:bg-red-500/20 text-red-400 rounded-lg transition-all mt-0.5">
@@ -990,12 +990,12 @@ export default function GenerateStep() {
               ))}
             </div>
             {editingFeatures ? (
-              <div className="flex gap-2 mt-4 pt-3 border-t border-white/10">
+              <div className="flex gap-2 mt-4 pt-3 border-t border-slate-200">
                 <Input
                   value={newFeatureText}
                   onChange={(e) => setNewFeatureText(e.target.value)}
                   placeholder="输入功能描述"
-                  className="h-10 text-sm flex-1 bg-cyan-950/20 border-cyan-500/30 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-500"
+                  className="h-10 text-sm flex-1 bg-blue-50 border-blue-300 text-slate-900 placeholder:text-slate-500 focus-visible:ring-blue-500"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && newFeatureText.trim()) {
                       setFeatureTexts((prev) => [...prev, { id: `feature-${Date.now()}`, text: newFeatureText.trim() }]);
@@ -1010,13 +1010,13 @@ export default function GenerateStep() {
                       setNewFeatureText("");
                     }
                   }}
-                  className="px-3 py-1.5 text-xs font-bold tracking-wide bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
+                  className="px-3 py-1.5 text-xs font-bold tracking-wide bg-blue-600 hover:bg-blue-500 text-slate-900 rounded-lg shadow-sm transition-all"
                 >
                   添加
                 </button>
               </div>
             ) : (
-              <button onClick={() => setEditingFeatures(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors">
+              <button onClick={() => setEditingFeatures(true)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
                 <Plus className="w-3.5 h-3.5" />
                 添加功能
               </button>
@@ -1024,22 +1024,22 @@ export default function GenerateStep() {
           </div>
         </div>
 
-        <div className="glass-panel border-white/10 rounded-2xl p-5 mb-8 shadow-xl transition-all">
-          <h3 className="font-bold tracking-wide text-slate-100 text-base mb-4">
+        <div className="glass-panel border-slate-200 rounded-2xl p-5 mb-8 shadow-xl transition-all">
+          <h3 className="font-bold tracking-wide text-slate-900 text-base mb-4">
             添加参考内容
-            <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-white/10 px-1.5 py-0.5 rounded">可选</span>
+            <span className="ml-2 text-xs font-medium text-slate-500 tracking-normal border border-slate-200 px-1.5 py-0.5 rounded">可选</span>
           </h3>
           <div className="flex gap-3 mb-4">
             <Input
               value={referenceUrl}
               onChange={(e) => setReferenceUrl(e.target.value)}
               placeholder="输入竞品链接或参考页面URL"
-              className="flex-1 bg-black/30 border-white/10 text-slate-100 placeholder:text-slate-500 h-11"
+              className="flex-1 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 h-11"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleAddReferenceUrl();
               }}
             />
-            <Button onClick={handleAddReferenceUrl} variant="outline" className="flex-shrink-0 h-11 border-white/20 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10">
+            <Button onClick={handleAddReferenceUrl} variant="outline" className="flex-shrink-0 h-11 border-slate-300 bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200">
               <LinkIcon className="w-4 h-4 mr-2" />
               添加
             </Button>
@@ -1047,7 +1047,7 @@ export default function GenerateStep() {
           <button
             onClick={() => referenceImageInputRef.current?.click()}
             disabled={isUploadingReferenceImages}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-cyan-500/30 rounded-xl bg-cyan-950/20 hover:border-cyan-400 hover:bg-cyan-900/30 transition-all text-sm font-bold tracking-wide text-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-blue-300 rounded-xl bg-blue-50 hover:border-blue-400 hover:bg-blue-100 transition-all text-sm font-bold tracking-wide text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Upload className="w-5 h-5" />
             {isUploadingReferenceImages ? "上传中..." : "上传参考图片（支持多张）"}
@@ -1056,18 +1056,18 @@ export default function GenerateStep() {
           {(referenceLinks.length > 0 || referenceImages.length > 0) && (
             <div className="mt-4 space-y-2">
               {referenceLinks.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
-                  <LinkIcon className="w-4 h-4 text-cyan-500 flex-shrink-0" />
-                  <span className="text-sm font-medium text-slate-200 flex-1 truncate">{item.name}</span>
+                <div key={item.id} className="flex items-center gap-3 p-3 bg-white/80 border border-slate-200 rounded-xl">
+                  <LinkIcon className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-slate-700 flex-1 truncate">{item.name}</span>
                   <button onClick={() => setReferenceLinks((prev) => prev.filter((current) => current.id !== item.id))} className="p-1.5 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-lg transition-colors">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               ))}
               {referenceImages.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
-                  <img src={item.content} alt={item.name} className="w-12 h-12 object-cover rounded shadow-md border border-white/10 flex-shrink-0" />
-                  <span className="text-sm font-medium text-slate-200 flex-1 truncate">{item.name}</span>
+                <div key={item.id} className="flex items-center gap-3 p-3 bg-white/80 border border-slate-200 rounded-xl">
+                  <img src={item.content} alt={item.name} className="w-12 h-12 object-cover rounded shadow-md border border-slate-200 flex-shrink-0" />
+                  <span className="text-sm font-medium text-slate-700 flex-1 truncate">{item.name}</span>
                   <button onClick={() => handleDeleteReferenceImage(item)} className="p-1.5 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-lg transition-colors">
                     <X className="w-4 h-4" />
                   </button>
@@ -1103,7 +1103,7 @@ export default function GenerateStep() {
             sessionStorage.setItem("detail_flow_origin", "generate");
             setLocation("/create/copywriting");
           }}
-          className="w-full mt-5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide text-slate-400 hover:text-cyan-400 transition-colors"
+          className="w-full mt-5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide text-slate-500 hover:text-blue-600 transition-colors"
         >
           <FileText className="w-4 h-4" />
           直接跑去生成详情文案

@@ -227,14 +227,14 @@ export default function StrategyStep() {
   if (error) {
     return (
       <div className="min-h-screen aurora-bg flex items-center justify-center px-4 py-8">
-        <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center rounded-[32px] glass-panel px-6 py-20 border border-white/10">
+        <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center rounded-[32px] glass-panel px-6 py-20 border border-slate-200">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-900/40 border border-red-500/30">
             <AlertCircle className="h-7 w-7 text-red-400" />
           </div>
-          <h1 className="mb-2 text-xl font-bold text-white">主图策略生成失败</h1>
-          <p className="mb-6 max-w-md text-center text-sm text-slate-400">{error}</p>
+          <h1 className="mb-2 text-xl font-bold text-slate-900">主图策略生成失败</h1>
+          <p className="mb-6 max-w-md text-center text-sm text-slate-500">{error}</p>
           <div className="flex gap-3">
-            <Button variant="outline" className="border-white/20 text-slate-300 hover:text-white hover:bg-white/10" onClick={() => setLocation("/create/generate")}>
+            <Button variant="outline" className="border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-200" onClick={() => setLocation("/create/generate")}>
               返回修改参数
             </Button>
             <Button className="sci-fi-button text-white" onClick={() => window.location.reload()}>重新生成策略</Button>
@@ -248,89 +248,89 @@ export default function StrategyStep() {
     <div className="min-h-screen aurora-bg px-4 py-8">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-white tracking-wide">AI已生成主图策略</h1>
-          <p className="mx-auto max-w-md text-sm text-slate-400">
+          <h1 className="mb-2 text-3xl font-bold text-slate-900 tracking-wide">AI已生成主图策略</h1>
+          <p className="mx-auto max-w-md text-sm text-slate-500">
             根据您的选择，AI已为您生成优化策略。请确认以下内容，符合预期后开始生成。
           </p>
         </div>
 
-        <div className="mb-6 rounded-[24px] glass-panel border border-white/10 p-6 shadow-2xl">
+        <div className="mb-6 rounded-[24px] glass-panel border border-slate-200 p-6 shadow-2xl">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-900/40 border border-cyan-500/40">
-              <Check className="h-4 w-4 text-cyan-400" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 border border-cyan-500/40">
+              <Check className="h-4 w-4 text-cyan-600" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-100 tracking-wide">主图策略分析报告</h2>
+            <h2 className="text-lg font-semibold text-slate-900 tracking-wide">主图策略分析报告</h2>
           </div>
 
-          <div className="space-y-4 grid sm:grid-cols-2 gap-4 auto-rows-min">
-            <div className="flex items-start gap-4 rounded-2xl bg-black/40 border border-white/5 p-4 sm:mt-4">
-              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-900/30 border border-cyan-500/20">
-                <Check className="h-3 w-3 text-cyan-500" />
+          <div className="grid sm:grid-cols-2 gap-4 auto-rows-min">
+            <div className="flex items-start gap-4 rounded-2xl bg-slate-50/50 border border-slate-200 p-4 sm:mt-4 transition-colors hover:bg-slate-50">
+              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-50 border border-cyan-100">
+                <Check className="h-3 w-3 text-cyan-600" />
               </div>
               <div>
-                <div className="mb-1 text-xs font-semibold tracking-wider text-slate-500 uppercase">核心场景</div>
-                <div className="text-sm text-slate-200 leading-relaxed">{strategyData.scene}</div>
+                <div className="mb-1 text-xs font-bold tracking-wider text-slate-500 uppercase">核心场景</div>
+                <div className="text-sm font-medium text-slate-800 leading-relaxed">{strategyData.scene}</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-4 rounded-2xl bg-black/40 border border-white/5 p-4">
-              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-900/30 border border-cyan-500/20">
-                <Check className="h-3 w-3 text-cyan-500" />
+            <div className="flex items-start gap-4 rounded-2xl bg-slate-50/50 border border-slate-200 p-4 transition-colors hover:bg-slate-50">
+              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-50 border border-cyan-100">
+                <Check className="h-3 w-3 text-cyan-600" />
               </div>
               <div>
-                <div className="mb-1 text-xs font-semibold tracking-wider text-slate-500 uppercase">核心性能</div>
-                <div className="text-sm text-slate-200 leading-relaxed">{strategyData.performance}</div>
+                <div className="mb-1 text-xs font-bold tracking-wider text-slate-500 uppercase">核心性能</div>
+                <div className="text-sm font-medium text-slate-800 leading-relaxed">{strategyData.performance}</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-4 rounded-2xl bg-black/40 border border-white/5 p-4 sm:col-span-2">
-              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-900/30 border border-cyan-500/20">
-                <Check className="h-3 w-3 text-cyan-500" />
+            <div className="flex items-start gap-4 rounded-2xl bg-slate-50/50 border border-slate-200 p-4 sm:col-span-2 transition-colors hover:bg-slate-50">
+              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-50 border border-cyan-100">
+                <Check className="h-3 w-3 text-cyan-600" />
               </div>
               <div>
-                <div className="mb-1 text-xs font-semibold tracking-wider text-slate-500 uppercase">核心卖点</div>
-                <div className="text-sm text-slate-200 leading-relaxed">{strategyData.sellingPoint}</div>
+                <div className="mb-1 text-xs font-bold tracking-wider text-slate-500 uppercase">核心卖点</div>
+                <div className="text-sm font-medium text-slate-800 leading-relaxed">{strategyData.sellingPoint}</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-4 rounded-2xl bg-black/40 border border-white/5 p-4 sm:col-span-2">
-              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-900/30 border border-cyan-500/20">
-                <Check className="h-3 w-3 text-cyan-500" />
+            <div className="flex items-start gap-4 rounded-2xl bg-slate-50/50 border border-slate-200 p-4 sm:col-span-2 transition-colors hover:bg-slate-50">
+              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-50 border border-cyan-100">
+                <Check className="h-3 w-3 text-cyan-600" />
               </div>
               <div>
-                <div className="mb-1 text-xs font-semibold tracking-wider text-slate-500 uppercase">主图构图建议</div>
-                <div className="text-sm text-slate-200 leading-relaxed">{strategyData.composition}</div>
+                <div className="mb-1 text-xs font-bold tracking-wider text-slate-500 uppercase">主图构图建议</div>
+                <div className="text-sm font-medium text-slate-800 leading-relaxed">{strategyData.composition}</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-4 rounded-2xl border border-orange-500/30 bg-orange-900/20 p-4 sm:col-span-2 shadow-[0_0_15px_rgba(249,115,22,0.1)]">
-              <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-500/20 border border-orange-500/40">
-                <ShoppingBag className="h-4 w-4 text-orange-400" />
+            <div className="flex items-start gap-4 rounded-2xl border border-orange-200 bg-orange-50/50 p-4 sm:col-span-2 shadow-sm">
+              <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-100 border border-orange-200">
+                <ShoppingBag className="h-4 w-4 text-orange-600" />
               </div>
               <div className="flex-1">
                 <div className="mb-1 flex items-center gap-3">
-                  <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">平台专属策略</span>
-                  <span className="rounded border border-orange-500/60 bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold tracking-wider text-orange-400">
+                  <span className="text-xs font-bold tracking-widest text-orange-800 uppercase">平台专属策略</span>
+                  <span className="rounded border border-orange-300 bg-orange-100 px-2 py-0.5 text-[10px] font-bold tracking-wider text-orange-700">
                     专属优化
                   </span>
                 </div>
-                <div className="mb-1 text-base font-bold text-slate-100">{strategyData.platform}</div>
-                <div className="text-sm leading-relaxed text-orange-200/80">{strategyData.platformTips}</div>
+                <div className="mb-1 text-base font-bold text-slate-900">{strategyData.platform}</div>
+                <div className="text-sm font-medium leading-relaxed text-orange-800/80">{strategyData.platformTips}</div>
               </div>
             </div>
 
             {expressionModes.length > 0 && (
-              <div className="flex items-start gap-4 rounded-2xl bg-black/40 border border-indigo-500/30 p-4 sm:col-span-2 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
-                <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-900/30 border border-indigo-500/20">
-                  <Check className="h-3 w-3 text-indigo-500" />
+              <div className="flex items-start gap-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 p-4 sm:col-span-2 shadow-sm">
+                <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 border border-indigo-200">
+                  <Check className="h-3 w-3 text-indigo-600" />
                 </div>
                 <div>
-                  <div className="mb-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">可选表达形态</div>
+                  <div className="mb-2 text-xs font-bold tracking-wider text-indigo-800 uppercase">可选表达形态</div>
                   <div className="flex flex-wrap gap-2">
                     {expressionModes.map((mode, i) => {
                       const txt = typeof mode === "string" ? mode : mode?.mode_name || mode?.label || mode?.mode || mode?.id || JSON.stringify(mode);
                       return (
-                        <span key={i} className="px-2 py-1 rounded-md text-[10px] font-bold tracking-widest bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
+                        <span key={i} className="px-2 py-1 rounded-md text-[10px] font-bold tracking-widest bg-white border border-indigo-200 text-indigo-700 shadow-sm">
                           {txt}
                         </span>
                       );
@@ -341,14 +341,14 @@ export default function StrategyStep() {
             )}
           </div>
 
-          <div className="mt-6 border-t border-white/10 pt-4">
+          <div className="mt-6 border-t border-slate-200 pt-4">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm text-slate-400 font-medium tracking-wide">
+              <span className="text-sm text-slate-600 font-bold tracking-wide">
                 {isAutoStart ? `${countdown}秒后自动开始生成主图...` : "已暂停，随时可手动开始"}
               </span>
               <button
                 onClick={() => setIsAutoStart((value) => !value)}
-                className="flex items-center gap-1.5 rounded-full border border-white/20 px-4 py-1.5 text-xs font-bold text-slate-300 transition-all hover:bg-white/10 hover:text-white"
+                className="flex items-center gap-1.5 rounded-full border border-slate-300 px-4 py-1.5 text-xs font-bold text-slate-600 transition-all hover:bg-slate-200 hover:text-slate-900"
               >
                 {isAutoStart ? (
                   <>
@@ -363,9 +363,9 @@ export default function StrategyStep() {
                 )}
               </button>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-black/40 border border-white/5">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-200">
               <div
-                className="h-full bg-gradient-to-r from-cyan-600 to-cyan-300 transition-all duration-1000 ease-linear shadow-[0_0_10px_rgba(34,211,238,0.5)]"
+                className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-1000 ease-linear"
                 style={{ width: `${((5 - countdown) / 5) * 100}%` }}
               />
             </div>
@@ -373,34 +373,34 @@ export default function StrategyStep() {
           
           {/* DEV INFO BLOCK for Strategy */}
           {(import.meta.env.DEV || localStorage.getItem("dev_debug") === "1") && assetPlan.some((p: any) => Object.keys(p.truth_contract || {}).length > 0 || Object.keys(p.selling_point_binding || {}).length > 0 || p.risk_flags?.length > 0) && (
-            <div className="mt-6 rounded-2xl glass-panel border-purple-500/30 p-5 shadow-lg bg-purple-900/10">
-              <h3 className="mb-3 text-sm font-bold text-purple-400 flex items-center gap-2">
+            <div className="mt-6 rounded-2xl border border-purple-200 p-5 shadow-sm bg-purple-50/50">
+              <h3 className="mb-3 text-sm font-bold text-purple-700 flex items-center gap-2">
                  <AlertCircle className="w-4 h-4" /> 内部调试 / 策略底层分析数据 (Prompt Items)
               </h3>
               <div className="space-y-4 max-h-64 overflow-y-auto custom-scrollbar pr-2">
                 {assetPlan.map((plan: any, idx: number) => {
                    if (!plan.truth_contract && !plan.selling_point_binding && (!plan.risk_flags || plan.risk_flags.length === 0)) return null;
                    return (
-                     <div key={idx} className="bg-black/40 border border-white/5 rounded-xl p-3">
-                        <div className="font-bold text-xs text-slate-300 mb-2">Slot: {plan.slot_id || plan.role}</div>
+                     <div key={idx} className="bg-white/80 border border-slate-200 rounded-xl p-3">
+                        <div className="font-bold text-xs text-slate-600 mb-2">Slot: {plan.slot_id || plan.role}</div>
                         {plan.risk_flags && plan.risk_flags.length > 0 && (
                           <div className="mb-2">
                             <span className="text-[10px] text-slate-500 mr-2">风险 (Risk Flags):</span>
                             {plan.risk_flags.map((rf: string, rIdx: number) => (
-                               <span key={rIdx} className="px-2 py-0.5 rounded bg-red-900/40 border border-red-500/30 text-[10px] text-red-300 mr-1">{rf}</span>
+                               <span key={rIdx} className="px-2 py-0.5 rounded bg-red-50 border border-red-200 text-[10px] text-red-600 mr-1">{rf}</span>
                             ))}
                           </div>
                         )}
                         {plan.selling_point_binding && (
                           <div className="mb-2">
                              <div className="text-[10px] text-slate-500 mb-1">卖点关联结构 (Selling Point Binding):</div>
-                             <pre className="text-[10px] text-slate-300 bg-black/60 p-2 rounded max-h-20 overflow-auto whitespace-pre-wrap">{JSON.stringify(plan.selling_point_binding, null, 2)}</pre>
+                             <pre className="text-[10px] text-slate-600 bg-white p-2 rounded max-h-20 overflow-auto whitespace-pre-wrap">{JSON.stringify(plan.selling_point_binding, null, 2)}</pre>
                           </div>
                         )}
                         {plan.truth_contract && (
                           <div>
                              <div className="text-[10px] text-slate-500 mb-1">生成与物理真值约束 (Truth Contract):</div>
-                             <pre className="text-[10px] text-slate-300 bg-black/60 p-2 rounded max-h-20 overflow-auto whitespace-pre-wrap">{JSON.stringify(plan.truth_contract, null, 2)}</pre>
+                             <pre className="text-[10px] text-slate-600 bg-white p-2 rounded max-h-20 overflow-auto whitespace-pre-wrap">{JSON.stringify(plan.truth_contract, null, 2)}</pre>
                           </div>
                         )}
                      </div>
@@ -415,7 +415,7 @@ export default function StrategyStep() {
           <Button
             onClick={handleModify}
             variant="outline"
-            className="h-14 flex-1 rounded-2xl border-2 border-white/10 bg-black/40 text-sm font-bold tracking-widest text-slate-300 hover:border-white/30 hover:bg-white/5 hover:text-white transition-all backdrop-blur-md"
+            className="h-14 flex-1 rounded-2xl border-2 border-slate-200 bg-white/80 text-sm font-bold tracking-widest text-slate-600 hover:border-white/30 hover:bg-slate-100 hover:text-slate-900 transition-all backdrop-blur-md"
           >
             修改策略参数
           </Button>

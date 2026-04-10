@@ -180,35 +180,15 @@
 
 @layer utilities {
   .glass-panel {
-    @apply bg-[#0a0f1d]/60 backdrop-blur-3xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] transition-all duration-300;
+    @apply bg-white/90 backdrop-blur-2xl border border-slate-200 shadow-sm transition-all duration-300;
   }
   .dark .glass-panel {
     @apply bg-slate-900/70 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.2)] ring-1 ring-white/10;
   }
   
-  /* Gemini Voice Style Aurora Waves */
-  @keyframes aurora-bg {
-    0% { background-position: 50% 100%, 0% 100%; }
-    50% { background-position: 50% 100%, 100% 100%; }
-    100% { background-position: 50% 100%, 0% 100%; }
-  }
+  /* Bright Theme Background */
   .aurora-bg {
-    @apply bg-[#050914] relative overflow-hidden text-slate-100 min-h-screen text-slate-200;
-  }
-  .aurora-bg::before {
-    content: '';
-    position: absolute;
-    bottom: -30%;
-    left: -20%;
-    right: -20%;
-    height: 60vh;
-    background: radial-gradient(ellipse at center, rgba(14, 165, 233, 0.25) 0%, rgba(59, 130, 246, 0.15) 30%, transparent 70%),
-                linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, rgba(139, 92, 246, 0.15) 50%, rgba(56, 189, 248, 0.1) 100%);
-    background-size: 100% 100%, 200% 100%;
-    filter: blur(80px);
-    animation: aurora-bg 15s ease-in-out infinite alternate;
-    pointer-events: none;
-    z-index: 0;
+    @apply bg-slate-50 relative overflow-hidden min-h-screen text-slate-800;
   }
 
   /* Scanner Animation */
@@ -256,13 +236,6 @@
   }
 
   .sci-fi-button {
-    @apply relative overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-[0_0_15px_rgba(56,189,248,0.3)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(56,189,248,0.5)] hover:-translate-y-0.5 border border-white/10 active:translate-y-0 disabled:opacity-50 disabled:hover:shadow-none disabled:hover:translate-y-0 disabled:from-slate-700 disabled:to-slate-800 disabled:border-slate-600;
-  }
-  .sci-fi-button::after {
-    content: '';
-    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full transition-transform duration-1000 ease-in-out;
-  }
-  .sci-fi-button:not(:disabled):hover::after {
-    @apply translate-x-full;
+    @apply relative overflow-hidden rounded-full bg-blue-500 text-white shadow-md transition-all duration-300 hover:shadow-lg hover:bg-blue-600 hover:-translate-y-0.5 border border-transparent active:translate-y-0 disabled:opacity-50 disabled:hover:shadow-none disabled:hover:translate-y-0 disabled:bg-slate-300 disabled:border-slate-200 disabled:text-slate-500;
   }
 }

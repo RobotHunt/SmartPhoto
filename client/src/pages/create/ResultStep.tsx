@@ -627,7 +627,7 @@ export default function ResultStep() {
     }
     setAssets((prev) =>
       prev.map((a) =>
-        a.asset_id === assetId ? { ...a, editOpen: false } : a,
+        a.asset_id === assetId ? { ...a, editOpen: false, isRegenerating: true } : a,
       ),
     );
     try {
@@ -640,13 +640,25 @@ export default function ResultStep() {
         overrides: nextOverrides,
       });
       setStrategyOverrides(saved.overrides || nextOverrides);
-      await handleRegen(assetId, "按当前文案 override 重生");
+      // Use edit-text API to preserve composition while only replacing text
+      const response = await assetAPI.editAssetText(assetId, asset.copy_blocks);
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id);
+      }
+      await loadResults();
+      toast({ title: "文案修改完成" });
     } catch (err: any) {
       toast({
         title: "保存失败",
         description: err?.message || "请稍后重试。",
         variant: "destructive",
       });
+    } finally {
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.asset_id === assetId ? { ...a, isRegenerating: false } : a,
+        ),
+      );
     }
   };
 
@@ -674,13 +686,13 @@ export default function ResultStep() {
       <div className="min-h-screen aurora-bg">
         <StepIndicator currentStep={5} step5Label="生成图片" />
         <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 relative z-10">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-950/40 border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-100 border border-red-200 shadow-sm">
             <X className="h-10 w-10 text-red-400" />
           </div>
-          <h2 className="mb-2 text-xl font-bold tracking-widest text-slate-100">
+          <h2 className="mb-2 text-xl font-bold tracking-widest text-slate-900">
             {isCreditsError ? "额度不足" : "生成失败"}
           </h2>
-          <p className="mb-8 max-w-sm text-center text-sm font-medium tracking-wide text-slate-400">
+          <p className="mb-8 max-w-sm text-center text-sm font-medium tracking-wide text-slate-500">
             {isCreditsError
               ? "当前额度不足以完成本次生成，请稍后重试或联系后端补充联调额度。"
               : error}
@@ -688,14 +700,14 @@ export default function ResultStep() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setLocation("/create/strategy")}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-6 py-3 text-sm font-bold tracking-widest text-slate-300 transition hover:bg-white/10 hover:text-white"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 backdrop-blur-md px-6 py-3 text-sm font-bold tracking-widest text-slate-600 transition hover:bg-slate-200 hover:text-slate-900"
             >
               <ArrowLeft className="h-4 w-4" />
               返回上一页
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="rounded-xl border border-cyan-500/30 bg-cyan-600/20 px-6 py-3 text-sm font-bold tracking-widest text-cyan-400 transition hover:bg-cyan-500/30 hover:text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+              className="rounded-xl border border-blue-300 bg-blue-600/20 px-6 py-3 text-sm font-bold tracking-widest text-blue-600 transition hover:bg-blue-500/30 hover:text-blue-600 shadow-sm"
             >
               重试
             </button>
@@ -714,25 +726,25 @@ export default function ResultStep() {
         <div className="mb-1 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
-              <Check className="h-3 w-3 stroke-[3] text-white" />
+              <Check className="h-3 w-3 stroke-[3] text-slate-900" />
             </div>
-            <span className="text-sm font-bold text-slate-100">
+            <span className="text-sm font-bold text-slate-900">
               已生成 {assets.length} 张图片
             </span>
           </div>
           <button
             onClick={() => setLocation("/create/generate")}
-            className="flex items-center gap-1 rounded-full border border-white/20 bg-black/40 backdrop-blur-md px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-blue-300 hover:text-white"
+            className="flex items-center gap-1 rounded-full border border-slate-300 bg-white/80 backdrop-blur-md px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:text-slate-900"
           >
             <RotateCcw className="h-3 w-3" />
             重新生成
           </button>
         </div>
         <div className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <p className="text-xs text-slate-400 font-medium">✨ 提示：预览图含水印，付费后可获取高清无水印原图</p>
+            <p className="text-xs text-slate-500 font-medium">✨ 提示：预览图含水印，付费后可获取高清无水印原图</p>
             {availableVersions.length > 1 && (
             <div className="flex items-center gap-2 relative z-50">
-                <span className="text-sm font-medium text-slate-300">生成版本历史:</span>
+                <span className="text-sm font-medium text-slate-600">生成版本历史:</span>
                 <VersionSelector
                   versions={availableVersions}
                   currentVersion={currentVersion || latestVersion || 0}
@@ -772,8 +784,8 @@ export default function ResultStep() {
                 key={asset.asset_id}
                 className={`overflow-hidden rounded-[24px] glass-panel transition-all flex flex-col ${
                   isSelected
-                    ? "shadow-[0_0_15px_rgba(6,182,212,0.5)] border-2 border-cyan-400 translate-y-[-2px]"
-                    : "shadow-md shadow-black/40 border border-white/5 hover:border-cyan-500/30"
+                    ? "shadow-md border-2 border-blue-400 translate-y-[-2px]"
+                    : "shadow-md shadow-black/40 border border-slate-200 hover:border-blue-300"
                 }`}
               >
                 {/* 1:1 image area */}
@@ -784,12 +796,12 @@ export default function ResultStep() {
                 >
                   {/* regenerating overlay */}
                   {asset.isRegenerating && (
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm">
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/90 backdrop-blur-sm">
                       <div className="relative">
-                        <div className="absolute inset-0 bg-cyan-500/30 blur-md rounded-full" />
-                        <Loader2 className="h-10 w-10 animate-spin text-cyan-400 relative" />
+                        <div className="absolute inset-0 bg-blue-500/30 blur-md rounded-full" />
+                        <Loader2 className="h-10 w-10 animate-spin text-blue-600 relative" />
                       </div>
-                      <span className="text-sm font-bold tracking-widest text-slate-200">重新生成中...</span>
+                      <span className="text-sm font-bold tracking-widest text-slate-700">重新生成中...</span>
                     </div>
                   )}
 
@@ -804,7 +816,7 @@ export default function ResultStep() {
                   {/* Single centered watermark */}
                   <div className="pointer-events-none absolute inset-0 flex select-none items-center justify-center">
                     <span
-                      className="whitespace-nowrap font-bold tracking-widest text-white/25 rotate-[-30deg]"
+                      className="whitespace-nowrap font-bold tracking-widest text-slate-900/25 rotate-[-30deg]"
                       style={{
                         fontSize: "clamp(16px, 4.5vw, 24px)",
                         textShadow: "0 1px 3px rgba(0,0,0,0.2)",
@@ -819,17 +831,17 @@ export default function ResultStep() {
                     <div
                       className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all ${
                         isSelected
-                          ? "border-cyan-400 bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]"
-                          : "border-white/20 bg-black/50 backdrop-blur-md"
+                          ? "border-blue-400 bg-blue-500 shadow-sm"
+                          : "border-slate-300 bg-slate-100 backdrop-blur-md"
                       }`}
                     >
-                      {isSelected && <Check className="h-3 w-3 stroke-[3] text-white" />}
+                      {isSelected && <Check className="h-3 w-3 stroke-[3] text-slate-900" />}
                     </div>
                   </div>
 
                   <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1.5">
                     {asset.carry_forward && asset.source_version_no != null && (
-                      <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
+                      <div className="rounded-full bg-white/90 backdrop-blur-sm border border-slate-300 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-700 shadow-sm">
                         沿用自 V{asset.source_version_no}
                       </div>
                     )}
@@ -854,9 +866,9 @@ export default function ResultStep() {
                 </div>
 
                 {/* Info row below image */}
-                <div className="flex items-center justify-between px-4 py-3 bg-black/20 backdrop-blur-md">
+                <div className="flex items-center justify-between px-4 py-3 bg-slate-50 backdrop-blur-md">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-sm font-bold tracking-wide text-slate-300">
+                    <span className="text-sm font-bold tracking-wide text-slate-600">
                       {productName} · {label}
                     </span>
                     <button
@@ -865,7 +877,7 @@ export default function ResultStep() {
                         toggleEditOpen(asset.asset_id);
                       }}
                       disabled={actionLocked}
-                      className="flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 px-3 py-1 text-xs font-bold tracking-wide text-cyan-400 transition hover:bg-cyan-900/60 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm"
+                      className="flex items-center gap-1.5 rounded-full border border-blue-300 bg-blue-100 px-3 py-1 text-xs font-bold tracking-wide text-blue-600 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm"
                     >
                       <Pencil className="h-3 w-3" />
                       修改
@@ -876,7 +888,7 @@ export default function ResultStep() {
                         setHistoryAssetId(asset.asset_id);
                       }}
                       disabled={actionLocked}
-                      className="flex items-center justify-center w-6 h-6 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition disabled:opacity-40 text-slate-300"
+                      className="flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition disabled:opacity-40 text-slate-600"
                       title="版本历史"
                     >
                       <History className="h-3 w-3" />
@@ -887,7 +899,7 @@ export default function ResultStep() {
                         setFeedbackAssetId(asset.asset_id);
                       }}
                       disabled={actionLocked}
-                      className="flex items-center justify-center w-6 h-6 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition disabled:opacity-40 text-slate-300"
+                      className="flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition disabled:opacity-40 text-slate-600"
                       title="反馈质量"
                     >
                       <MessageSquare className="h-3 w-3" />
@@ -896,7 +908,7 @@ export default function ResultStep() {
                   <button
                     onClick={() => openRegenModal(asset.asset_id)}
                     disabled={actionLocked || asset.isRegenerating}
-                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold tracking-wide text-slate-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40 shadow-sm"
+                    className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold tracking-wide text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-40 shadow-sm"
                   >
                     <RefreshCw className="h-3 w-3" />
                     重绘
@@ -905,10 +917,10 @@ export default function ResultStep() {
 
                 {/* Expandable inline edit panel */}
                 {asset.editOpen && (
-                  <div className="border-t border-white/10 bg-black/40 backdrop-blur-md px-4 pb-4 pt-3">
+                  <div className="border-t border-slate-200 bg-white/80 backdrop-blur-md px-4 pb-4 pt-3">
                     <div className="space-y-3">
                       <div>
-                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-400">
+                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
                           主标题
                         </label>
                         <input
@@ -918,11 +930,11 @@ export default function ResultStep() {
                             updateAssetText(asset.asset_id, "headline", e.target.value)
                           }
                           placeholder="输入主标题..."
-                          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                         />
                       </div>
                       <div>
-                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-400">
+                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
                           副标题
                         </label>
                         <input
@@ -932,11 +944,11 @@ export default function ResultStep() {
                             updateAssetText(asset.asset_id, "supporting", e.target.value)
                           }
                           placeholder="输入副标题..."
-                          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                         />
                       </div>
                       <div>
-                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-400">
+                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
                           佐证短句
                         </label>
                         <textarea
@@ -946,11 +958,11 @@ export default function ResultStep() {
                             updateAssetLineText(asset.asset_id, "proof_lines", e.target.value)
                           }
                           placeholder={"每行一条"}
-                          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 resize-y"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 resize-y"
                         />
                       </div>
                       <div>
-                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-400">
+                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
                           标签短句
                         </label>
                         <textarea
@@ -960,14 +972,14 @@ export default function ResultStep() {
                             updateAssetLineText(asset.asset_id, "matrix_lines", e.target.value)
                           }
                           placeholder={"每行一条"}
-                          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 resize-y"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 resize-y"
                         />
                       </div>
                     </div>
                     <button
                       onClick={() => saveAssetText(asset.asset_id)}
                       disabled={actionLocked}
-                      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-bold tracking-widest text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold tracking-widest text-slate-900 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
                     >
                       <Check className="h-4 w-4" />
                       应用文案重生
@@ -982,15 +994,15 @@ export default function ResultStep() {
 
       {/* --- Bottom fixed bar --- */}
       <div className="fixed bottom-0 left-0 right-0 z-30">
-        <div className="border-t border-white/10 bg-[#050914]/80 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        <div className="border-t border-slate-200 bg-white/90 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
           <div className="mx-auto flex max-w-5xl items-center gap-4">
             <div className="min-w-0 flex-1 pl-2">
               {selectedCount > 0 ? (
                 <>
-                  <p className="text-sm font-bold tracking-widest text-slate-100">
-                    已选择 <span className="text-cyan-400 font-black">{selectedCount}</span> 张
+                  <p className="text-sm font-bold tracking-widest text-slate-900">
+                    已选择 <span className="text-blue-600 font-black">{selectedCount}</span> 张
                   </p>
-                  <p className="truncate text-xs font-medium tracking-wide text-cyan-400/70 mt-0.5">
+                  <p className="truncate text-xs font-medium tracking-wide text-blue-600/70 mt-0.5">
                     确认后生成高分辨率无水印画质
                   </p>
                 </>
@@ -1016,7 +1028,7 @@ export default function ResultStep() {
                 setLocation("/create/payment");
               }}
               disabled={selectedCount === 0 || actionLocked}
-              className="sci-fi-button flex items-center gap-2 rounded-2xl bg-cyan-600 px-8 py-3.5 text-base font-bold tracking-widest text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all active:scale-[0.98] disabled:bg-white/10 disabled:text-white/30 disabled:border-white/5 disabled:shadow-none"
+              className="sci-fi-button flex items-center gap-2 rounded-2xl bg-blue-600 px-8 py-3.5 text-base font-bold tracking-widest text-white shadow-md transition-all active:scale-[0.98] disabled:bg-slate-200 disabled:text-white/30 disabled:border-slate-200 disabled:shadow-none"
             >
               <Sparkles className="h-5 w-5 fill-white/80" />
               执行高清生成
@@ -1029,21 +1041,21 @@ export default function ResultStep() {
       {regenModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-white backdrop-blur-sm transition-opacity"
             onClick={() => setRegenModalOpen(false)}
           />
-          <div className="relative w-full max-w-lg rounded-t-3xl bg-slate-900/95 backdrop-blur-xl border-t border-white/10 px-5 pb-8 pt-5 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] outline-none animate-in slide-in-from-bottom duration-300">
+          <div className="relative w-full max-w-lg rounded-t-3xl bg-white/95 backdrop-blur-xl border-t border-slate-200 px-5 pb-8 pt-5 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] outline-none animate-in slide-in-from-bottom duration-300">
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-base font-bold tracking-widest text-slate-100">重新生成</h3>
+              <h3 className="text-base font-bold tracking-widest text-slate-900">重新生成</h3>
               <button
                 onClick={() => setRegenModalOpen(false)}
-                className="text-slate-400 transition-colors hover:text-white"
+                className="text-slate-500 transition-colors hover:text-slate-900"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="mb-3 text-xs text-slate-400">
+            <p className="mb-3 text-xs text-slate-500">
               请告诉 AI 你希望如何调整这张图片（可选）
             </p>
             <textarea
@@ -1051,7 +1063,7 @@ export default function ResultStep() {
               value={regenInstruction}
               onChange={(event) => setRegenInstruction(event.target.value)}
               rows={5}
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-slate-200 outline-none ring-0 transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+              className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
               placeholder="例如：背景更干净一些，产品更居中，去掉多余装饰..."
             />
             <div className="mt-3 flex flex-wrap gap-2">
@@ -1063,7 +1075,7 @@ export default function ResultStep() {
                     onClick={() =>
                       setRegenInstruction((prev) => `${prev}${prev ? "；" : ""}${tag}`)
                     }
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10 hover:border-cyan-500/30 hover:text-cyan-300"
+                    className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-200 hover:border-blue-300 hover:text-blue-600"
                   >
                     + {tag}
                   </button>
@@ -1081,7 +1093,7 @@ export default function ResultStep() {
                   value={regenKeepElements}
                   onChange={(e) => setRegenKeepElements(e.target.value)}
                   placeholder="例如：模特，包装"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                  className="w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
               <div>
@@ -1093,7 +1105,7 @@ export default function ResultStep() {
                   value={regenRemoveElements}
                   onChange={(e) => setRegenRemoveElements(e.target.value)}
                   placeholder="例如：背景阴影，反光"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                  className="w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
             </div>
@@ -1101,7 +1113,7 @@ export default function ResultStep() {
             <button
               onClick={confirmRegen}
               disabled={regenLoading}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 py-3.5 text-base font-bold tracking-widest text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-base font-bold tracking-widest text-slate-900 shadow-md transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
             >
               {regenLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -1118,32 +1130,32 @@ export default function ResultStep() {
       {globalEditOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-white backdrop-blur-sm transition-opacity"
             onClick={() => setGlobalEditOpen(false)}
           />
-          <div className="relative w-full max-w-lg rounded-t-3xl bg-slate-900/95 backdrop-blur-xl border-t border-white/10 px-5 pb-8 pt-5 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] outline-none animate-in slide-in-from-bottom duration-300">
+          <div className="relative w-full max-w-lg rounded-t-3xl bg-white/95 backdrop-blur-xl border-t border-slate-200 px-5 pb-8 pt-5 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] outline-none animate-in slide-in-from-bottom duration-300">
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-base font-bold tracking-widest text-slate-100">AI 整体优化</h3>
+              <h3 className="text-base font-bold tracking-widest text-slate-900">AI 整体优化</h3>
               <button
                 onClick={() => setGlobalEditOpen(false)}
-                className="text-slate-400 transition-colors hover:text-white"
+                className="text-slate-500 transition-colors hover:text-slate-900"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="mb-3 text-xs text-slate-400">描述希望 AI 如何整体优化当前这一版主图。</p>
+            <p className="mb-3 text-xs text-slate-500">描述希望 AI 如何整体优化当前这一版主图。</p>
             <textarea
               value={globalInstruction}
               onChange={(event) => setGlobalInstruction(event.target.value)}
               rows={5}
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-slate-200 outline-none ring-0 transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+              className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
               placeholder="例如：整体更高级一些，主图更聚焦产品，卖点文字更清晰"
             />
             <button
               onClick={startGlobalEdit}
               disabled={globalEditLoading}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 py-3.5 text-base font-bold tracking-widest text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-base font-bold tracking-widest text-slate-900 shadow-md transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
             >
               {globalEditLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />

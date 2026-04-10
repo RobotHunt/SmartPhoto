@@ -24,14 +24,14 @@ export function QualityBadge({ status, reason, className = "" }: QualityBadgePro
   switch (status) {
     case "pending_async_review":
       config = {
-        color: "bg-blue-500/20 text-blue-400 border-blue-500/40",
+        color: "bg-blue-50 text-blue-600 border-blue-200",
         icon: <Loader2 className="w-3 h-3 animate-spin" />,
         text: "质检中",
       };
       break;
     case "passed":
       config = {
-        color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/40",
+        color: "bg-emerald-50 text-emerald-600 border-emerald-200",
         icon: <CheckCircle2 className="w-3 h-3" />,
         text: "质检通过",
       };
@@ -39,14 +39,14 @@ export function QualityBadge({ status, reason, className = "" }: QualityBadgePro
     case "sync_failed":
     case "generation_failed":
       config = {
-        color: "bg-red-500/20 text-red-400 border-red-500/40",
+        color: "bg-red-50 text-red-600 border-red-200",
         icon: <XCircle className="w-3 h-3" />,
         text: "生成失败",
       };
       break;
     case "async_failed":
       config = {
-        color: "bg-orange-500/20 text-orange-400 border-orange-500/40",
+        color: "bg-orange-50 text-orange-600 border-orange-200",
         icon: <AlertCircle className="w-3 h-3" />,
         text: "质量不达标",
       };
@@ -57,7 +57,7 @@ export function QualityBadge({ status, reason, className = "" }: QualityBadgePro
 
   const badge = (
     <div
-      className={`inline-flex items-center gap-1 rounded-full backdrop-blur-md border px-2 py-0.5 text-[10px] font-bold tracking-widest shadow-sm ${config.color} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-widest shadow-sm ${config.color} ${className}`}
     >
       {config.icon}
       {config.text}
@@ -71,7 +71,7 @@ export function QualityBadge({ status, reason, className = "" }: QualityBadgePro
           <TooltipTrigger asChild>
             <div className="cursor-help">{badge}</div>
           </TooltipTrigger>
-          <TooltipContent className="bg-slate-900 border-white/10 text-slate-200">
+          <TooltipContent className="bg-white border-slate-200 text-slate-700 shadow-lg">
             <p className="text-xs">{reason}</p>
           </TooltipContent>
         </Tooltip>

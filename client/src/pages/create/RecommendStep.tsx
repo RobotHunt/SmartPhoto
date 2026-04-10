@@ -203,7 +203,7 @@ export default function RecommendStep() {
                     >
                       <ImageIcon
                         className={`w-6 h-6 ${
-                          plan.enabled ? "text-blue-600" : "text-slate-400"
+                          plan.enabled ? "text-blue-600" : "text-slate-500"
                         }`}
                       />
                     </div>

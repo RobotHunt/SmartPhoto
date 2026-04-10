@@ -50,7 +50,7 @@ export default function Account() {
         {/* header */}
         <div className="bg-white px-4 pt-12 pb-6 text-center">
           <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <User className="w-10 h-10 text-slate-300" />
+            <User className="w-10 h-10 text-slate-400" />
           </div>
           <h2 className="text-lg font-bold text-slate-900 mb-1">
             登录后查看本地资料
@@ -185,7 +185,7 @@ function MenuItem({
         <Icon className="w-5 h-5 text-slate-400" />
         <span className="text-sm text-slate-700">{label}</span>
       </div>
-      <ChevronRight className="w-4 h-4 text-slate-300" />
+      <ChevronRight className="w-4 h-4 text-slate-400" />
     </div>
   );
 }

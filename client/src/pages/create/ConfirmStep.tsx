@@ -293,7 +293,7 @@ export default function ConfirmStep() {
               <button
                 onClick={handleGenerate}
                 disabled={confirming}
-                className="bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600 disabled:opacity-60 text-white px-12 py-6 text-xl font-bold shadow-lg hover:shadow-xl transition-all rounded-xl inline-flex items-center gap-3"
+                className="bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600 disabled:opacity-60 text-slate-900 px-12 py-6 text-xl font-bold shadow-lg hover:shadow-xl transition-all rounded-xl inline-flex items-center gap-3"
               >
                 {confirming ? (
                   <>
@@ -311,7 +311,7 @@ export default function ConfirmStep() {
               )}
               <button
                 onClick={handleCopywriting}
-                className="mt-3 flex items-center justify-center gap-1.5 mx-auto text-slate-400 hover:text-blue-600 text-sm transition-colors"
+                className="mt-3 flex items-center justify-center gap-1.5 mx-auto text-slate-500 hover:text-blue-600 text-sm transition-colors"
               >
                 直接生成详情文案
               </button>

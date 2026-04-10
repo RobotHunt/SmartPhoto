@@ -117,12 +117,12 @@ export default function PlatformStep() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* 标题区域 */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-base font-bold text-white shadow">
+          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-base font-bold text-slate-900 shadow">
             3
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-wide">选择平台与类型</h1>
-            <p className="text-xs text-slate-300 mt-0.5">按照平台规范精准生图</p>
+            <h1 className="text-xl font-bold text-slate-900 tracking-wide">选择平台与类型</h1>
+            <p className="text-xs text-slate-600 mt-0.5">按照平台规范精准生图</p>
           </div>
         </div>
 
@@ -135,13 +135,13 @@ export default function PlatformStep() {
                 key={platform.id}
                 onClick={() => togglePlatform(platform.id)}
                 className={`glass-panel rounded-xl flex flex-col items-center justify-center py-4 px-2 relative cursor-pointer transition-all hover:scale-[1.02] ${
-                  isSelected ? 'ring-2 ring-cyan-400 border-cyan-400/50 bg-cyan-900/20' : 'border-white/10 hover:bg-white/5'
+                  isSelected ? 'ring-2 ring-blue-400 border-blue-400/50 bg-blue-50' : 'border-slate-200 hover:bg-slate-100'
                 }`}
               >
                 {/* 平台Logo */}
                 {platform.logo === "plus" ? (
                   <div className="w-12 h-12 flex items-center justify-center mb-2">
-                    <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-10 h-10 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/>
                     </svg>
                   </div>
@@ -154,21 +154,21 @@ export default function PlatformStep() {
                     />
                   </div>
                 ) : (
-                  <div className="w-12 h-12 flex items-center justify-center mb-2 bg-slate-800/80 border border-white/10 rounded-lg">
-                    <span className="text-2xl font-bold text-slate-400">官</span>
+                  <div className="w-12 h-12 flex items-center justify-center mb-2 bg-slate-100 border border-slate-200 rounded-lg">
+                    <span className="text-2xl font-bold text-slate-500">官</span>
                   </div>
                 )}
 
                 {/* 平台名称 */}
-                <div className="text-[11px] font-medium text-slate-200 text-center whitespace-nowrap leading-tight mt-1">
+                <div className="text-[11px] font-medium text-slate-700 text-center whitespace-nowrap leading-tight mt-1">
                   {platform.name}
                 </div>
 
                 {/* 选中标记 */}
                 {isSelected && (
-                  <div className="absolute inset-0 bg-cyan-500/10 rounded-xl flex items-center justify-center pointer-events-none">
-                    <div className="w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.6)]">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="absolute inset-0 bg-blue-500/10 rounded-xl flex items-center justify-center pointer-events-none">
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
+                      <svg className="w-5 h-5 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
                       </svg>
                     </div>
@@ -181,9 +181,9 @@ export default function PlatformStep() {
 
         {/* 已选平台提示 */}
         {selectedPlatforms.length > 0 && (
-          <div className="glass-panel bg-cyan-900/30 rounded-xl p-4 mb-6 border border-cyan-500/30 text-center">
-            <p className="text-slate-200 text-sm">
-              已选择 <span className="font-bold text-cyan-400 px-1">{selectedPlatforms.length}</span> 个平台
+          <div className="glass-panel bg-blue-100 rounded-xl p-4 mb-6 border border-blue-300 text-center">
+            <p className="text-slate-700 text-sm">
+              已选择 <span className="font-bold text-blue-600 px-1">{selectedPlatforms.length}</span> 个平台
             </p>
           </div>
         )}

@@ -142,8 +142,8 @@ const MODULE_CONFIG: ModuleConfig[] = [
   {
     key: "product_parameters",
     icon: BarChart2,
-    color: "text-cyan-600",
-    bgColor: "bg-cyan-50",
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
     label: "产品参数",
     styleTag: "参数图",
     styleDesc: "数据清晰·专业风",
@@ -369,7 +369,7 @@ export default function CopywritingStep() {
   // ── render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen aurora-bg bg-black flex flex-col pt-8 sm:pt-12">
+    <div className="min-h-screen aurora-bg flex flex-col pt-8 sm:pt-12">
       <div className="w-full max-w-5xl mx-auto px-4 relative z-10 w-full pb-28">
         <DetailStepIndicator currentStep={1} />
 
@@ -387,13 +387,13 @@ export default function CopywritingStep() {
           <div className="flex items-center gap-4">
             <Button
               onClick={() => setLocation("/create/generate")}
-              className="px-6 h-12 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-slate-300 rounded-xl font-bold tracking-widest font-sm"
+              className="px-6 h-12 bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:border-slate-300 text-slate-600 rounded-xl font-bold tracking-widest font-sm"
             >
               返回上一页
             </Button>
             <Button
               onClick={forceRegenerateCopy}
-              className="px-6 h-12 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.5)] font-bold tracking-widest font-sm"
+              className="px-6 h-12 bg-blue-600 hover:bg-blue-500 text-slate-900 rounded-xl shadow-md font-bold tracking-widest font-sm"
             >
               重新连接引擎
             </Button>
@@ -404,18 +404,18 @@ export default function CopywritingStep() {
       {/* ── Content ───────────────────────────────────────────────────── */}
       {!loading && !error && (
         <div className="flex-1 w-full pb-10">
-          <div className="glass-panel border-white/10 rounded-2xl p-6 sm:p-8 mb-8 mt-6">
+          <div className="glass-panel border-slate-200 rounded-2xl p-6 sm:p-8 mb-8 mt-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-1.5 h-6 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]"></div>
-                  <h1 className="text-xl font-bold tracking-widest text-slate-100">AI 执行策略已生成</h1>
+                  <div className="w-1.5 h-6 bg-blue-400 rounded-full shadow-sm"></div>
+                  <h1 className="text-xl font-bold tracking-widest text-slate-900">AI 执行策略已生成</h1>
                 </div>
-                <p className="text-sm font-medium tracking-wide text-slate-400 pl-4">
+                <p className="text-sm font-medium tracking-wide text-slate-500 pl-4">
                   根据商品分析与参数提取，已为您规划核心卖点。
                 </p>
               </div>
-              <div className="flex items-center gap-2 self-start sm:self-auto bg-cyan-950/30 border border-cyan-500/20 text-cyan-400 text-xs font-bold px-4 py-2 rounded-xl">
+              <div className="flex items-center gap-2 self-start sm:self-auto bg-blue-100 border border-blue-200 text-blue-600 text-xs font-bold px-4 py-2 rounded-xl">
                 <Zap className="w-3.5 h-3.5" />
                 标准流程
               </div>
@@ -436,31 +436,31 @@ export default function CopywritingStep() {
               const bodyLines = content.slice(1);
 
               return (
-                <div key={mod.key} className="glass-panel border-white/10 rounded-2xl p-5 shadow-xl flex flex-col h-full hover:border-cyan-500/30 transition-all group">
+                <div key={mod.key} className="glass-panel border-slate-200 rounded-2xl p-5 shadow-xl flex flex-col h-full hover:border-blue-300 transition-all group">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2.5">
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${mod.bgColor.replace('50', '950/40')} border ${mod.bgColor.replace('bg-', 'border-').replace('50', '500/20')}`}>
                         <Icon className={`w-4 h-4 ${mod.color.replace('600', '400')}`} />
                       </div>
-                      <span className="text-base font-bold tracking-wider text-slate-100 group-hover:text-white transition-colors">{mod.label}</span>
+                      <span className="text-base font-bold tracking-wider text-slate-900 group-hover:text-slate-900 transition-colors">{mod.label}</span>
                     </div>
-                    <div className="px-2.5 py-1 rounded border border-white/10 bg-white/5 text-[10px] text-slate-400 uppercase tracking-widest">
+                    <div className="px-2.5 py-1 rounded border border-slate-200 bg-slate-100 text-[10px] text-slate-500 uppercase tracking-widest">
                       Module
                     </div>
                   </div>
                   
                   <div className="flex-1 space-y-3">
                     {titleLine && (
-                      <div className="bg-black/30 border border-white/5 rounded-xl px-4 py-3 mb-3">
-                        <p className="text-sm font-bold tracking-wide text-slate-200 leading-snug">{titleLine}</p>
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-3">
+                        <p className="text-sm font-bold tracking-wide text-slate-700 leading-snug">{titleLine}</p>
                       </div>
                     )}
                     
                     {bodyLines.length > 0 && (
                       <div className="space-y-3 px-2">
                         {bodyLines.map((line, i) => (
-                          <div key={i} className="flex items-start gap-2.5 text-sm text-slate-300">
-                            <div className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${mod.bgColor.replace('bg-', 'bg-').replace('50', '400')} shadow-[0_0_5px_currentColor]`}></div>
+                          <div key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
+                            <div className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${mod.bgColor.replace('bg-', 'bg-').replace('50', '400')} `}></div>
                             <span className="leading-relaxed font-medium tracking-wide">{line.replace(/^[•·\-\*]\s*/, "")}</span>
                           </div>
                         ))}
@@ -468,9 +468,9 @@ export default function CopywritingStep() {
                     )}
                   </div>
                   
-                  <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between">
+                  <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold tracking-wider text-cyan-400 bg-cyan-950/40 border border-cyan-500/20 px-2 py-1 rounded-md">
+                      <span className="text-xs font-bold tracking-wider text-blue-600 bg-blue-100 border border-blue-200 px-2 py-1 rounded-md">
                         {mod.styleTag}
                       </span>
                     </div>
@@ -483,8 +483,8 @@ export default function CopywritingStep() {
 
           {/* Footer stats */}
           <div className="mt-10 px-4 py-3 flex items-center justify-center">
-            <div className="px-4 py-1.5 bg-black/40 border border-white/10 rounded-full">
-               <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+            <div className="px-4 py-1.5 bg-white/80 border border-slate-200 rounded-full">
+               <span className="text-xs font-bold tracking-widest text-slate-500 uppercase">
                  已完成基于商品图片的参数提取与卖点生成
                </span>
             </div>
@@ -494,19 +494,19 @@ export default function CopywritingStep() {
 
       {/* Button dock */}
       {!loading && !error && (
-        <div className="fixed bottom-0 left-0 right-0 bg-[#050914]/80 backdrop-blur-xl border-t border-white/10 p-4 flex justify-center z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-4 flex justify-center z-50">
           <div className="w-full max-w-4xl flex items-center gap-3">
             <Button
               variant="outline"
               onClick={handleModify}
-              className="h-14 px-6 bg-white/5 border-white/10 hover:bg-white/10 text-slate-300 hover:text-white rounded-2xl tracking-widest text-sm font-bold shadow-lg"
+              className="h-14 px-6 bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-2xl tracking-widest text-sm font-bold shadow-lg"
             >
               <Edit2 className="w-4 h-4 mr-2" />
               调整方案
             </Button>
             <Button
               onClick={handleGenerateAll}
-              className="sci-fi-button flex-1 h-14 bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-widest text-base rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2"
+              className="sci-fi-button flex-1 h-14 bg-blue-600 hover:bg-blue-500 text-white font-bold tracking-widest text-base rounded-2xl shadow-md flex items-center justify-center gap-2"
             >
               <Zap className="w-5 h-5 fill-white/80 shrink-0" />
               确认卖点，继续生成
@@ -515,7 +515,7 @@ export default function CopywritingStep() {
               variant="outline"
               size="icon"
               onClick={handleShare}
-              className="h-14 w-14 border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-cyan-400 rounded-2xl shrink-0 transition-colors shadow-lg"
+              className="h-14 w-14 border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-blue-600 rounded-2xl shrink-0 transition-colors shadow-lg"
             >
               <Share2 className="w-5 h-5" />
             </Button>

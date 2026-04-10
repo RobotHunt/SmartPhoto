@@ -401,19 +401,19 @@ export default function UploadStep() {
       <div key={def.slotType} className="relative">
         {hasPreview ? (
           <div className="relative flex aspect-square flex-col">
-            <div className={`relative h-full w-full overflow-hidden rounded-2xl border-2 ${isRec ? 'border-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'border-white/20'} bg-slate-800/50`}>
+            <div className={`relative h-full w-full overflow-hidden rounded-2xl border-2 ${isRec ? 'border-orange-300 shadow-[0_0_15px_rgba(249,115,22,0.1)]' : 'border-slate-200'} bg-slate-50`}>
               <img
                 src={slot.previewUrl!}
                 alt={def.label}
                 className="h-full w-full object-cover"
               />
               {slot.uploading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/80 border-t-transparent" />
                 </div>
               )}
               {isRec && (
-                <div className="absolute top-0 left-0 bg-orange-500/90 text-white text-[10px] px-2 py-0.5 rounded-br-lg font-bold tracking-widest backdrop-blur-md">
+                <div className="absolute top-0 left-0 bg-orange-500/90 text-slate-900 text-[10px] px-2 py-0.5 rounded-br-lg font-bold tracking-widest backdrop-blur-md">
                   AI 推荐
                 </div>
               )}
@@ -422,12 +422,12 @@ export default function UploadStep() {
             <button
               onClick={() => removeImage(def.slotType)}
               disabled={slot.uploading}
-              className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600 disabled:opacity-50 z-10"
+              className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-slate-900 shadow-lg transition hover:bg-red-600 disabled:opacity-50 z-10"
             >
               <X className="h-4 w-4" />
             </button>
 
-            <div className="absolute bottom-2 left-2 right-2 rounded-lg bg-black/70 backdrop-blur-sm px-2 py-1 text-center text-xs text-white border border-white/10">
+            <div className="absolute bottom-2 left-2 right-2 rounded-lg bg-white/90 backdrop-blur-sm px-2 py-1 text-center text-xs text-slate-800 border border-slate-100 shadow-sm">
               {def.label}
             </div>
           </div>
@@ -438,30 +438,30 @@ export default function UploadStep() {
             onDragOver={(event) => event.preventDefault()}
             className={`flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition relative overflow-hidden group ${
               isRec 
-                ? 'border-orange-500/60 bg-orange-950/20 hover:border-orange-400 hover:bg-orange-900/30' 
-                : 'border-slate-600 bg-slate-900/40 hover:border-cyan-500/50 hover:bg-cyan-950/30'
+                ? 'border-orange-300 bg-orange-50 hover:border-orange-400 hover:bg-orange-100' 
+                : 'border-slate-300 bg-slate-50 hover:border-cyan-400 hover:bg-cyan-50'
             }`}
           >
             {isRec && (
-              <div className="absolute top-0 left-0 bg-orange-500/90 text-white text-[10px] px-2 py-0.5 rounded-br-lg font-bold tracking-widest z-10">
+              <div className="absolute top-0 left-0 bg-orange-500/90 text-slate-900 text-[10px] px-2 py-0.5 rounded-br-lg font-bold tracking-widest z-10">
                 AI 推荐
               </div>
             )}
             
-            <CloudUpload className={`mb-2 h-8 w-8 ${isRec ? 'text-orange-400/80 group-hover:text-orange-400' : 'text-slate-500 group-hover:text-cyan-400'}`} strokeWidth={1.5} />
-            <div className={`px-2 text-center text-sm font-bold tracking-widest mb-1 ${isRec ? 'text-orange-300' : 'text-slate-300'}`}>
+            <CloudUpload className={`mb-2 h-8 w-8 ${isRec ? 'text-orange-400/80 group-hover:text-orange-500' : 'text-slate-500 group-hover:text-cyan-500'}`} strokeWidth={1.5} />
+            <div className={`px-2 text-center text-sm font-bold tracking-widest mb-1 ${isRec ? 'text-orange-600' : 'text-slate-600'}`}>
               {def.label}
             </div>
             
             {isRec && def.recommendation && (
               <div className="px-3 mt-1 w-full flex flex-col gap-1 text-[10px]">
                 {def.recommendation.must_show && (
-                  <div className="bg-orange-500/10 border border-orange-500/20 text-orange-200/90 px-1.5 py-0.5 rounded truncate w-full text-center" title={`必拍: ${def.recommendation.must_show}`}>
+                  <div className="bg-orange-500/10 border border-orange-500/20 text-orange-700/90 px-1.5 py-0.5 rounded truncate w-full text-center" title={`必拍: ${def.recommendation.must_show}`}>
                     必拍: {def.recommendation.must_show}
                   </div>
                 )}
                 {def.recommendation.framing_hint && (
-                  <div className="bg-cyan-500/10 border border-cyan-500/20 text-cyan-200/90 px-1.5 py-0.5 rounded truncate w-full text-center" title={`构图: ${def.recommendation.framing_hint}`}>
+                  <div className="bg-cyan-500/10 border border-cyan-200 text-cyan-700/90 px-1.5 py-0.5 rounded truncate w-full text-center" title={`构图: ${def.recommendation.framing_hint}`}>
                     构图: {def.recommendation.framing_hint}
                   </div>
                 )}
@@ -480,8 +480,8 @@ export default function UploadStep() {
       <div className="mx-auto max-w-5xl px-4 py-12">
         <div className="mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-wide">上传商品原图</h1>
-            <p className="text-sm text-slate-300 mt-1">支持批量上传，单张最大10MB</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-wide">上传商品原图</h1>
+            <p className="text-sm text-slate-600 mt-1">支持批量上传，单张最大10MB</p>
           </div>
         </div>
 
@@ -498,15 +498,15 @@ export default function UploadStep() {
           </div>
         )}
 
-        <div className="glass-panel border-white/10 rounded-3xl p-6 md:p-8 mb-8 shadow-xl">
+        <div className="glass-panel border-slate-200 rounded-3xl p-6 md:p-8 mb-8 shadow-xl">
           {aiRecommendations.length > 0 && (
-            <h2 className="text-sm font-bold text-slate-400 tracking-widest mb-4">常规视角补充</h2>
+            <h2 className="text-sm font-bold text-slate-500 tracking-widest mb-4">常规视角补充</h2>
           )}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {standardDefs.map(renderSlot)}
           </div>
 
-          <div className="mt-8 text-center text-sm text-slate-400">
+          <div className="mt-8 text-center text-sm text-slate-500">
             支持 JPG / PNG，至少上传1张图片即可开始
           </div>
 
@@ -524,7 +524,7 @@ export default function UploadStep() {
               sessionStorage.removeItem(ANALYSIS_SUPPLEMENT_LIST_KEY);
               setLocation("/");
             }}
-            className="mt-4 flex w-full items-center justify-center gap-1 text-sm text-slate-400 transition hover:text-slate-600"
+            className="mt-4 flex w-full items-center justify-center gap-1 text-sm text-slate-500 transition hover:text-slate-600"
           >
             <ChevronLeft className="h-4 w-4" />
             返回首页

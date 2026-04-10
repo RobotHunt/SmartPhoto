@@ -51,15 +51,15 @@ function AssetCard({ record }: { record: SessionRecord }) {
   ];
 
   return (
-    <div className="glass-panel text-slate-100 rounded-[24px] p-4 mx-4 md:mx-auto max-w-2xl mb-4 border border-white/10 shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]">
+    <div className="glass-panel text-slate-700 rounded-[24px] p-4 mx-4 md:mx-auto max-w-2xl mb-4 border border-slate-200 shadow-sm transition-all hover:shadow-md">
       {/* 顶部：日期 + 三点菜单 */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-semibold text-slate-200">{formatDate(record.created_at)}</span>
+        <span className="text-sm font-semibold text-slate-700">{formatDate(record.created_at)}</span>
         <div className="relative">
           <button
             ref={btnRef}
             onClick={openMenu}
-            className="text-slate-400 hover:text-white active:scale-95 transition-all p-0.5"
+            className="text-slate-500 hover:text-slate-900 active:scale-95 transition-all p-0.5"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
@@ -72,7 +72,7 @@ function AssetCard({ record }: { record: SessionRecord }) {
               >
                 <button
                   onClick={() => { setMenuOpen(false); handleDownload(); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-white/5 active:bg-white/10"
+                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 active:bg-slate-200"
                 >
                   批量下载
                 </button>
@@ -84,17 +84,17 @@ function AssetCard({ record }: { record: SessionRecord }) {
       </div>
 
       {/* 平台 & 步骤信息行 */}
-      <p className="text-xs text-slate-400 mb-3">
+      <p className="text-xs text-slate-500 mb-3">
         平台：{record.platform || "未知"} &middot; {record.last_step || "未知步骤"}
       </p>
 
       {/* 标签行 */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-3">
-        <span className="flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-cyan-900/40 text-cyan-400 border border-cyan-500/30">
+        <span className="flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-blue-50 text-blue-600 border border-blue-200">
           {record.product_name || "未命名"}
         </span>
         {record.image_count > 0 && (
-          <span className="flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-white/5 text-slate-300 border border-white/10">
+          <span className="flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-slate-100 text-slate-600 border border-slate-200">
             {record.image_count} 张图片
           </span>
         )}
@@ -105,7 +105,7 @@ function AssetCard({ record }: { record: SessionRecord }) {
         {thumbs.map((img, idx) => (
           <div
             key={idx}
-            className="flex-1 rounded-xl overflow-hidden bg-black/40 border border-white/5 flex items-center justify-center relative"
+            className="flex-1 rounded-xl overflow-hidden bg-white/80 border border-slate-200 flex items-center justify-center relative"
           >
             {img ? (
               <img src={img} alt="" className="w-full h-full object-cover" />
@@ -114,8 +114,8 @@ function AssetCard({ record }: { record: SessionRecord }) {
             )}
             {/* 最后一张显示 +N 角标 */}
             {idx === 2 && record.image_count > 3 && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-xl">
-                <span className="text-white text-sm font-bold">+{record.image_count - 3}</span>
+              <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-xl">
+                <span className="text-slate-900 text-sm font-bold">+{record.image_count - 3}</span>
               </div>
             )}
           </div>
@@ -126,14 +126,14 @@ function AssetCard({ record }: { record: SessionRecord }) {
       <div className="flex gap-2">
         <button
           onClick={() => toast({ title: "功能开发中", description: "查看全部图片功能即将上线" })}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-slate-300 hover:bg-white/10 active:bg-white/20 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-sm text-slate-600 hover:bg-slate-200 active:bg-white/20 transition-colors"
         >
           查看全部
-          <span className="text-slate-400">&rsaquo;</span>
+          <span className="text-slate-500">&rsaquo;</span>
         </button>
         <button
           onClick={handleDownload}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-slate-300 hover:bg-white/10 active:bg-white/20 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-sm text-slate-600 hover:bg-slate-200 active:bg-white/20 transition-colors"
         >
           下载
           <span className="text-base leading-none">↓</span>
@@ -154,15 +154,15 @@ export default function History() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 px-6">
-        <div className="text-center py-20 glass-panel border-white/10 rounded-3xl mx-4">
+        <div className="text-center py-20 glass-panel border-slate-200 rounded-3xl mx-4">
           <PackageOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-200 mb-2">暂无历史记录</h2>
-          <p className="text-slate-400 mb-8 max-w-sm mx-auto">
+          <h2 className="text-xl font-bold text-slate-700 mb-2">暂无历史记录</h2>
+          <p className="text-slate-500 mb-8 max-w-sm mx-auto">
             您还没有生成过任何商品图片，快去体验一下强大的 AI 视觉创作吧。
           </p>
           <Button
             onClick={() => setLocation("/")}
-            className="sci-fi-button px-8 py-6 rounded-full text-lg shadow-[0_0_15px_rgba(56,189,248,0.3)]"
+            className="sci-fi-button px-8 py-6 rounded-full text-lg shadow-md"
           >
             开始创作
           </Button>
@@ -189,28 +189,28 @@ export default function History() {
   return (
     <div className="min-h-screen aurora-bg flex flex-col">
       {/* 顶部导航 */}
-      <div className="sticky top-0 z-50 glass-panel border-b border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.2)] pl-8 pr-4">
+      <div className="sticky top-0 z-50 glass-panel border-b border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.05)] pl-8 pr-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center">
-              <FolderOpen className="w-4 h-4 text-white" />
+              <FolderOpen className="w-4 h-4 text-slate-900" />
             </div>
             <h1 className="text-base font-bold text-slate-900">我的资产</h1>
           </div>
-          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-            <h1 className="ml-4 text-lg md:text-xl font-bold text-white tracking-wide">
+          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-slate-900 text-xs font-bold">
+            <h1 className="ml-4 text-lg md:text-xl font-bold text-slate-900 tracking-wide">
               历史创作
             </h1>
           </div>
           <div className="flex gap-2">
-            <div className="bg-black/40 backdrop-blur-md rounded-2xl p-1 border border-white/10 hidden md:flex min-w-[200px]">
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl p-1 border border-slate-200 hidden md:flex min-w-[200px]">
               {(["create", "history"] as const).map((tab) => (
                 <button
                   key={tab}
                   className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${
                     tab === "history"
-                      ? "bg-cyan-500 text-white shadow-md shadow-cyan-500/20"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                      ? "bg-blue-500 text-white shadow-md shadow-blue-500/20"
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   {tab}
@@ -239,7 +239,7 @@ export default function History() {
 
         {/* 搜索框 */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
             placeholder="搜索商品名称..."
@@ -254,8 +254,8 @@ export default function History() {
       <div className="flex-1 px-4 pt-4 pb-24 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <ImageIcon className="w-12 h-12 text-slate-300" />
-            <p className="text-sm text-slate-400">还没有生成过图片</p>
+            <ImageIcon className="w-12 h-12 text-slate-600" />
+            <p className="text-sm text-slate-500">还没有生成过图片</p>
           </div>
         ) : (
           filtered.map((record) => <AssetCard key={record.session_id} record={record} />)
@@ -266,7 +266,7 @@ export default function History() {
       <div className="fixed bottom-0 left-0 right-0 glass-panel border-t border-slate-200/50 flex z-20">
         <Link
           href="/"
-          className="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-slate-400 hover:text-slate-600"
+          className="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-slate-500 hover:text-slate-600"
         >
           <Home className="w-5 h-5" />
           <span className="text-xs">首页</span>
@@ -280,7 +280,7 @@ export default function History() {
         </Link>
         <Link
           href="/account"
-          className="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-slate-400 hover:text-slate-600"
+          className="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-slate-500 hover:text-slate-600"
         >
           <User className="w-5 h-5" />
           <span className="text-xs">账户</span>

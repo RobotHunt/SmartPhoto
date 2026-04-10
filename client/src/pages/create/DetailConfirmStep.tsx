@@ -180,7 +180,7 @@ export default function DetailConfirmStep() {
             <div className="flex items-center gap-4">
               <button
                 onClick={handleBack}
-                className="px-6 h-12 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-slate-300 rounded-xl font-bold tracking-widest text-sm transition-colors"
+                className="px-6 h-12 bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:border-slate-300 text-slate-600 rounded-xl font-bold tracking-widest text-sm transition-colors"
               >
                 返回文案页
               </button>
@@ -191,21 +191,21 @@ export default function DetailConfirmStep() {
         {phase === "planning" && (
           <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header info */}
-            <div className="glass-panel border-white/10 rounded-2xl p-6 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="glass-panel border-slate-200 rounded-2xl p-6 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-1.5 h-6 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]"></div>
-                  <h1 className="text-xl font-bold tracking-widest text-slate-100">
+                  <h1 className="text-xl font-bold tracking-widest text-slate-900">
                     已规划 {cards.length} 个详情模块
                   </h1>
                 </div>
-                <p className="text-sm font-medium tracking-wide text-slate-400 pl-4">
+                <p className="text-sm font-medium tracking-wide text-slate-500 pl-4">
                   确认后将进入结账环节，支付完成后 AI 将生成极清无水印的详情图资产。
                 </p>
               </div>
               <button
                 onClick={handleBack}
-                className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-cyan-400 border border-white/10 bg-white/5 rounded-xl px-4 py-2 transition self-start sm:self-auto"
+                className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-cyan-600 border border-slate-200 bg-slate-100 rounded-xl px-4 py-2 transition self-start sm:self-auto"
               >
                 <RefreshCw className="w-4 h-4" />
                 重新配置
@@ -217,32 +217,32 @@ export default function DetailConfirmStep() {
               {cards.map((card, index) => (
                 <div
                   key={card.id}
-                  className="glass-panel border-white/10 rounded-2xl p-6 shadow-xl flex flex-col h-full hover:border-cyan-500/30 transition-all group"
+                  className="glass-panel border-slate-200 rounded-2xl p-6 shadow-xl flex flex-col h-full hover:border-cyan-300 transition-all group"
                 >
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest bg-cyan-950/40 border border-cyan-500/20 px-2 py-0.5 rounded">
+                        <span className="text-xs font-bold text-cyan-600 uppercase tracking-widest bg-cyan-100 border border-cyan-200 px-2 py-0.5 rounded">
                           模块 {index + 1}
                         </span>
                       </div>
-                      <h3 className="text-lg font-bold text-slate-100 group-hover:text-white transition-colors">
+                      <h3 className="text-lg font-bold text-slate-900 group-hover:text-slate-900 transition-colors">
                         {card.label}
                       </h3>
                     </div>
                   </div>
 
-                  <p className="text-sm leading-relaxed text-slate-400 font-medium mb-5 flex-1">
+                  <p className="text-sm leading-relaxed text-slate-500 font-medium mb-5 flex-1">
                     {card.description}
                   </p>
 
                   <div className="space-y-4">
                     {card.copyHighlights.length > 0 && (
-                      <div className="rounded-xl border border-white/5 bg-black/40 p-4">
+                      <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
                          <div className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">核心文案</div>
                          <div className="space-y-2">
                            {card.copyHighlights.map((line, i) => (
-                             <div key={i} className="flex items-start gap-2 text-sm text-slate-300">
+                             <div key={i} className="flex items-start gap-2 text-sm text-slate-600">
                                <div className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.8)]"></div>
                                <span className="leading-relaxed font-medium">{line}</span>
                              </div>
@@ -256,7 +256,7 @@ export default function DetailConfirmStep() {
                         {card.tags.map((tag) => (
                           <span
                             key={tag}
-                            className="rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-medium text-slate-300"
+                            className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600"
                           >
                             {tag}
                           </span>
@@ -266,7 +266,7 @@ export default function DetailConfirmStep() {
 
                     {card.layoutNotes && (
                       <div className="text-xs leading-relaxed text-slate-500 font-medium">
-                        布局说明: <span className="text-slate-400">{card.layoutNotes}</span>
+                        布局说明: <span className="text-slate-500">{card.layoutNotes}</span>
                       </div>
                     )}
 
@@ -281,10 +281,10 @@ export default function DetailConfirmStep() {
             </div>
 
             {/* Bottom Sticky Action Area */}
-            <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#050914]/80 backdrop-blur-xl border-t border-white/10 p-4 flex justify-center">
+            <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-4 flex justify-center">
               <div className="w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="hidden sm:block">
-                  <span className="text-sm font-bold text-slate-300">共 {cards.length} 个独立高转化模块</span>
+                  <span className="text-sm font-bold text-slate-600">共 {cards.length} 个独立高转化模块</span>
                 </div>
                 <button
                   onClick={handleGoToPayment}

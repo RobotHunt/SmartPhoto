@@ -737,6 +737,19 @@ export const assetAPI = {
       }),
     });
   },
+  editAssetText(
+    assetId: string,
+    copyBlocks: Partial<MainGalleryCopyBlocks>,
+    instruction?: string | null,
+  ) {
+    return apiFetch(`/assets/${assetId}/edit-text`, {
+      method: 'POST',
+      body: JSON.stringify({
+        copy_blocks: copyBlocks,
+        instruction: instruction ?? null,
+      }),
+    });
+  },
   submitFeedback(assetId: string, data: { rating: number; issue_tags?: string[]; comment?: string }) {
     return apiFetch(`/assets/${assetId}/feedback`, {
       method: 'POST',

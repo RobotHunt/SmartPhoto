@@ -17,7 +17,7 @@ function HistoryThumbnail({ record }: { record: any }) {
 
   if (!currentSrc || isFailed) {
     return (
-      <div className="w-20 h-20 shrink-0 rounded-xl border border-white/10 bg-black/50 flex items-center justify-center opacity-50">
+      <div className="w-20 h-20 shrink-0 rounded-xl border border-slate-200 bg-slate-100 flex items-center justify-center opacity-50">
         <span className="text-[10px] text-slate-500 font-bold tracking-widest">
           {isFailed ? "加载失败" : "无预览"}
         </span>
@@ -26,7 +26,7 @@ function HistoryThumbnail({ record }: { record: any }) {
   }
 
   return (
-    <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-white/10 bg-black/50">
+    <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
       <img
         src={currentSrc}
         alt="thumbnail"
@@ -104,19 +104,19 @@ export function AssetHistoryDrawer({
 
   return (
     <div className="fixed inset-0 z-[100] flex justify-end" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" />
+      <div className="absolute inset-0 bg-black/40 transition-opacity" />
       <div
-        className="w-full max-w-sm bg-[#050914]/95 border-l border-white/10 shadow-2xl h-full flex flex-col relative animate-in slide-in-from-right duration-300 pointer-events-auto"
+        className="w-full max-w-sm bg-white border-l border-slate-200 shadow-2xl h-full flex flex-col relative animate-in slide-in-from-right duration-300 pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-black/40">
-          <h2 className="text-base font-bold tracking-widest text-slate-100 flex items-center gap-2">
-            <History className="w-4 h-4 text-cyan-400" />
+        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50">
+          <h2 className="text-base font-bold tracking-widest text-slate-800 flex items-center gap-2">
+            <History className="w-4 h-4 text-blue-600" />
             素材版本历史
           </h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition"
+            className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -125,7 +125,7 @@ export function AssetHistoryDrawer({
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
           {loading ? (
             <div className="h-full flex flex-col items-center justify-center opacity-50">
-              <Loader2 className="w-8 h-8 text-cyan-500 animate-spin mb-4" />
+              <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
               <span className="text-xs font-bold tracking-widest text-slate-400">加载中...</span>
             </div>
           ) : history.length === 0 ? (
@@ -144,8 +144,8 @@ export function AssetHistoryDrawer({
                     key={record.asset_id}
                     className={`rounded-2xl border ${
                       isCurrent
-                        ? "border-cyan-500/50 bg-cyan-950/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
-                        : "border-white/10 bg-black/40 hover:border-white/20"
+                        ? "border-blue-300 bg-blue-50 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-slate-300"
                     } p-4 transition-all flex flex-col`}
                   >
                     <div className="flex items-start gap-4">
@@ -153,11 +153,11 @@ export function AssetHistoryDrawer({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className={`text-sm font-bold tracking-widest ${isCurrent ? "text-cyan-400" : "text-slate-200"}`}>
+                          <span className={`text-sm font-bold tracking-widest ${isCurrent ? "text-blue-600" : "text-slate-700"}`}>
                             V{record.version_no}
                           </span>
                           {isCurrent && (
-                            <span className="text-[10px] font-bold text-cyan-400 flex items-center gap-1 bg-cyan-500/20 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                            <span className="text-[10px] font-bold text-blue-600 flex items-center gap-1 bg-blue-100 px-1.5 py-0.5 rounded border border-blue-300">
                               <Check className="w-3 h-3" />
                               当前
                             </span>
@@ -176,9 +176,16 @@ export function AssetHistoryDrawer({
                     </div>
 
                     {record.edit_instruction && (
-                      <div className="mt-3 px-3 py-2 rounded-lg bg-white/5 border border-white/5 text-xs text-slate-300 font-medium leading-relaxed">
+                      <div className="mt-3 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-medium leading-relaxed">
                         <span className="text-slate-500 text-[10px] block mb-0.5">重绘指令：</span>
                         {record.edit_instruction}
+                      </div>
+                    )}
+
+                    {record.generation_snapshot?.edit_mode === "text_replace" && (
+                      <div className="mt-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700 font-medium leading-relaxed">
+                        <span className="text-blue-400 text-[10px] block mb-0.5">文案替换版本</span>
+                        由 V{record.generation_snapshot.source_version_no} 文案修改生成
                       </div>
                     )}
 
@@ -186,7 +193,7 @@ export function AssetHistoryDrawer({
                       <button
                         onClick={() => handleRestore(record.asset_id, record.version_no)}
                         disabled={isRestoring}
-                        className="mt-4 w-full h-9 rounded-xl border border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 text-xs font-bold tracking-widest flex items-center justify-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(59,130,246,0.1)]"
+                        className="mt-4 w-full h-9 rounded-xl border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-bold tracking-widest flex items-center justify-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                       >
                         {isRestoring ? (
                           <>

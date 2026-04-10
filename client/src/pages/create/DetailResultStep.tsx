@@ -534,23 +534,23 @@ export default function DetailResultStep() {
       {/* Error phase */}
       {phase === "error" && (
         <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 relative z-10 text-center">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-950/40 border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-100 border border-red-200 shadow-sm">
             <AlertCircle className="h-10 w-10 text-red-400" />
           </div>
           <div>
-            <p className="mb-2 text-xl font-bold tracking-widest text-slate-100">详情图生成失败</p>
-            <p className="mb-8 max-w-sm text-center text-sm font-medium tracking-wide text-slate-400">{error}</p>
+            <p className="mb-2 text-xl font-bold tracking-widest text-slate-900">详情图生成失败</p>
+            <p className="mb-8 max-w-sm text-center text-sm font-medium tracking-wide text-slate-500">{error}</p>
           </div>
           <div className="flex items-center gap-4">
             <button
               onClick={() => setLocation("/create/detail-confirm")}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-6 py-3 text-sm font-bold tracking-widest text-slate-300 transition hover:bg-white/10 hover:text-white"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 backdrop-blur-md px-6 py-3 text-sm font-bold tracking-widest text-slate-600 transition hover:bg-slate-200 hover:text-slate-900"
             >
               返回上一步
             </button>
             <button
               onClick={handleRetry}
-              className="rounded-xl border border-cyan-500/30 bg-cyan-600/20 px-6 py-3 text-sm font-bold tracking-widest text-cyan-400 transition hover:bg-cyan-500/30 hover:text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+              className="rounded-xl border border-blue-300 bg-blue-600/20 px-6 py-3 text-sm font-bold tracking-widest text-blue-600 transition hover:bg-blue-500/30 hover:text-blue-600 shadow-sm"
             >
               重试
             </button>
@@ -562,19 +562,19 @@ export default function DetailResultStep() {
       {phase === "done" && (
         <div className="flex-1 flex flex-col w-full max-w-7xl mx-auto px-4 md:px-8 mt-4">
           {/* success banner */}
-          <div className="glass-panel border-cyan-500/30 bg-cyan-900/20 px-4 py-4 flex items-center gap-4 rounded-2xl mb-6 shadow-[0_0_15px_rgba(6,182,212,0.1)] relative z-10">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(34,211,238,0.5)]">
-              <Crown className="w-5 h-5 text-white" />
+          <div className="glass-panel border-blue-300 bg-blue-50 px-4 py-4 flex items-center gap-4 rounded-2xl mb-6 shadow-sm relative z-10">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full flex items-center justify-center shrink-0 shadow-sm">
+              <Crown className="w-5 h-5 text-slate-900" />
             </div>
             <div className="flex-1">
-              <p className="text-base font-bold tracking-widest text-slate-100">详情图生成成功！</p>
-              <p className="text-sm font-medium text-cyan-400/80 tracking-wide mt-0.5">无水印 · 可直接用于电商上架</p>
+              <p className="text-base font-bold tracking-widest text-slate-900">详情图生成成功！</p>
+              <p className="text-sm font-medium text-blue-600/80 tracking-wide mt-0.5">无水印 · 可直接用于电商上架</p>
             </div>
           </div>
 
           {/* partial warning banner */}
           {results?.missing_panel_ids && results.missing_panel_ids.length > 0 && (
-            <div className="glass-panel border-orange-500/30 bg-orange-900/20 px-4 py-3 flex items-center gap-3 rounded-2xl mb-6 shadow-[0_0_15px_rgba(249,115,22,0.1)] relative z-10">
+            <div className="glass-panel border-orange-500/30 bg-orange-50 px-4 py-3 flex items-center gap-3 rounded-2xl mb-6 shadow-sm relative z-10">
               <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
                 <AlertCircle className="w-4 h-4 text-orange-400" />
               </div>
@@ -588,13 +588,13 @@ export default function DetailResultStep() {
           {/* version select & image count */}
           <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
             <div className="flex items-center gap-3 pl-2">
-              <div className="w-1.5 h-5 bg-cyan-500 rounded-full shadow-[0_0_8px_#06b6d4]"></div>
-              <span className="text-base font-bold tracking-widest text-slate-100">长图分解列表</span>
-              <span className="text-xs font-medium bg-white/10 px-2 py-0.5 rounded text-cyan-300">{images.length} 块</span>
+              <div className="w-1.5 h-5 bg-blue-500 rounded-full shadow-sm"></div>
+              <span className="text-base font-bold tracking-widest text-slate-900">长图分解列表</span>
+              <span className="text-xs font-medium bg-slate-200 px-2 py-0.5 rounded text-blue-600">{images.length} 块</span>
             </div>
             {results && results.available_versions.length > 1 && (
             <div className="flex items-center gap-2 relative z-50">
-                <span className="text-sm font-bold tracking-wide text-slate-400">生成版本历史:</span>
+                <span className="text-sm font-bold tracking-wide text-slate-500">生成版本历史:</span>
                 <VersionSelector
                   versions={results.available_versions}
                   currentVersion={currentVersion || results.detail_latest_result_version || 0}
@@ -634,7 +634,7 @@ export default function DetailResultStep() {
               }
 
               return (
-              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] shadow-md shadow-black/40 border border-white/5 hover:border-cyan-500/50 transition-all flex flex-col group">
+              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] shadow-md shadow-black/40 border border-slate-200 hover:border-blue-400 transition-all flex flex-col group">
                 {/* image */}
                 <div 
                   className="relative select-none cursor-zoom-in" 
@@ -642,8 +642,8 @@ export default function DetailResultStep() {
                   onClick={() => setPreviewImage(img.url)}
                 >
                   {img.isRegenerating ? (
-                    <div className="w-full flex items-center justify-center bg-black/30" style={{ minHeight: "200px" }}>
-                      <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                    <div className="w-full flex items-center justify-center bg-slate-50" style={{ minHeight: "200px" }}>
+                      <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
                     </div>
                   ) : (
                     <>
@@ -654,14 +654,14 @@ export default function DetailResultStep() {
                         draggable={false}
                         style={{ maxHeight: "400px" }}
                       />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-cyan-900/10 transition-colors pointer-events-none" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-blue-900/10 transition-colors pointer-events-none" />
                     </>
                   )}
 
                   {/* carry forward badge */}
                   <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1.5">
                     {img.carry_forward && img.source_version_no != null && (
-                      <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
+                      <div className="rounded-full bg-white/90 backdrop-blur-sm border border-slate-300 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-700 shadow-sm">
                         沿用自 V{img.source_version_no}
                       </div>
                     )}
@@ -686,15 +686,15 @@ export default function DetailResultStep() {
                 </div>
 
                 {/* bottom action row */}
-                <div className="flex items-center justify-between px-4 py-3 bg-black/20 backdrop-blur-md">
-                  <span className="text-sm font-bold tracking-wide text-slate-300">{productType} · {img.label}</span>
+                <div className="flex items-center justify-between px-4 py-3 bg-slate-50 backdrop-blur-md">
+                  <span className="text-sm font-bold tracking-wide text-slate-600">{productType} · {img.label}</span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleEdit(img.id)}
                       className={`flex items-center gap-1.5 text-xs font-bold tracking-wide shadow-sm rounded-full px-3 py-1 border transition
                         ${img.editOpen
-                          ? "text-cyan-400 border-cyan-500/50 bg-cyan-900/60"
-                          : "text-cyan-400 border-cyan-500/30 bg-cyan-950/40 hover:bg-cyan-900/60"
+                          ? "text-blue-600 border-blue-400 bg-blue-500"
+                          : "text-blue-600 border-blue-300 bg-blue-100 hover:bg-blue-500"
                         }`}
                     >
                       <Pencil className="w-3 h-3" />
@@ -702,14 +702,14 @@ export default function DetailResultStep() {
                     </button>
                     <button
                       onClick={() => setHistoryAssetId(img.id)}
-                      className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                      className="flex items-center justify-center w-7 h-7 rounded-full border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition shadow-sm text-slate-600"
                       title="版本历史"
                     >
                       <History className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setFeedbackAssetId(img.id)}
-                      className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                      className="flex items-center justify-center w-7 h-7 rounded-full border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition shadow-sm text-slate-600"
                       title="反馈质量"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
@@ -719,21 +719,21 @@ export default function DetailResultStep() {
 
                 {/* edit panel */}
                 {img.editOpen && (
-                  <div className="border-t border-white/10 px-4 pb-4 pt-3 bg-black/40 backdrop-blur-md">
+                  <div className="border-t border-slate-200 px-4 pb-4 pt-3 bg-white/80 backdrop-blur-md">
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
-                        <span className="text-xs font-bold tracking-widest text-slate-400 w-14 shrink-0">标注文字</span>
+                        <span className="text-xs font-bold tracking-widest text-slate-500 w-14 shrink-0">标注文字</span>
                         <input
                           value={img.text}
                           onChange={(e) => updateText(img.id, e.target.value)}
-                          className="flex-1 text-sm bg-black/30 border border-white/10 text-slate-200 rounded-xl px-3 py-2 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                          className="flex-1 text-sm bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                           placeholder="输入标注文字"
                         />
                       </div>
                     </div>
                     <button
                       onClick={() => saveText(img.id)}
-                      className="mt-4 w-full flex items-center justify-center gap-1.5 text-sm font-bold tracking-widest text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl py-2.5 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                      className="mt-4 w-full flex items-center justify-center gap-1.5 text-sm font-bold tracking-widest text-slate-900 bg-blue-600 hover:bg-blue-500 rounded-xl py-2.5 transition-all shadow-sm"
                     >
                       <Check className="w-4 h-4" />
                       保存修改
@@ -748,18 +748,18 @@ export default function DetailResultStep() {
           <div className="fixed bottom-0 left-0 right-0 z-30">
             {/* login prompt (hidden when logged in) */}
             {!isAuthenticated && (
-              <div className="bg-[#050914] border-t border-white/5 px-4 py-2 flex items-center justify-center">
+              <div className="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-center">
                 <div className="max-w-5xl w-full flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-center shrink-0">
-                    <CloudUpload className="w-4 h-4 text-cyan-400" />
+                  <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0">
+                    <CloudUpload className="w-4 h-4 text-blue-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold tracking-widest text-slate-200">登录后可云端保存资料与历史</p>
+                    <p className="text-xs font-bold tracking-widest text-slate-700">登录后可云端保存资料与历史</p>
                     <p className="text-xs font-medium tracking-wide text-slate-500">当前数据仅保存在浏览器内</p>
                   </div>
                   <a
                     href={getLoginUrl()}
-                    className="shrink-0 bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 text-xs font-bold tracking-widest px-4 py-2 rounded-xl transition-all"
+                    className="shrink-0 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 text-xs font-bold tracking-widest px-4 py-2 rounded-xl transition-all"
                   >
                     前往登录
                   </a>
@@ -767,16 +767,16 @@ export default function DetailResultStep() {
               </div>
             )}
             {/* action buttons */}
-            <div className="border-t border-white/10 bg-[#050914]/80 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+            <div className="border-t border-slate-200 bg-white/90 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
               <div className="max-w-5xl w-full mx-auto flex gap-3">
-                <Button size="lg" className="flex-1 text-slate-300 font-bold tracking-widest bg-white/5 border border-white/10 hover:bg-white/10 rounded-2xl h-14" onClick={handleDownloadAll} disabled={downloading}>
+                <Button size="lg" className="flex-1 text-slate-600 font-bold tracking-widest bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-2xl h-14" onClick={handleDownloadAll} disabled={downloading}>
                   {downloading ? <Loader2 className="w-5 h-5 animate-spin mr-1" /> : <Download className="w-5 h-5 mr-1" />}
                   一键打包下载
                 </Button>
-                <Button size="icon" variant="outline" className="h-14 w-14 border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-cyan-400 rounded-2xl shrink-0 transition-colors shadow-lg" onClick={() => setShareOpen(true)}>
+                <Button size="icon" variant="outline" className="h-14 w-14 border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-blue-600 rounded-2xl shrink-0 transition-colors shadow-lg" onClick={() => setShareOpen(true)}>
                   <Share2 className="w-5 h-5" />
                 </Button>
-                <Button size="lg" className="sci-fi-button flex-[1.5] bg-cyan-600 font-bold tracking-widest text-base shadow-[0_0_20px_rgba(6,182,212,0.4)] rounded-2xl h-14 gap-2 text-white" onClick={() => setBrandOpen(true)}>
+                <Button size="lg" className="sci-fi-button flex-[1.5] bg-blue-600 font-bold tracking-widest text-base shadow-md rounded-2xl h-14 gap-2 text-white" onClick={() => setBrandOpen(true)}>
                   <Crown className="w-5 h-5 fill-white/50" />
                   保存品牌风格
                 </Button>
@@ -789,7 +789,7 @@ export default function DetailResultStep() {
       {/* brand save modal (bottom sheet) */}
       {brandOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setBrandOpen(false)}>
-          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 bg-white/80" />
           <div
             className="relative bg-white rounded-t-2xl w-full max-w-sm pb-8 pt-5 px-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
@@ -813,7 +813,7 @@ export default function DetailResultStep() {
                 value={brandName}
                 onChange={(e) => setBrandName(e.target.value)}
                 placeholder="例如：NaoNao宠物、小米官方旗舰店"
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-slate-300"
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-slate-600"
               />
             </div>
 
@@ -840,8 +840,8 @@ export default function DetailResultStep() {
               disabled={!brandName.trim()}
               className={`w-full h-11 rounded-2xl font-semibold text-sm transition-colors ${
                 brandName.trim()
-                  ? "bg-blue-500 hover:bg-blue-600 text-white"
-                  : "bg-slate-100 text-slate-300 cursor-not-allowed"
+                  ? "bg-blue-500 hover:bg-blue-600 text-slate-900"
+                  : "bg-slate-100 text-slate-600 cursor-not-allowed"
               }`}
             >
               保存品牌风格
@@ -853,10 +853,10 @@ export default function DetailResultStep() {
       {/* brand save success modal */}
       {brandSuccessOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
-          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 bg-white/80" />
           <div className="relative bg-white rounded-3xl w-full max-w-sm px-6 py-8 shadow-2xl flex flex-col items-center text-center">
             <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-green-200">
-              <CheckCircle2 className="w-8 h-8 text-white" />
+              <CheckCircle2 className="w-8 h-8 text-slate-900" />
             </div>
             <h3 className="text-lg font-bold text-slate-900 mb-2">
               已为您记住「{brandSavedName}」品牌风格
@@ -866,7 +866,7 @@ export default function DetailResultStep() {
             </p>
             <button
               onClick={handleBrandSuccessClose}
-              className="w-full h-11 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm transition-colors"
+              className="w-full h-11 rounded-2xl bg-blue-500 hover:bg-blue-600 text-slate-900 font-semibold text-sm transition-colors"
             >
               好的，返回主页
             </button>
@@ -877,7 +877,7 @@ export default function DetailResultStep() {
       {/* share modal (bottom sheet) */}
       {shareOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShareOpen(false)}>
-          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 bg-white/80" />
           <div className="relative bg-white rounded-t-2xl w-full max-w-sm pb-8 pt-5 px-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-slate-900">选择分享方式</h3>
@@ -886,7 +886,7 @@ export default function DetailResultStep() {
               </button>
             </div>
             <button
-              className="w-full h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm transition-colors"
+              className="w-full h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-slate-900 font-semibold text-sm transition-colors"
               onClick={async () => {
                 await navigator.clipboard.writeText(window.location.href);
                 toast({ title: "已复制链接" });

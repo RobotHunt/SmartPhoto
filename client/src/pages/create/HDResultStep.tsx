@@ -336,50 +336,56 @@ export default function HDResultStep() {
         overrides: nextOverrides,
       });
       setStrategyOverrides(saved.overrides || nextOverrides);
-      await regenerateImage(id, "按当前文案 override 重生");
+      // Use edit-text API to preserve composition while only replacing text
+      const response = await assetAPI.editAssetText(id, img.copy_blocks);
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id);
+      }
+      await loadImages();
+      toast({ title: "文案修改完成" });
     } catch (err: any) {
       toast({ title: "保存失败", description: err.message, variant: "destructive" });
     }
   };
 
   const renderCopyEditor = (img: PreviewImage) => (
-    <div className="border-t border-white/5 p-5 bg-black/40">
+    <div className="border-t border-slate-200 p-5 bg-white/80">
       <div className="space-y-3">
         <div className="flex items-start gap-3">
-          <span className="text-xs font-bold tracking-widest text-slate-400 w-16 shrink-0 pt-2.5">主标题</span>
+          <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">主标题</span>
           <input
             value={img.copy_blocks.headline}
             onChange={(e) => updateText(img.id, "headline", e.target.value)}
-            className="flex-1 text-sm text-slate-100 bg-[#050914] border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+            className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
             placeholder="输入主标题..."
           />
         </div>
         <div className="flex items-start gap-3">
-          <span className="text-xs font-bold tracking-widest text-slate-400 w-16 shrink-0 pt-2.5">副标题</span>
+          <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">副标题</span>
           <input
             value={img.copy_blocks.supporting}
             onChange={(e) => updateText(img.id, "supporting", e.target.value)}
-            className="flex-1 text-sm text-slate-100 bg-[#050914] border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+            className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
             placeholder="输入副标题..."
           />
         </div>
         <div className="flex items-start gap-3">
-          <span className="text-xs font-bold tracking-widest text-slate-400 w-16 shrink-0 pt-2.5">佐证短句</span>
+          <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">佐证短句</span>
           <textarea
             rows={3}
             value={copyLinesToTextarea(img.copy_blocks.proof_lines)}
             onChange={(e) => updateLineText(img.id, "proof_lines", e.target.value)}
-            className="flex-1 text-sm text-slate-100 bg-[#050914] border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+            className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
             placeholder={"每行一条，例如：\n通过质检认证\n核心参数可视化"}
           />
         </div>
         <div className="flex items-start gap-3">
-          <span className="text-xs font-bold tracking-widest text-slate-400 w-16 shrink-0 pt-2.5">标签短句</span>
+          <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">标签短句</span>
           <textarea
             rows={3}
             value={copyLinesToTextarea(img.copy_blocks.matrix_lines)}
             onChange={(e) => updateLineText(img.id, "matrix_lines", e.target.value)}
-            className="flex-1 text-sm text-slate-100 bg-[#050914] border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+            className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
             placeholder={"每行一条，例如：\n净化除湿二合一\n低噪运行"}
           />
         </div>
@@ -449,7 +455,7 @@ export default function HDResultStep() {
           onClick={() => setPreviewImage(null)}
         >
           <button 
-            className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white z-[110]"
+            className="absolute top-6 right-6 p-2 bg-slate-200 hover:bg-white/20 rounded-full transition-colors text-slate-900 z-[110]"
             onClick={(e) => {
               e.stopPropagation();
               setPreviewImage(null);
@@ -500,18 +506,18 @@ export default function HDResultStep() {
         <StepIndicator currentStep={5} />
 
         <div className="w-full max-w-7xl mx-auto px-4 relative z-10 pb-36">
-          <div className="flex items-center justify-between gap-3 mb-6 bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl">
+          <div className="flex items-center justify-between gap-3 mb-6 bg-white/80 backdrop-blur-md border border-slate-200 p-4 rounded-2xl">
             <div className="flex flex-col">
-              <span className="text-sm font-bold tracking-widest text-slate-100 mb-1">
-                已生成 <span className="text-cyan-400">{images.length}</span> 张图片
+              <span className="text-sm font-bold tracking-widest text-slate-900 mb-1">
+                已生成 <span className="text-blue-600">{images.length}</span> 张图片
               </span>
-              <span className="text-xs text-cyan-500/80 font-medium tracking-widest">
+              <span className="text-xs text-blue-500/80 font-medium tracking-widest">
                 预览图含水印，付费后生成无水印高清原图
               </span>
             </div>
             <button
               onClick={regenAll}
-              className="flex items-center gap-1 text-xs font-bold tracking-widest text-slate-300 hover:text-white bg-white/5 border border-white/10 rounded-full px-4 py-2 transition hover:bg-white/10"
+              className="flex items-center gap-1 text-xs font-bold tracking-widest text-slate-600 hover:text-slate-900 bg-slate-100 border border-slate-200 rounded-full px-4 py-2 transition hover:bg-slate-200"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               全部重新生成
@@ -535,15 +541,15 @@ export default function HDResultStep() {
               }
 
               return (
-              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.3)] hover:border-cyan-500/40 transition-all flex flex-col group">
+              <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-slate-200 shadow-md hover:border-blue-500/40 transition-all flex flex-col group">
                 <div 
                   className="relative select-none cursor-zoom-in flex-1" 
                   onContextMenu={(e) => e.preventDefault()}
                   onClick={() => setPreviewImage(img.url)}
                 >
                   {img.isRegenerating && (
-                    <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10">
-                      <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
+                    <div className="absolute inset-0 bg-white/90 backdrop-blur-md flex items-center justify-center z-10">
+                      <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
                     </div>
                   )}
                   <img
@@ -552,10 +558,10 @@ export default function HDResultStep() {
                     className="w-full aspect-square object-cover pointer-events-none transition-transform duration-700 group-hover:scale-[1.02]"
                     draggable={false}
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-cyan-900/10 pointer-events-none transition-colors" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-blue-900/10 pointer-events-none transition-colors" />
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                     <div
-                      className="text-white/25 font-bold text-xl select-none"
+                      className="text-slate-900/25 font-bold text-xl select-none"
                       style={{
                         transform: "rotate(-30deg)",
                         textShadow: "0 1px 4px rgba(0,0,0,0.6)",
@@ -570,7 +576,7 @@ export default function HDResultStep() {
                   {/* carry forward badge */}
                   <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1.5">
                     {img.carry_forward && img.source_version_no != null && (
-                      <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
+                      <div className="rounded-full bg-white/90 backdrop-blur-sm border border-slate-300 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-700 shadow-sm">
                         沿用自 V{img.source_version_no}
                       </div>
                     )}
@@ -594,17 +600,17 @@ export default function HDResultStep() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-black/30">
-                  <span className="text-sm font-bold tracking-widest text-slate-300">
-                    {img.product} · <span className="text-cyan-400">{img.type}</span>
+                <div className="flex items-center justify-between p-4 bg-slate-50">
+                  <span className="text-sm font-bold tracking-widest text-slate-600">
+                    {img.product} · <span className="text-blue-600">{img.type}</span>
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleEdit(img.id)}
                       className={`flex items-center gap-1.5 text-xs font-bold tracking-widest rounded-full px-3 py-1 transition shadow-sm ${
                         img.editOpen
-                          ? "bg-cyan-900/60 text-cyan-300 border border-cyan-500/50"
-                          : "bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:text-white"
+                          ? "bg-blue-500 text-blue-600 border border-blue-400"
+                          : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 hover:text-slate-900"
                       }`}
                     >
                       <Pencil className="w-3 h-3" />
@@ -612,21 +618,21 @@ export default function HDResultStep() {
                     </button>
                     <button
                       onClick={() => regenSingle(img.id)}
-                      className="flex items-center gap-1 text-xs font-bold tracking-widest text-slate-300 border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white rounded-full px-3 py-1 transition shadow-sm"
+                      className="flex items-center gap-1 text-xs font-bold tracking-widest text-slate-600 border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 rounded-full px-3 py-1 transition shadow-sm"
                     >
                       <RefreshCw className="w-3 h-3" />
                       单独重绘
                     </button>
                     <button
                       onClick={() => setHistoryAssetId(img.id)}
-                      className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                      className="flex items-center justify-center w-7 h-7 rounded-full border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition shadow-sm text-slate-600"
                       title="版本历史"
                     >
                       <History className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setFeedbackAssetId(img.id)}
-                      className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                      className="flex items-center justify-center w-7 h-7 rounded-full border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition shadow-sm text-slate-600"
                       title="反馈质量"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
@@ -639,7 +645,7 @@ export default function HDResultStep() {
             )})}
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#050914]/80 backdrop-blur-xl border-t border-white/10 px-4 py-4 md:py-6 sm:px-12 flex justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 px-4 py-4 md:py-6 sm:px-12 flex justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
             <div className="w-full max-w-4xl flex flex-col items-center">
               <button
                 onClick={goToPayment}
@@ -648,7 +654,7 @@ export default function HDResultStep() {
                 <Sparkles className="w-5 h-5" />
                 生成无水印高清图
               </button>
-              <p className="text-center text-xs font-medium tracking-widest text-slate-400 mt-2">共 {images.length} 张，确认后全部生成</p>
+              <p className="text-center text-xs font-medium tracking-widest text-slate-500 mt-2">共 {images.length} 张，确认后全部生成</p>
             </div>
           </div>
         </div>
@@ -676,20 +682,20 @@ export default function HDResultStep() {
 
       <div className="w-full max-w-7xl mx-auto px-4 relative z-10 pb-44">
         {/* State Banner */}
-        <div className="glass-panel border-cyan-500/30 bg-cyan-950/20 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+        <div className="glass-panel border-blue-300 bg-blue-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 rounded-2xl shadow-md">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/20">
-              <Crown className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
+              <Crown className="w-5 h-5 text-slate-900" />
             </div>
             <div className="flex-1">
-              <p className="text-base font-bold tracking-widest text-cyan-50">高清图生成成功！</p>
-              <p className="text-xs font-medium tracking-widest text-cyan-300/80 mt-0.5">无水印真高清 · 可直接用于电商上架</p>
+              <p className="text-base font-bold tracking-widest text-blue-800">高清图生成成功！</p>
+              <p className="text-xs font-medium tracking-widest text-blue-600/80 mt-0.5">无水印真高清 · 可直接用于电商上架</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold tracking-widest text-slate-100">高清成片</span>
-            <span className="text-xs font-bold tracking-widest bg-white/10 px-2 py-0.5 rounded-md text-slate-300 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-sm font-bold tracking-widest text-slate-900">高清成片</span>
+            <span className="text-xs font-bold tracking-widest bg-slate-200 px-2 py-0.5 rounded-md text-slate-600 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
               {images.length} 张
             </span>
           </div>
@@ -713,15 +719,15 @@ export default function HDResultStep() {
             }
 
             return (
-            <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.5)] transition hover:border-cyan-500/40 group flex flex-col">
+            <div key={img.id} className="glass-panel overflow-hidden rounded-[24px] border border-slate-200 shadow-lg transition hover:border-blue-500/40 group flex flex-col">
               <div 
                 className="relative select-none cursor-zoom-in flex-1" 
                 onContextMenu={(e) => e.preventDefault()}
                 onClick={() => setPreviewImage(img.url)}
               >
                 {img.isRegenerating && (
-                  <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10 pointer-events-none">
-                    <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                  <div className="absolute inset-0 bg-white/90 backdrop-blur-md flex items-center justify-center z-10 pointer-events-none">
+                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
                   </div>
                 )}
                 <img
@@ -730,12 +736,12 @@ export default function HDResultStep() {
                   className="w-full aspect-square object-cover pointer-events-none transition-transform duration-700 group-hover:scale-[1.02]"
                   draggable={false}
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-cyan-900/10 pointer-events-none transition-colors" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-blue-900/10 pointer-events-none transition-colors" />
 
                 {/* carry forward badge */}
                 <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1.5">
                   {img.carry_forward && img.source_version_no != null && (
-                    <div className="rounded-full bg-slate-800/80 backdrop-blur-md border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-300 shadow-sm">
+                    <div className="rounded-full bg-white/90 backdrop-blur-sm border border-slate-300 px-2 py-0.5 text-[10px] font-bold tracking-widest text-slate-700 shadow-sm">
                       沿用自 V{img.source_version_no}
                     </div>
                   )}
@@ -758,16 +764,16 @@ export default function HDResultStep() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap items-center justify-between p-4 bg-black/30">
-                <span className="text-sm font-bold tracking-widest text-slate-300">
-                  {img.product} · <span className="text-cyan-400">{img.type}</span>
+              <div className="flex flex-wrap items-center justify-between p-4 bg-slate-50">
+                <span className="text-sm font-bold tracking-widest text-slate-600">
+                  {img.product} · <span className="text-blue-600">{img.type}</span>
                 </span>
                 <button
                   onClick={() => toggleEdit(img.id)}
                   className={`flex items-center gap-1.5 text-xs font-bold tracking-widest rounded-full px-3 py-1 transition shadow-sm ${
                     img.editOpen
-                      ? "bg-cyan-900/60 text-cyan-300 border border-cyan-500/50"
-                      : "bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:text-white"
+                      ? "bg-blue-500 text-blue-600 border border-blue-400"
+                      : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 hover:text-slate-900"
                   }`}
                 >
                   <Pencil className="w-3 h-3" />
@@ -776,14 +782,14 @@ export default function HDResultStep() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setHistoryAssetId(img.id)}
-                    className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                    className="flex items-center justify-center w-7 h-7 rounded-full border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition shadow-sm text-slate-600"
                     title="版本历史"
                   >
                     <History className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setFeedbackAssetId(img.id)}
-                    className="flex items-center justify-center w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition shadow-sm text-slate-300"
+                    className="flex items-center justify-center w-7 h-7 rounded-full border border-slate-200 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition shadow-sm text-slate-600"
                     title="反馈质量"
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
@@ -798,41 +804,41 @@ export default function HDResultStep() {
         {/* --- Bottom Actions Bar --- */}
         <div className="fixed bottom-0 left-0 right-0 z-30 flex flex-col">
           {!isAuthenticated && (
-            <div className="bg-[#050914]/90 backdrop-blur-xl border-t border-white/10 px-6 py-3 flex flex-wrap items-center justify-center gap-4 relative z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+            <div className="bg-white/90 backdrop-blur-xl border-t border-slate-200 px-6 py-3 flex flex-wrap items-center justify-center gap-4 relative z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-cyan-900/30 border border-cyan-500/30 flex items-center justify-center shrink-0">
-                  <CloudUpload className="w-4 h-4 text-cyan-400" />
+                <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0">
+                  <CloudUpload className="w-4 h-4 text-blue-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold tracking-widest text-slate-200">登录账号，自动保存全部设计资产</p>
-                  <p className="text-[10px] font-medium tracking-widest text-slate-400 mt-0.5 text-cyan-500/80">避免高清原图丢失 终生可用</p>
+                  <p className="text-xs font-bold tracking-widest text-slate-700">登录账号，自动保存全部设计资产</p>
+                  <p className="text-[10px] font-medium tracking-widest text-slate-500 mt-0.5 text-blue-500/80">避免高清原图丢失 终生可用</p>
                 </div>
               </div>
               <a
                 href={getLoginUrl()}
-                className="shrink-0 bg-transparent hover:bg-white/5 border border-cyan-500/30 text-cyan-400 text-xs font-bold tracking-widest px-4 py-2 rounded-xl transition"
+                className="shrink-0 bg-transparent hover:bg-slate-100 border border-blue-300 text-blue-600 text-xs font-bold tracking-widest px-4 py-2 rounded-xl transition"
               >
                 立即登录注册
               </a>
             </div>
           )}
           
-          <div className="bg-[#050914]/90 backdrop-blur-xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] px-4 py-4 md:py-6 flex justify-center w-full z-10">
+          <div className="bg-white/90 backdrop-blur-xl border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-4 py-4 md:py-6 flex justify-center w-full z-10">
             <div className="w-full max-w-4xl flex items-center gap-3 md:gap-4">
               <button
-                className="flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold tracking-widest bg-white/5 border border-white/10 text-slate-200 hover:bg-white/10 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold tracking-widest bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleDownload}
                 disabled={downloading}
               >
                 {downloading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                 ) : (
                   <Download className="w-5 h-5" />
                 )}
                 一键下载高清图包
               </button>
               <button 
-                className="w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition"
+                className="w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition"
                 onClick={() => setShowShareModal(true)}
               >
                 <Share2 className="w-5 h-5" />
@@ -851,22 +857,22 @@ export default function HDResultStep() {
         {/* --- Share Modal --- */}
         {showShareModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" onClick={() => setShowShareModal(false)}>
-            <div className="absolute inset-0 bg-[#050914]/80 backdrop-blur-md" />
+            <div className="absolute inset-0 bg-white/90 backdrop-blur-md" />
             <div
-              className="relative glass-panel rounded-3xl w-[90%] max-w-sm pb-8 pt-6 px-6 shadow-[0_0_50px_rgba(34,211,238,0.15)] border border-white/10"
+              className="relative glass-panel rounded-3xl w-[90%] max-w-sm pb-8 pt-6 px-6 shadow-lg border border-slate-200"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-base font-bold tracking-widest text-slate-100 flex items-center gap-2"><Share2 className="w-4 h-4 text-cyan-400" />分享你的作品</h3>
+                <h3 className="text-base font-bold tracking-widest text-slate-900 flex items-center gap-2"><Share2 className="w-4 h-4 text-blue-600" />分享你的作品</h3>
                 <button
                   onClick={() => setShowShareModal(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-black/40 border border-white/10 hover:bg-white/10 text-slate-400 transition"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/80 border border-slate-200 hover:bg-slate-200 text-slate-500 transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
               <button
-                className="w-full h-12 rounded-xl bg-cyan-600/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 font-bold tracking-widest text-sm transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                className="w-full h-12 rounded-xl bg-blue-600/20 hover:bg-blue-500/30 border border-blue-300 text-blue-600 font-bold tracking-widest text-sm transition-all shadow-sm"
                 onClick={copyShareLink}
               >
                 一键复制专属链接

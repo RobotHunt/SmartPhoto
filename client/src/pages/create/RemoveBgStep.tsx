@@ -80,7 +80,7 @@ export default function RemoveBgStep() {
             {/* Before */}
             <div>
               <div className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
-                <span className="w-6 h-6 bg-slate-500 text-white rounded-full flex items-center justify-center text-xs">
+                <span className="w-6 h-6 bg-slate-500 text-slate-900 rounded-full flex items-center justify-center text-xs">
                   1
                 </span>
                 原图
@@ -97,7 +97,7 @@ export default function RemoveBgStep() {
             {/* After */}
             <div>
               <div className="text-sm font-semibold text-blue-600 mb-3 flex items-center gap-2">
-                <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs">
+                <span className="w-6 h-6 bg-blue-500 text-slate-900 rounded-full flex items-center justify-center text-xs">
                   2
                 </span>
                 白底图
