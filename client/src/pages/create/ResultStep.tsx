@@ -60,6 +60,7 @@ type ResultAssetView = {
   quality_status?: string;
   quality_scores?: Record<string, any> | null;
   failure_reason?: string | null;
+  brand_memory_trace?: any;
 };
 
 function normalizeGenerationError(error: any) {
@@ -140,6 +141,7 @@ function buildViewAssets(
     quality_status: asset.quality_status,
     quality_scores: asset.quality_scores,
     failure_reason: asset.failure_reason,
+    brand_memory_trace: asset.brand_memory_trace,
   }));
 }
 
@@ -984,6 +986,19 @@ export default function ResultStep() {
                       <Check className="h-4 w-4" />
                       应用文案重生
                     </button>
+                  </div>
+                )}
+
+                {/* --- Dev Info Block for Brand Trace --- */}
+                {(import.meta.env.DEV || localStorage.getItem("dev_debug") === "1") && asset.brand_memory_trace && (
+                  <div className="border-t border-teal-200/50 bg-teal-50/50 backdrop-blur-md px-4 py-3">
+                    <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold tracking-widest text-teal-700 uppercase">
+                      <Sparkles className="h-3 w-3" />
+                      品牌特征追踪 (DEV)
+                    </div>
+                    <pre className="text-[10px] text-teal-800/80 max-h-24 overflow-y-auto whitespace-pre-wrap custom-scrollbar">
+                      {JSON.stringify(asset.brand_memory_trace, null, 2)}
+                    </pre>
                   </div>
                 )}
               </div>

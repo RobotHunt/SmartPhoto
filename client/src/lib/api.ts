@@ -9,6 +9,19 @@ function asArray<T = any>(value: any): T[] {
   return Array.isArray(value) ? value : [];
 }
 
+export interface BrandItem {
+  brand_id: string;
+  brand_name: string;
+  slug: string;
+  aliases?: string[];
+  status: string;
+  is_active: boolean;
+}
+
+export interface BrandListResponse {
+  items: BrandItem[];
+}
+
 export interface AccountAssetPreview {
   image_url: string;
   asset_family?: string;
@@ -72,6 +85,8 @@ export interface SessionSnapshot {
   latest_result_version: number;
   detail_generation_round: number;
   detail_latest_result_version: number;
+  brand_id?: string | null;
+  brand_memory_enabled?: boolean;
 }
 
 export interface VersionSummary {
@@ -107,6 +122,7 @@ export interface SessionResultAsset {
   quality_scores?: Record<string, any> | null;
   quality_review_job_id?: string | null;
   failure_reason?: string | null;
+  brand_memory_trace?: any;
 }
 
 export interface SessionResults {
@@ -141,10 +157,15 @@ export interface PromptPreviewItem {
   risk_flags?: string[];
   selling_point_binding?: Record<string, any> | null;
   truth_contract?: Record<string, any> | null;
+  brand_memory_trace?: any;
 }
 
 export interface PromptPreviewData {
   session_id: string;
+  brand_id?: string | null;
+  brand_memory_enabled?: boolean;
+  brand_memory_applied?: boolean;
+  brand_memory_trace?: any;
   prompts: PromptPreviewItem[];
   latest_assets: Array<Record<string, any>>;
 }
@@ -226,6 +247,8 @@ function normalizeSessionSnapshot(data: any): SessionSnapshot {
     latest_result_version: Number(data?.latest_result_version || 0),
     detail_generation_round: Number(data?.detail_generation_round || 0),
     detail_latest_result_version: Number(data?.detail_latest_result_version || 0),
+    brand_id: data?.brand_id ?? null,
+    brand_memory_enabled: Boolean(data?.brand_memory_enabled),
   };
 }
 
@@ -250,6 +273,7 @@ function normalizeSessionResults(data: any): SessionResults {
     quality_scores: item?.quality_scores ?? null,
     quality_review_job_id: item?.quality_review_job_id ?? null,
     failure_reason: item?.failure_reason ?? null,
+    brand_memory_trace: item?.brand_memory_trace ?? null,
   }));
 
   return {
@@ -396,6 +420,15 @@ export const sessionAPI = {
     const data = await apiFetch<any>(`/sessions/${sessionId}`);
     return normalizeSessionSnapshot(data);
   },
+  updateBrand(sessionId: string, brandId: string | null, brandMemoryEnabled: boolean) {
+    return apiFetch<{ session_id: string; brand_id: string | null; brand_memory_enabled: boolean }>(`/sessions/${sessionId}/brand`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        brand_id: brandId,
+        brand_memory_enabled: brandMemoryEnabled,
+      }),
+    });
+  },
 
   // Step 1: Upload images (presign-based direct upload)
   async uploadImage(sessionId: string, file: File, slotType?: string, displayOrder?: number) {
@@ -529,8 +562,14 @@ export const sessionAPI = {
   },
 
   // Step 5: Strategy preview
-  buildStrategy(sessionId: string) {
-    return apiFetch<any>(`/sessions/${sessionId}/strategy/preview`, { method: 'POST' });
+  buildStrategy(sessionId: string, options?: { brand_memory_enabled?: boolean }) {
+    const body = options?.brand_memory_enabled !== undefined 
+      ? { brand_memory_enabled: options.brand_memory_enabled } 
+      : {};
+    return apiFetch<any>(`/sessions/${sessionId}/strategy/preview`, { 
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
   },
 
   // Step 6: Generation
@@ -771,5 +810,15 @@ export const assetAPI = {
 export const pricingAPI = {
   getRules() {
     return removedFeature('价格规则');
+  },
+};
+
+// ===== Brands API =====
+export const brandsAPI = {
+  async getBrands() {
+    const data = await apiFetch<any>('/brands');
+    // Ensure we unwrap the data correctly as usually done in API calls
+    // Wait, the API returns { "data": { "items": [...] } }, which `apiFetch` resolves to the inner `data` directly.
+    return { items: asArray<BrandItem>(data?.items ?? data) } as BrandListResponse;
   },
 };

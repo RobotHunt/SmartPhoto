@@ -5,7 +5,8 @@ import { AlertCircle, FileText, Link as LinkIcon, Pencil, Plus, Upload, X, Chevr
 import { StepIndicator } from "@/components/StepIndicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { jobAPI, sessionAPI } from "@/lib/api";
+import { Switch } from "@/components/ui/switch";
+import { jobAPI, sessionAPI, brandsAPI, type BrandItem } from "@/lib/api";
 import {
   ANALYSIS_REFRESH_REQUIRED_KEY,
   ANALYSIS_SNAPSHOT_KEY,
@@ -165,6 +166,10 @@ export default function GenerateStep() {
   const [referenceLinks, setReferenceLinks] = useState<ReferenceLinkItem[]>([]);
   const [referenceImages, setReferenceImages] = useState<ReferenceImageItem[]>([]);
   const [referenceUrl, setReferenceUrl] = useState("");
+
+  const [availableBrands, setAvailableBrands] = useState<BrandItem[]>([]);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const [brandMemoryEnabled, setBrandMemoryEnabled] = useState<boolean>(false);
 
   const [editingParams, setEditingParams] = useState(false);
   const [editingPoints, setEditingPoints] = useState(false);
@@ -368,6 +373,16 @@ export default function GenerateStep() {
 
         const { session, analysisSnapshot } = await waitForAnalysisReady(sessionId);
         if (cancelled) return;
+
+        setSelectedBrandId(session?.brand_id || "");
+        setBrandMemoryEnabled(Boolean(session?.brand_memory_enabled));
+
+        try {
+          const brandsData = await brandsAPI.getBrands();
+          setAvailableBrands(brandsData.items || []);
+        } catch (e) {
+          console.warn("Failed to load brands:", e);
+        }
 
         setLoadingMessage("正在同步 AI 参数内容...");
 
@@ -638,6 +653,27 @@ export default function GenerateStep() {
   const handleNext = async () => {
     const ok = await saveParameters();
     if (ok) {
+      const sessionId = getSessionId();
+      if (sessionId) {
+        setIsSaving(true);
+        try {
+          await sessionAPI.updateBrand(
+            sessionId,
+            selectedBrandId || null,
+            selectedBrandId ? brandMemoryEnabled : false
+          );
+        } catch (err: any) {
+          toast({
+            title: "保存品牌配置失败",
+            description: err?.message || "请稍后重试",
+            variant: "destructive"
+          });
+          setIsSaving(false);
+          return;
+        }
+        setIsSaving(false);
+      }
+      
       sessionStorage.setItem("generation_target", "main_gallery");
       setLocation("/create/strategy");
     }
@@ -1083,6 +1119,64 @@ export default function GenerateStep() {
             <span>{saveError}</span>
           </div>
         )}
+
+        {/* ALWAYS show the Brand Strategy section to make the UI visible */}
+        <div className="glass-panel border-slate-200 rounded-2xl p-5 mb-8 shadow-xl transition-all">
+          <h3 className="font-bold tracking-wide text-slate-900 text-base mb-4">
+            品牌策略资产配置
+          </h3>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-bold text-slate-700 w-24">当前品牌</span>
+              <select
+                value={selectedBrandId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedBrandId(val);
+                  if (!val) {
+                    setBrandMemoryEnabled(false);
+                  }
+                }}
+                disabled={availableBrands.length === 0}
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {availableBrands.length === 0 ? (
+                  <option value="">暂无可用品牌资产</option>
+                ) : (
+                  <option value="">未绑定品牌</option>
+                )}
+                {availableBrands.map((b) => (
+                  <option key={b.brand_id} value={b.brand_id}>
+                    {b.brand_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-bold text-slate-700 w-24">启用品牌记忆</span>
+              <div className="flex-1 flex items-center gap-2">
+                <Switch
+                  checked={brandMemoryEnabled}
+                  onCheckedChange={(val) => {
+                    if (!selectedBrandId && val) {
+                      toast({ title: "提示", description: "请先选择品牌才能启用品牌记忆" });
+                      return;
+                    }
+                    setBrandMemoryEnabled(val);
+                  }}
+                  disabled={!selectedBrandId || availableBrands.length === 0}
+                />
+                <span className="text-xs text-slate-500">
+                  {availableBrands.length === 0 
+                     ? "（没有可用的品牌数据）"
+                     : !selectedBrandId 
+                       ? "（请先选择品牌）" 
+                       : "开启后，本次主图将深度结合该品牌的过往成功资产沉淀"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <Button
           onClick={handleNext}

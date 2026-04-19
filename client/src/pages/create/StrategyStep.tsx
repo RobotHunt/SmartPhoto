@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { AlertCircle, Check, Loader2, Pause, Play, ShoppingBag } from "lucide-react";
+import { AlertCircle, Check, Loader2, Pause, Play, ShoppingBag, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { jobAPI, sessionAPI, platformAPI } from "@/lib/api";
 import { resolveAssetLabel } from "@/lib/assetLabels";
@@ -339,6 +339,22 @@ export default function StrategyStep() {
                 </div>
               </div>
             )}
+            
+            {strategyPreview?.brand_memory_applied && (
+              <div className="flex items-start gap-4 rounded-2xl border border-teal-200 bg-teal-50/50 p-4 sm:col-span-2 shadow-sm">
+                <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-teal-100 border border-teal-200">
+                  <Sparkles className="h-4 w-4 text-teal-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="mb-1 flex items-center gap-3">
+                    <span className="text-xs font-bold tracking-widest text-teal-800 uppercase">品牌记忆沉淀应用</span>
+                  </div>
+                  <div className="text-sm font-medium leading-relaxed text-teal-800/80">
+                    已深度关联该品牌过往成功资产，生成过程中将严格约束品牌调性与版式习惯。
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 border-t border-slate-200 pt-4">
@@ -372,12 +388,18 @@ export default function StrategyStep() {
           </div>
           
           {/* DEV INFO BLOCK for Strategy */}
-          {(import.meta.env.DEV || localStorage.getItem("dev_debug") === "1") && assetPlan.some((p: any) => Object.keys(p.truth_contract || {}).length > 0 || Object.keys(p.selling_point_binding || {}).length > 0 || p.risk_flags?.length > 0) && (
+          {(import.meta.env.DEV || localStorage.getItem("dev_debug") === "1") && (assetPlan.some((p: any) => Object.keys(p.truth_contract || {}).length > 0 || Object.keys(p.selling_point_binding || {}).length > 0 || p.risk_flags?.length > 0) || strategyPreview?.brand_memory_trace) && (
             <div className="mt-6 rounded-2xl border border-purple-200 p-5 shadow-sm bg-purple-50/50">
               <h3 className="mb-3 text-sm font-bold text-purple-700 flex items-center gap-2">
                  <AlertCircle className="w-4 h-4" /> 内部调试 / 策略底层分析数据 (Prompt Items)
               </h3>
               <div className="space-y-4 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                {strategyPreview?.brand_memory_trace && (
+                  <div className="bg-white/80 border border-slate-200 rounded-xl p-3">
+                     <div className="font-bold text-xs text-slate-600 mb-2">Session Brand Memory Trace:</div>
+                     <pre className="text-[10px] text-slate-600 bg-white p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap">{JSON.stringify(strategyPreview.brand_memory_trace, null, 2)}</pre>
+                  </div>
+                )}
                 {assetPlan.map((plan: any, idx: number) => {
                    if (!plan.truth_contract && !plan.selling_point_binding && (!plan.risk_flags || plan.risk_flags.length === 0)) return null;
                    return (

@@ -65,6 +65,7 @@ type PreviewImage = {
   quality_status?: string;
   quality_scores?: Record<string, any> | null;
   failure_reason?: string | null;
+  brand_memory_trace?: any;
 };
 
 type Phase = "loading" | "preview" | "hd-loading" | "hd-done";
@@ -96,8 +97,43 @@ function buildPreviewImages(
       quality_status: asset.quality_status,
       quality_scores: asset.quality_scores,
       failure_reason: asset.failure_reason,
+      brand_memory_trace: asset.brand_memory_trace,
     };
   });
+}
+
+function saveBrandStyleProfile(payload: {
+  brandName: string;
+  sessionId: string;
+  version: number;
+  panelCount: number;
+}) {
+  const key = "saved_brand_style_profiles";
+  try {
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    const safeExisting = Array.isArray(existing) ? existing : [];
+    safeExisting.unshift({
+      brand_name: payload.brandName,
+      session_id: payload.sessionId,
+      version: payload.version,
+      panel_count: payload.panelCount,
+      saved_at: new Date().toISOString(),
+    });
+    localStorage.setItem(key, JSON.stringify(safeExisting.slice(0, 20)));
+  } catch {
+    localStorage.setItem(
+      key,
+      JSON.stringify([
+        {
+          brand_name: payload.brandName,
+          session_id: payload.sessionId,
+          version: payload.version,
+          panel_count: payload.panelCount,
+          saved_at: new Date().toISOString(),
+        },
+      ]),
+    );
+  }
 }
 
 export default function HDResultStep() {
@@ -117,6 +153,11 @@ export default function HDResultStep() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [historyAssetId, setHistoryAssetId] = useState<string | null>(null);
   const [feedbackAssetId, setFeedbackAssetId] = useState<string | null>(null);
+
+  const [brandOpen, setBrandOpen] = useState(false);
+  const [brandName, setBrandName] = useState("");
+  const [brandSavedName, setBrandSavedName] = useState("");
+  const [brandSuccessOpen, setBrandSuccessOpen] = useState(false);
 
   const sessionId = sessionStorage.getItem("current_session_id") || "";
   const unlockedVersion =
@@ -447,6 +488,21 @@ export default function HDResultStep() {
     }
   };
 
+  const handleSaveBrand = () => {
+    const trimmed = brandName.trim();
+    if (!trimmed) return;
+    saveBrandStyleProfile({
+      brandName: trimmed,
+      sessionId,
+      version: Number(unlockedVersion) || 1,
+      panelCount: images.length,
+    });
+    setBrandSavedName(trimmed);
+    setBrandOpen(false);
+    setBrandName("");
+    setBrandSuccessOpen(true);
+  };
+
   const renderModals = () => (
     <>
       {previewImage && (
@@ -484,6 +540,83 @@ export default function HDResultStep() {
         open={!!feedbackAssetId}
         onClose={() => setFeedbackAssetId(null)}
       />
+
+      {/* brand save modal (bottom sheet) */}
+      {brandOpen && (
+        <div className="fixed inset-0 z-[120] flex items-end justify-center" onClick={() => setBrandOpen(false)}>
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm" />
+          <div
+            className="relative bg-white/95 backdrop-blur-xl border-t border-slate-200 rounded-t-3xl w-full max-w-lg pb-8 pt-6 px-6 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] outline-none animate-in slide-in-from-bottom duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
+            <div className="flex items-center justify-between mb-4">
+               <h3 className="text-base font-bold tracking-widest text-slate-900 flex items-center gap-2">
+                 <Crown className="w-5 h-5 text-blue-600" />
+                 保存当前主图生成风格
+               </h3>
+               <button
+                 onClick={() => setBrandOpen(false)}
+                 className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
+               >
+                 <X className="w-4 h-4" />
+               </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-5 leading-relaxed font-medium">
+              提取并保存本次生成的美术资产、拍摄角度、主图排版和色彩体系，以便在下一次生成中保持一致。
+            </p>
+            <div className="mb-6">
+              <label className="block text-xs font-bold tracking-widest text-slate-700 mb-2">品牌 / 风格名称</label>
+              <input 
+                 value={brandName}
+                 onChange={e => setBrandName(e.target.value)}
+                 autoFocus
+                 placeholder="例如：小智智能家居风格"
+                 className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 shadow-inner font-medium text-sm transition-all placeholder-slate-400"
+                 onKeyDown={e => {
+                   if (e.key === 'Enter') handleSaveBrand();
+                 }}
+              />
+            </div>
+            <button
+               disabled={!brandName.trim()}
+               onClick={handleSaveBrand}
+               className="w-full h-12 flex items-center justify-center rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold tracking-widest text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              保存风格提取
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* brand success modal */}
+      {brandSuccessOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center" onClick={() => setBrandSuccessOpen(false)}>
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm" />
+          <div
+            className="relative bg-white/95 backdrop-blur-xl border border-slate-200 rounded-3xl w-[90%] max-w-sm p-8 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center shadow-inner mb-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-md">
+                <Check className="w-5 h-5 stroke-[3]" />
+              </div>
+            </div>
+            <h3 className="text-lg font-bold tracking-widest text-slate-900 mb-2">
+              已为您保存「{brandSavedName}」品牌风格
+            </h3>
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">
+              下次生成主图图片时，在配置页选中「{brandSavedName}」将自动应用一致风格，无需重复设置。
+            </p>
+            <button
+               onClick={() => setBrandSuccessOpen(false)}
+               className="w-full h-12 flex items-center justify-center rounded-2xl bg-blue-600/10 hover:bg-blue-600/20 border border-blue-600/20 text-blue-700 font-bold tracking-widest text-sm shadow-sm transition"
+            >
+              好的，我知道了
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -641,6 +774,19 @@ export default function HDResultStep() {
                 </div>
 
                 {img.editOpen && renderCopyEditor(img)}
+
+                {/* --- Dev Info Block for Brand Trace --- */}
+                {(import.meta.env.DEV || localStorage.getItem("dev_debug") === "1") && img.brand_memory_trace && (
+                  <div className="border-t border-teal-200/50 bg-teal-50/50 backdrop-blur-md px-4 py-3">
+                    <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold tracking-widest text-teal-700 uppercase">
+                      <Sparkles className="h-3 w-3" />
+                      品牌特征追踪 (DEV)
+                    </div>
+                    <pre className="text-[10px] text-teal-800/80 max-h-24 overflow-y-auto whitespace-pre-wrap custom-scrollbar">
+                      {JSON.stringify(img.brand_memory_trace, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
             )})}
           </div>
@@ -797,6 +943,19 @@ export default function HDResultStep() {
                 </div>
               </div>
               {img.editOpen && renderCopyEditor(img)}
+
+              {/* --- Dev Info Block for Brand Trace --- */}
+              {(import.meta.env.DEV || localStorage.getItem("dev_debug") === "1") && img.brand_memory_trace && (
+                <div className="border-t border-teal-200/50 bg-teal-50/50 backdrop-blur-md px-4 py-3">
+                  <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold tracking-widest text-teal-700 uppercase">
+                    <Sparkles className="h-3 w-3" />
+                    品牌特征追踪 (DEV)
+                  </div>
+                  <pre className="text-[10px] text-teal-800/80 max-h-24 overflow-y-auto whitespace-pre-wrap custom-scrollbar">
+                    {JSON.stringify(img.brand_memory_trace, null, 2)}
+                  </pre>
+                </div>
+              )}
             </div>
           )})}
         </div>
@@ -824,27 +983,27 @@ export default function HDResultStep() {
           )}
           
           <div className="bg-white/90 backdrop-blur-xl border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-4 py-4 md:py-6 flex justify-center w-full z-10">
-            <div className="w-full max-w-4xl flex items-center gap-3 md:gap-4">
+            <div className="w-full max-w-5xl flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="flex w-full md:w-auto items-center gap-3">
+                <button
+                  className="w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition"
+                  onClick={() => setShowShareModal(true)}
+                  title="分享"
+                >
+                  <Share2 className="w-5 h-5" />
+                </button>
+                <button className="flex-1 min-w-[160px] h-14 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold tracking-widest bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition disabled:opacity-50" onClick={handleDownload} disabled={downloading}>
+                  {downloading ? ( <Loader2 className="w-5 h-5 animate-spin text-blue-600" /> ) : ( <Download className="w-5 h-5" /> )}
+                  下载高清图
+                </button>
+                <button className="flex-1 min-w-[160px] h-14 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold tracking-widest bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition shadow-sm" onClick={() => setBrandOpen(true)}>
+                  <Crown className="w-4 h-4 text-blue-600" />
+                  保存主图风格
+                </button>
+              </div>
+
               <button
-                className="flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold tracking-widest bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handleDownload}
-                disabled={downloading}
-              >
-                {downloading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                ) : (
-                  <Download className="w-5 h-5" />
-                )}
-                一键下载高清图包
-              </button>
-              <button 
-                className="w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition"
-                onClick={() => setShowShareModal(true)}
-              >
-                <Share2 className="w-5 h-5" />
-              </button>
-              <button
-                className="flex-[1.5] h-14 rounded-2xl flex items-center justify-center gap-2 text-base font-bold tracking-widest sci-fi-button text-white shadow-md shadow-blue-500/20 transition active:scale-95"
+                className="w-full md:w-auto flex-[1.5] h-14 rounded-2xl flex items-center justify-center gap-2 text-base font-bold tracking-widest sci-fi-button text-white shadow-md shadow-blue-500/20 transition active:scale-95"
                 onClick={goToDetailCopywriting}
               >
                 <FileText className="w-5 h-5" />
