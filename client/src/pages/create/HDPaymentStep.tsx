@@ -67,7 +67,7 @@ export default function HDPaymentStep() {
       <StepIndicator currentStep={5} />
 
       <div className="max-w-lg mx-auto mt-8 sm:mt-12 px-4 relative z-10">
-        <div className="glass-panel border-slate-200 rounded-[32px] overflow-hidden shadow-[0_0_50px_rgba(34,211,238,0.15)] flex flex-col">
+        <div className="glass-panel border-slate-200 rounded-[32px] overflow-hidden shadow-lg flex flex-col">
           {/* 顶部导航 */}
           <div className="flex items-center gap-3 px-6 py-5 bg-slate-100 border-b border-slate-200">
             <button
@@ -81,10 +81,10 @@ export default function HDPaymentStep() {
 
           <div className="p-6 sm:p-8">
             {/* 已选图片数量 */}
-            <div className="flex items-center gap-2 mb-6 bg-white/80 border border-cyan-200 px-4 py-2 rounded-xl inline-flex shadow-sm">
-              <CheckCircle2 className="w-4 h-4 text-cyan-600" />
-              <span className="text-sm font-bold tracking-widest text-cyan-800">
-                共 <span className="text-cyan-600 px-1">{selectedCount}</span> 张图片
+            <div className="flex items-center gap-2 mb-6 bg-white/80 border border-blue-200 px-4 py-2 rounded-xl inline-flex shadow-sm">
+              <CheckCircle2 className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-bold tracking-widest text-blue-800">
+                共 <span className="text-blue-600 px-1">{selectedCount}</span> 张图片
               </span>
             </div>
 
@@ -116,7 +116,7 @@ export default function HDPaymentStep() {
             {/* 套餐名称 */}
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-bold tracking-widest text-slate-600 flex items-center gap-2">
-                <div className="w-1.5 h-4 bg-cyan-500 rounded-full"></div>
+                <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
                 无水印高清图 · AI生成
               </span>
             </div>
@@ -125,9 +125,9 @@ export default function HDPaymentStep() {
             <div className="flex flex-wrap items-center gap-4 mb-8 bg-slate-50 border border-slate-200 p-4 rounded-2xl">
               <div className="flex items-baseline gap-2">
                 <span className="text-sm font-bold tracking-widest text-slate-500 line-through">¥99/套</span>
-                <span className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-cyan-300 to-blue-500 drop-shadow-sm">¥69</span>
+                <span className="text-4xl font-black tracking-tight text-slate-900 drop-shadow-sm">¥69</span>
               </div>
-              <div className="bg-gradient-to-r from-amber-600 to-orange-500 text-slate-900 rounded-xl px-3 py-1.5 shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+              <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl px-3 py-1.5 shadow-[0_0_15px_rgba(249,115,22,0.3)]">
                 <div className="text-xs font-bold tracking-widest leading-none mb-1 shadow-sm">新用户首套</div>
                 <div className="text-[10px] font-medium tracking-wide opacity-90 leading-none">后续续订 <span className="font-black tracking-tighter">¥99</span></div>
               </div>
@@ -137,8 +137,8 @@ export default function HDPaymentStep() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
               {PERKS.map(perk => (
                 <div key={perk} className="flex items-center gap-2">
-                  <div className="w-5 h-5 flex items-center justify-center rounded-full bg-cyan-100 border border-cyan-300 shrink-0">
-                    <span className="text-cyan-600 font-bold text-[10px]">✓</span>
+                  <div className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 border border-blue-300 shrink-0">
+                    <span className="text-blue-600 font-bold text-[10px]">✓</span>
                   </div>
                   <span className="text-xs font-bold tracking-widest text-slate-600">{perk}</span>
                 </div>
@@ -168,12 +168,12 @@ export default function HDPaymentStep() {
       </div>
 
       {/* 底部协议文字 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 py-4 z-30">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 py-4 z-30 pb-[env(safe-area-inset-bottom)]">
         <p className="text-center text-[11px] tracking-widest text-slate-500 font-bold">
           支付即代表同意
-          <Link href="/terms" className="text-cyan-500 hover:text-cyan-600 hover:underline mx-1">《用户协议》</Link>
+          <Link href="/terms" className="text-blue-500 hover:text-blue-600 hover:underline mx-1">《用户协议》</Link>
           和
-          <Link href="/privacy" className="text-cyan-500 hover:text-cyan-600 hover:underline mx-1">《隐私政策》</Link>
+          <Link href="/privacy" className="text-blue-500 hover:text-blue-600 hover:underline mx-1">《隐私政策》</Link>
         </p>
       </div>
     </div>

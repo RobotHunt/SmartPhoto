@@ -200,6 +200,9 @@ export default function UploadStep() {
 
         setSlots((prev) => {
           const next = { ...prev };
+          // Track which slots have been assigned in this hydration to avoid overwriting
+          const assignedSlots = new Set<string>();
+
           for (const image of images) {
             const preferredSlot =
               (image.slot_type === "extra"
@@ -208,9 +211,22 @@ export default function UploadStep() {
             const fallbackSlot =
               slotOrder.get(Number(image.display_order || 0)) ||
               (image.slot_type ? (`${image.slot_type}` as SlotType) : undefined);
-            const slotType = preferredSlot && next[preferredSlot] ? preferredSlot : fallbackSlot;
+            let slotType = preferredSlot && next[preferredSlot] ? preferredSlot : fallbackSlot;
 
-            if (!slotType || !next[slotType]) continue;
+            // If target slot is already assigned or doesn't exist, find next available slot
+            if (!slotType || !next[slotType] || assignedSlots.has(slotType)) {
+              const availableSlot = allSlotDefs.find(
+                (def) => next[def.slotType] && !next[def.slotType].imageId && !assignedSlots.has(def.slotType)
+              );
+              if (availableSlot) {
+                slotType = availableSlot.slotType;
+              } else {
+                // All slots occupied, skip this image to prevent overwriting
+                continue;
+              }
+            }
+
+            assignedSlots.add(slotType);
             next[slotType] = {
               imageId: image.image_id,
               previewUrl: image.url,
@@ -304,11 +320,27 @@ export default function UploadStep() {
   );
 
   const handleFileSelect = useCallback(
-    (files: FileList | null, slotType: SlotType, displayOrder: number) => {
+    (files: FileList | null, targetSlotType: SlotType, displayOrder: number) => {
       if (!files || files.length === 0) return;
-      uploadFile(files[0], slotType, displayOrder);
+
+      // Upload first file to target slot
+      uploadFile(files[0], targetSlotType, displayOrder);
+
+      // Distribute remaining files to empty slots
+      if (files.length > 1) {
+        const remainingFiles = Array.from(files).slice(1);
+        const emptySlots = allSlotDefs.filter(
+          (def) => def.slotType !== targetSlotType && !slots[def.slotType]?.imageId && !slots[def.slotType]?.uploading
+        );
+
+        remainingFiles.forEach((file, index) => {
+          if (emptySlots[index]) {
+            uploadFile(file, emptySlots[index].slotType, emptySlots[index].displayOrder);
+          }
+        });
+      }
     },
-    [uploadFile],
+    [uploadFile, allSlotDefs, slots],
   );
 
   const triggerFileInput = useCallback(
@@ -316,6 +348,7 @@ export default function UploadStep() {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = "image/*";
+      input.multiple = true;
       input.onchange = (event) => {
         const target = event.target as HTMLInputElement;
         handleFileSelect(target.files, slotType, displayOrder);

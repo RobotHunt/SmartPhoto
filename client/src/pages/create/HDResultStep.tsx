@@ -223,9 +223,10 @@ export default function HDResultStep() {
 
       if (paid) {
         setPhase("hd-loading");
+        // 保守的阶段式进度：每 600ms 增长 0.5%-2%，避免用户感知假跳
         const fake = setInterval(() => {
-          setHdProgress((p) => (p >= 95 ? 95 : p + Math.random() * 8));
-        }, 400);
+          setHdProgress((p) => (p >= 92 ? 92 : p + Math.random() * 1.5 + 0.5));
+        }, 600);
         try {
           await loadImages();
         } finally {
@@ -244,8 +245,8 @@ export default function HDResultStep() {
       } else {
         setPhase("loading");
         const fake = setInterval(() => {
-          setProgress((p) => (p >= 95 ? 95 : p + Math.random() * 10));
-        }, 350);
+          setProgress((p) => (p >= 92 ? 92 : p + Math.random() * 1.5 + 0.5));
+        }, 600);
         try {
           await loadImages();
         } finally {
@@ -389,57 +390,112 @@ export default function HDResultStep() {
     }
   };
 
-  const renderCopyEditor = (img: PreviewImage) => (
-    <div className="border-t border-slate-200 p-5 bg-white/80">
-      <div className="space-y-3">
-        <div className="flex items-start gap-3">
-          <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">主标题</span>
-          <input
-            value={img.copy_blocks.headline}
-            onChange={(e) => updateText(img.id, "headline", e.target.value)}
-            className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
-            placeholder="输入主标题..."
-          />
+  const regenerateText = async (id: string) => {
+    const img = images.find((i) => i.id === id);
+    if (!img || !sessionId) return;
+    const slotId = img.slot_id || img.id;
+
+    const totalLength =
+      (img.copy_blocks.headline?.length || 0) +
+      (img.copy_blocks.supporting?.length || 0) +
+      (img.copy_blocks.proof_lines?.join("").length || 0) +
+      (img.copy_blocks.matrix_lines?.join("").length || 0);
+
+    setImages((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, editOpen: false, isRegenerating: true } : item)),
+    );
+
+    try {
+      const nextOverrides = upsertStrategyOverride(strategyOverrides, slotId, img.copy_blocks);
+      const saved = await sessionAPI.saveStrategyOverrides(sessionId, {
+        overrides: nextOverrides,
+      });
+      setStrategyOverrides(saved.overrides || nextOverrides);
+
+      const instruction = `根据新文案重新排版。当前文案总长度约${totalLength}字。`;
+      const response = await assetAPI.regenerate(id, instruction);
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id);
+      }
+      await loadImages();
+      toast({ title: "智能重排版完成", description: "已根据新文案重新计算布局。" });
+    } catch (err: any) {
+      toast({ title: "重排版失败", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const renderCopyEditor = (img: PreviewImage) => {
+    const totalLen =
+      (img.copy_blocks.headline?.length || 0) +
+      (img.copy_blocks.supporting?.length || 0) +
+      (img.copy_blocks.proof_lines?.join("").length || 0) +
+      (img.copy_blocks.matrix_lines?.join("").length || 0);
+    return (
+      <div className="border-t border-slate-200 p-5 bg-white/80">
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">主标题</span>
+            <input
+              value={img.copy_blocks.headline}
+              onChange={(e) => updateText(img.id, "headline", e.target.value)}
+              className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+              placeholder="输入主标题..."
+            />
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">副标题</span>
+            <input
+              value={img.copy_blocks.supporting}
+              onChange={(e) => updateText(img.id, "supporting", e.target.value)}
+              className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+              placeholder="输入副标题..."
+            />
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">佐证短句</span>
+            <textarea
+              rows={3}
+              value={copyLinesToTextarea(img.copy_blocks.proof_lines)}
+              onChange={(e) => updateLineText(img.id, "proof_lines", e.target.value)}
+              className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+              placeholder={"每行一条，例如：\n通过质检认证\n核心参数可视化"}
+            />
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">标签短句</span>
+            <textarea
+              rows={3}
+              value={copyLinesToTextarea(img.copy_blocks.matrix_lines)}
+              onChange={(e) => updateLineText(img.id, "matrix_lines", e.target.value)}
+              className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+              placeholder={"每行一条，例如：\n净化除湿二合一\n低噪运行"}
+            />
+          </div>
+          {totalLen > 80 && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700">
+              当前文案共 {totalLen} 字，文字较长。如排版异常，建议使用"智能重排版"。
+            </div>
+          )}
         </div>
-        <div className="flex items-start gap-3">
-          <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">副标题</span>
-          <input
-            value={img.copy_blocks.supporting}
-            onChange={(e) => updateText(img.id, "supporting", e.target.value)}
-            className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
-            placeholder="输入副标题..."
-          />
-        </div>
-        <div className="flex items-start gap-3">
-          <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">佐证短句</span>
-          <textarea
-            rows={3}
-            value={copyLinesToTextarea(img.copy_blocks.proof_lines)}
-            onChange={(e) => updateLineText(img.id, "proof_lines", e.target.value)}
-            className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
-            placeholder={"每行一条，例如：\n通过质检认证\n核心参数可视化"}
-          />
-        </div>
-        <div className="flex items-start gap-3">
-          <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">标签短句</span>
-          <textarea
-            rows={3}
-            value={copyLinesToTextarea(img.copy_blocks.matrix_lines)}
-            onChange={(e) => updateLineText(img.id, "matrix_lines", e.target.value)}
-            className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
-            placeholder={"每行一条，例如：\n净化除湿二合一\n低噪运行"}
-          />
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={() => saveText(img.id)}
+            className="flex-1 flex items-center justify-center gap-1.5 text-sm text-blue-700 font-bold tracking-widest bg-blue-50 border border-blue-300 hover:bg-blue-100 rounded-xl py-2.5 transition-all outline-none"
+          >
+            <Check className="w-4 h-4" />
+            仅替换文字
+          </button>
+          <button
+            onClick={() => regenerateText(img.id)}
+            className="flex-1 flex items-center justify-center gap-1.5 text-sm text-white font-bold tracking-widest bg-blue-600 hover:bg-blue-500 rounded-xl py-2.5 transition-all outline-none"
+          >
+            <Sparkles className="w-4 h-4" />
+            智能重排版
+          </button>
         </div>
       </div>
-      <button
-        onClick={() => saveText(img.id)}
-        className="mt-5 w-full flex items-center justify-center gap-1.5 text-sm text-teal-300 font-bold tracking-widest bg-teal-900/30 border border-teal-500/30 hover:bg-teal-900/50 hover:text-teal-200 rounded-xl py-2.5 transition-all outline-none"
-      >
-        <Check className="w-4 h-4" />
-        保存文字更改
-      </button>
-    </div>
-  );
+    );
+  };
 
   const regenAll = () => {
     navigate("/create/result");
@@ -791,7 +847,7 @@ export default function HDResultStep() {
             )})}
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 px-4 py-4 md:py-6 sm:px-12 flex justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 px-4 py-4 md:py-6 sm:px-12 flex justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
             <div className="w-full max-w-4xl flex flex-col items-center">
               <button
                 onClick={goToPayment}
@@ -961,7 +1017,7 @@ export default function HDResultStep() {
         </div>
 
         {/* --- Bottom Actions Bar --- */}
-        <div className="fixed bottom-0 left-0 right-0 z-30 flex flex-col">
+        <div className="fixed bottom-0 left-0 right-0 z-30 flex flex-col pb-[env(safe-area-inset-bottom)]">
           {!isAuthenticated && (
             <div className="bg-white/90 backdrop-blur-xl border-t border-slate-200 px-6 py-3 flex flex-wrap items-center justify-center gap-4 relative z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
               <div className="flex items-center gap-3">

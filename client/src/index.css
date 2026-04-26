@@ -119,6 +119,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Mobile safe-area support for bottom toolbar */
+    padding-bottom: env(safe-area-inset-bottom);
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -236,6 +238,6 @@
   }
 
   .sci-fi-button {
-    @apply relative overflow-hidden rounded-full bg-blue-500 text-white shadow-md transition-all duration-300 hover:shadow-lg hover:bg-blue-600 hover:-translate-y-0.5 border border-transparent active:translate-y-0 disabled:opacity-50 disabled:hover:shadow-none disabled:hover:translate-y-0 disabled:bg-slate-300 disabled:border-slate-200 disabled:text-slate-500;
+    @apply relative overflow-hidden rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md transition-all duration-300 hover:shadow-lg hover:from-blue-600 hover:to-emerald-600 hover:-translate-y-0.5 border border-transparent active:translate-y-0 disabled:opacity-50 disabled:hover:shadow-none disabled:hover:translate-y-0 disabled:bg-slate-300 disabled:border-slate-200 disabled:text-slate-500;
   }
 }

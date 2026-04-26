@@ -494,7 +494,7 @@ export default function CopywritingStep() {
 
       {/* Button dock */}
       {!loading && !error && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-4 flex justify-center z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-4 flex justify-center z-50 pb-[env(safe-area-inset-bottom)]">
           <div className="w-full max-w-4xl flex items-center gap-3">
             <Button
               variant="outline"

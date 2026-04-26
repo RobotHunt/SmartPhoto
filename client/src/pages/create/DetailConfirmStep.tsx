@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, Loader2, RefreshCw } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
-import { sessionAPI } from "@/lib/api";
+import { jobAPI, sessionAPI } from "@/lib/api";
 import { resolveGenerationStageText } from "@/lib/generationStatus";
 
 import { DetailStepIndicator } from "./DetailStepIndicator";
@@ -39,7 +39,7 @@ type PlanningCard = {
   originNote?: string;
 };
 
-type Phase = "loading" | "planning" | "error";
+type Phase = "loading" | "planning" | "generating-preview" | "error";
 
 function collectText(value: unknown): string[] {
   if (typeof value === "string") {
@@ -95,6 +95,8 @@ export default function DetailConfirmStep() {
   const [loadingText, setLoadingText] = useState("正在加载详情图方案...");
   const [error, setError] = useState("");
   const [cards, setCards] = useState<PlanningCard[]>([]);
+  const [previewProgress, setPreviewProgress] = useState(0);
+  const [previewStage, setPreviewStage] = useState("正在准备生成预览...");
 
   useEffect(() => {
     let cancelled = false;
@@ -152,11 +154,59 @@ export default function DetailConfirmStep() {
     };
   }, [sessionId, setLocation]);
 
-  const handleGoToPayment = () => {
+  const handleGeneratePreview = async () => {
+    if (!sessionId) return;
+    setPhase("generating-preview");
+    setPreviewProgress(0);
+    setPreviewStage("正在生成详情预览...");
     sessionStorage.setItem("detail_preview_count", String(cards.length));
     const snapshotVersion = sessionStorage.getItem("detail_current_version") || "0";
     sessionStorage.setItem("detail_preview_version", snapshotVersion);
-    setLocation("/create/detail-payment");
+
+    try {
+      // 阶段式进度：策略校验阶段缓慢增长
+      let stageProgress = 0;
+      const stageTimer = setInterval(() => {
+        stageProgress += Math.random() * 1.2 + 0.3;
+        if (stageProgress > 8) stageProgress = 8;
+        setPreviewProgress(stageProgress);
+      }, 800);
+
+      const generation = await sessionAPI.generateDetailPage(sessionId);
+      clearInterval(stageTimer);
+
+      const jobId = generation?.job_id || generation?.jobId;
+      if (!jobId) {
+        throw new Error("未拿到预览生成任务 ID");
+      }
+
+      await jobAPI.pollUntilDone(
+        jobId,
+        (status) => {
+          const pct = Number(status?.progress || 0);
+          const stage = status?.stage || status?.status || "";
+          if (pct > 0) {
+            setPreviewProgress(Math.min(92, Math.round(12 + pct * 0.8)));
+          }
+          setPreviewStage(resolveGenerationStageText(stage, "detail").title);
+        },
+        2000,
+        300000,
+      );
+
+      setPreviewProgress(100);
+      // 标记预览已生成，进入结果页预览模式
+      sessionStorage.setItem("detail_preview_mode", "1");
+      setLocation("/create/detail-result");
+    } catch (err: any) {
+      setPhase("error");
+      setError(err?.message || "预览生成失败，请稍后重试。");
+      toast({
+        title: "预览生成失败",
+        description: err?.message || "请稍后重试",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleBack = () => {
@@ -170,6 +220,10 @@ export default function DetailConfirmStep() {
 
         {phase === "loading" && (
           <GenerationWaitingUI kind="detail" progress={0} stage="正在配置详情图方案" />
+        )}
+
+        {phase === "generating-preview" && (
+          <GenerationWaitingUI kind="detail" progress={previewProgress} stage={previewStage} />
         )}
 
         {phase === "error" && (
@@ -281,17 +335,17 @@ export default function DetailConfirmStep() {
             </div>
 
             {/* Bottom Sticky Action Area */}
-            <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-4 flex justify-center">
+            <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-4 flex justify-center pb-[env(safe-area-inset-bottom)]">
               <div className="w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="hidden sm:block">
                   <span className="text-sm font-bold text-slate-600">共 {cards.length} 个独立高转化模块</span>
                 </div>
                 <button
-                  onClick={handleGoToPayment}
+                  onClick={handleGeneratePreview}
                   className="sci-fi-button w-full sm:w-auto px-10 h-14 bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-widest text-base rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2 transition-all"
                 >
-                  确认方案并继续
-                  <CheckCircle2 className="w-5 h-5 ml-1 opacity-80" />
+                  生成预览图
+                  <Eye className="w-5 h-5 ml-1 opacity-80" />
                 </button>
               </div>
             </div>

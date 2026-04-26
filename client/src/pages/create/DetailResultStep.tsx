@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 import { useToast } from "@/hooks/use-toast";
 import { getLoginUrl } from "@/const";
-import { jobAPI, sessionAPI, type VersionSummary } from "@/lib/api";
+import { assetAPI, jobAPI, sessionAPI, type VersionSummary } from "@/lib/api";
 import { resolveGenerationStageText } from "@/lib/generationStatus";
 import { updateSessionRecord } from "@/lib/localUser";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +30,7 @@ import { FailedAssetCard } from "@/components/FailedAssetCard";
 import { AssetHistoryDrawer } from "@/components/AssetHistoryDrawer";
 import { AssetFeedbackModal } from "@/components/AssetFeedbackModal";
 import { useQualityPolling } from "@/hooks/useQualityPolling";
+import { VersionSelector } from "@/components/VersionSelector";
 
 import { DetailStepIndicator } from "./DetailStepIndicator";
 
@@ -56,6 +57,7 @@ type DetailPanel = {
   source_version_no?: number | null;
   fidelity_validation_status?: string | null;
   display_module_intent?: string | null;
+  display_module_title?: string | null;
   display_tags?: string[] | null;
   status?: string;
   quality_status?: string;
@@ -86,6 +88,7 @@ interface DetailImage {
   id: string;
   label: string;
   url: string;
+  text?: string;
   editOpen: boolean;
   isRegenerating: boolean;
   carry_forward?: boolean;
@@ -230,12 +233,13 @@ export default function DetailResultStep() {
   const sessionId = sessionStorage.getItem("current_session_id") || "";
 
   const [phase, setPhase] = useState<"loading" | "done" | "error">("loading");
-  const [progress, setProgress] = useState(8);
+  const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("正在生成详情图...");
   const [error, setError] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [historyAssetId, setHistoryAssetId] = useState<string | null>(null);
   const [feedbackAssetId, setFeedbackAssetId] = useState<string | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   const generateStartRef = useRef(Date.now());
   const [downloading, setDownloading] = useState(false);
@@ -294,14 +298,17 @@ export default function DetailResultStep() {
     setPhase("loading");
     setError("");
     setLoadingText(initialText);
-    setProgress(8);
+    setProgress(0);
+
+    let hasRealProgress = false;
 
     await jobAPI.pollUntilDone(
       jobId,
       (status) => {
         const nextProgress = Number(status?.progress || 0);
         if (nextProgress > 0) {
-          setProgress(Math.max(8, Math.min(99, nextProgress)));
+          hasRealProgress = true;
+          setProgress(Math.min(99, nextProgress));
         }
         setLoadingText(resolveGenerationStageText(status?.stage || status?.status, "detail").title);
       },
@@ -346,7 +353,19 @@ export default function DetailResultStep() {
         const snapshot = await sessionAPI.get(sessionId);
         if (cancelled) return;
 
-        // If results already exist, show them directly
+        // Check preview mode and payment status from sessionStorage
+        const previewMode = sessionStorage.getItem("detail_preview_mode") === "1";
+        const paymentSuccess = sessionStorage.getItem("detail_payment_success");
+
+        // If just paid successfully, clear preview mode and show HD version
+        if (paymentSuccess) {
+          sessionStorage.removeItem("detail_preview_mode");
+          setIsPreviewMode(false);
+        } else {
+          setIsPreviewMode(previewMode);
+        }
+
+        // If results already exist, show them directly (preview mode or paid mode)
         if (Number(snapshot.detail_latest_result_version || 0) > 0) {
           setLoadingText("正在加载详情结果...");
           setProgress(30);
@@ -358,15 +377,15 @@ export default function DetailResultStep() {
           return;
         }
 
-        // Payment gate: if not paid, redirect to detail payment page
-        const paymentSuccess = sessionStorage.getItem("detail_payment_success");
-        if (!paymentSuccess) {
+        // Payment gate: if not paid AND not in preview mode, redirect to detail payment page
+        if (!paymentSuccess && !previewMode) {
           setLocation("/create/detail-payment");
           return;
         }
 
-        // Clear one-time payment flag
+        // Clear one-time flags
         sessionStorage.removeItem("detail_payment_success");
+        sessionStorage.removeItem("detail_preview_mode");
 
         // If a generation job is in progress, resume polling
         if (snapshot.latest_detail_generate_job_id) {
@@ -589,9 +608,16 @@ export default function DetailResultStep() {
           <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
             <div className="flex items-center gap-3 pl-2">
               <div className="w-1.5 h-5 bg-blue-500 rounded-full shadow-sm"></div>
-              <span className="text-base font-bold tracking-widest text-slate-900">长图分解列表</span>
-              <span className="text-xs font-medium bg-slate-200 px-2 py-0.5 rounded text-blue-600">{images.length} 块</span>
-            </div>
+            <span className="text-base font-bold tracking-widest text-slate-900">
+              {isPreviewMode ? "详情图预览" : "长图分解列表"}
+            </span>
+            <span className="text-xs font-medium bg-slate-200 px-2 py-0.5 rounded text-blue-600">{images.length} 块</span>
+            {isPreviewMode && (
+              <span className="text-xs font-bold tracking-widest text-amber-600 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded">
+                预览版
+              </span>
+            )}
+          </div>
             {results && results.available_versions.length > 1 && (
             <div className="flex items-center gap-2 relative z-50">
                 <span className="text-sm font-bold tracking-wide text-slate-500">生成版本历史:</span>
@@ -599,7 +625,7 @@ export default function DetailResultStep() {
                   versions={results.available_versions}
                   currentVersion={currentVersion || results.detail_latest_result_version || 0}
                   summaries={results.version_summaries}
-                  onSelectVersion={(v) => {
+                  onSelectVersion={(v: number) => {
                     setPhase("loading");
                     setLoadingText(`正在加载 V${v}...`);
                     setProgress(20);
@@ -655,6 +681,17 @@ export default function DetailResultStep() {
                         style={{ maxHeight: "400px" }}
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-blue-900/10 transition-colors pointer-events-none" />
+                      {/* 预览模式水印 */}
+                      {isPreviewMode && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                          <span
+                            className="text-3xl font-black tracking-widest text-slate-900/10 whitespace-nowrap"
+                            style={{ transform: "rotate(-15deg)" }}
+                          >
+                            预览版
+                          </span>
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -745,7 +782,7 @@ export default function DetailResultStep() {
           </div>
 
           {/* fixed bottom: login bar + action buttons */}
-          <div className="fixed bottom-0 left-0 right-0 z-30">
+          <div className="fixed bottom-0 left-0 right-0 z-30 pb-[env(safe-area-inset-bottom)]">
             {/* login prompt (hidden when logged in) */}
             {!isAuthenticated && (
               <div className="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-center">
@@ -769,17 +806,39 @@ export default function DetailResultStep() {
             {/* action buttons */}
             <div className="border-t border-slate-200 bg-white/90 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
               <div className="max-w-5xl w-full mx-auto flex gap-3">
-                <Button size="lg" className="flex-1 text-slate-600 font-bold tracking-widest bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-2xl h-14" onClick={handleDownloadAll} disabled={downloading}>
-                  {downloading ? <Loader2 className="w-5 h-5 animate-spin mr-1" /> : <Download className="w-5 h-5 mr-1" />}
-                  一键打包下载
-                </Button>
-                <Button size="icon" variant="outline" className="h-14 w-14 border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-blue-600 rounded-2xl shrink-0 transition-colors shadow-lg" onClick={() => setShareOpen(true)}>
-                  <Share2 className="w-5 h-5" />
-                </Button>
-                <Button size="lg" className="sci-fi-button flex-[1.5] bg-blue-600 font-bold tracking-widest text-base shadow-md rounded-2xl h-14 gap-2 text-white" onClick={() => setBrandOpen(true)}>
-                  <Crown className="w-5 h-5 fill-white/50" />
-                  保存品牌风格
-                </Button>
+                {isPreviewMode ? (
+                  <>
+                    <Button
+                      size="lg"
+                      className="flex-1 text-slate-600 font-bold tracking-widest bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-2xl h-14"
+                      onClick={() => setLocation("/create/copywriting")}
+                    >
+                      返回修改文案
+                    </Button>
+                    <Button
+                      size="lg"
+                      className="sci-fi-button flex-[2] bg-cyan-600 hover:bg-cyan-500 font-bold tracking-widest text-base shadow-md rounded-2xl h-14 gap-2 text-white"
+                      onClick={() => setLocation("/create/detail-payment")}
+                    >
+                      <Crown className="w-5 h-5 fill-white/50" />
+                      获取高清无水印版
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button size="lg" className="flex-1 text-slate-600 font-bold tracking-widest bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-2xl h-14" onClick={handleDownloadAll} disabled={downloading}>
+                      {downloading ? <Loader2 className="w-5 h-5 animate-spin mr-1" /> : <Download className="w-5 h-5 mr-1" />}
+                      一键打包下载
+                    </Button>
+                    <Button size="icon" variant="outline" className="h-14 w-14 border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-blue-600 rounded-2xl shrink-0 transition-colors shadow-lg" onClick={() => setShareOpen(true)}>
+                      <Share2 className="w-5 h-5" />
+                    </Button>
+                    <Button size="lg" className="sci-fi-button flex-[1.5] bg-blue-600 font-bold tracking-widest text-base shadow-md rounded-2xl h-14 gap-2 text-white" onClick={() => setBrandOpen(true)}>
+                      <Crown className="w-5 h-5 fill-white/50" />
+                      保存品牌风格
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>

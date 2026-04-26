@@ -303,12 +303,13 @@ export default function ResultStep() {
       }
 
       try {
-        let fakeProgress = 0;
+        // 阶段式进度：策略校验阶段缓慢从 0% 增长到 8%，避免用户感知"假跳半程"
+        let stageProgress = 0;
         fakeTimer = setInterval(() => {
-          fakeProgress += Math.random() * 5 + 1;
-          if (fakeProgress > 40) fakeProgress = 40;
-          if (!cancelled) safeSetProgress(fakeProgress);
-        }, 400);
+          stageProgress += Math.random() * 1.2 + 0.3;
+          if (stageProgress > 8) stageProgress = 8;
+          if (!cancelled) safeSetProgress(stageProgress);
+        }, 800);
 
         setStatusText("正在校验主图策略...");
         const snapshot = await sessionAPI.get(sessionId).catch(() => null);
@@ -338,7 +339,7 @@ export default function ResultStep() {
           if (!latestJob || !["failed", "error"].includes(String(latestJob.status || "").toLowerCase())) {
             clearInterval(fakeTimer);
             setStatusText("正在恢复已有生成任务...");
-            safeSetProgress(45);
+            safeSetProgress(12);
             await jobAPI.pollUntilDone(snapshot.latest_generate_job_id, (jobStatus) => {
               const pct = jobStatus.progress ?? jobStatus.progress_pct ?? 0;
               const stage = jobStatus.stage || jobStatus.status || "";
@@ -346,7 +347,8 @@ export default function ResultStep() {
                 setStatusText(resolveGenerationStageText(stage, "main").title);
               }
               if (!cancelled) {
-                safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
+                // 映射后端进度到 12%-92% 区间，避免前端假跳
+                safeSetProgress(Math.min(Math.round(12 + pct * 0.8), 92));
               }
             });
             if (cancelled) return;
@@ -357,11 +359,11 @@ export default function ResultStep() {
           }
 
           setStatusText("检测到上一轮生成失败，正在重新创建任务...");
-          safeSetProgress(42);
+          safeSetProgress(10);
         }
 
         setStatusText("正在生成主图...");
-        safeSetProgress(45);
+        safeSetProgress(10);
         const generateResponse = await sessionAPI.generateGallery(sessionId);
         clearInterval(fakeTimer);
 
@@ -373,7 +375,8 @@ export default function ResultStep() {
               setStatusText(resolveGenerationStageText(stage, "main").title);
             }
             if (!cancelled) {
-              safeSetProgress(Math.min(Math.round(50 + pct * 0.42), 92));
+              // 映射后端进度到 12%-92% 区间
+              safeSetProgress(Math.min(Math.round(12 + pct * 0.8), 92));
             }
           });
         }
@@ -652,6 +655,65 @@ export default function ResultStep() {
     } catch (err: any) {
       toast({
         title: "保存失败",
+        description: err?.message || "请稍后重试。",
+        variant: "destructive",
+      });
+    } finally {
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.asset_id === assetId ? { ...a, isRegenerating: false } : a,
+        ),
+      );
+    }
+  };
+
+  const regenerateAssetText = async (assetId: string) => {
+    const asset = assets.find((a) => a.asset_id === assetId);
+    if (!asset) return;
+    const slotId =
+      asset.resolved_slot_id ||
+      resolveMainGalleryAssetCopy(asset, promptPreviews, strategyOverrides).slotId;
+    if (!slotId || !sessionId) {
+      toast({
+        title: "重排版失败",
+        description: "当前图片缺少可用槽位标识，暂时无法重排版。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalLength =
+      (asset.copy_blocks.headline?.length || 0) +
+      (asset.copy_blocks.supporting?.length || 0) +
+      (asset.copy_blocks.proof_lines?.join("").length || 0) +
+      (asset.copy_blocks.matrix_lines?.join("").length || 0);
+
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.asset_id === assetId ? { ...a, editOpen: false, isRegenerating: true } : a,
+      ),
+    );
+    try {
+      const nextOverrides = upsertStrategyOverride(
+        strategyOverrides,
+        slotId,
+        asset.copy_blocks,
+      );
+      const saved = await sessionAPI.saveStrategyOverrides(sessionId, {
+        overrides: nextOverrides,
+      });
+      setStrategyOverrides(saved.overrides || nextOverrides);
+
+      const instruction = `根据新文案重新排版。当前文案总长度约${totalLength}字。`;
+      const response = await assetAPI.regenerate(assetId, instruction);
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id);
+      }
+      await loadResults();
+      toast({ title: "智能重排版完成", description: "已根据新文案重新计算布局。" });
+    } catch (err: any) {
+      toast({
+        title: "重排版失败",
         description: err?.message || "请稍后重试。",
         variant: "destructive",
       });
@@ -977,15 +1039,41 @@ export default function ResultStep() {
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 resize-y"
                         />
                       </div>
+                      {/* 文字长度校验提示 */}
+                      {(() => {
+                        const totalLen =
+                          (asset.copy_blocks.headline?.length || 0) +
+                          (asset.copy_blocks.supporting?.length || 0) +
+                          (asset.copy_blocks.proof_lines?.join("").length || 0) +
+                          (asset.copy_blocks.matrix_lines?.join("").length || 0);
+                        if (totalLen > 80) {
+                          return (
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700">
+                              当前文案共 {totalLen} 字，文字较长。如排版异常，建议使用"智能重排版"。
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
-                    <button
-                      onClick={() => saveAssetText(asset.asset_id)}
-                      disabled={actionLocked}
-                      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold tracking-widest text-slate-900 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
-                    >
-                      <Check className="h-4 w-4" />
-                      应用文案重生
-                    </button>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={() => saveAssetText(asset.asset_id)}
+                        disabled={actionLocked}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2.5 text-sm font-bold tracking-widest text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
+                      >
+                        <Check className="h-4 w-4" />
+                        仅替换文字
+                      </button>
+                      <button
+                        onClick={() => regenerateAssetText(asset.asset_id)}
+                        disabled={actionLocked}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold tracking-widest text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        智能重排版
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -1008,7 +1096,7 @@ export default function ResultStep() {
       </div>
 
       {/* --- Bottom fixed bar --- */}
-      <div className="fixed bottom-0 left-0 right-0 z-30">
+      <div className="fixed bottom-0 left-0 right-0 z-30 pb-[env(safe-area-inset-bottom)]">
         <div className="border-t border-slate-200 bg-white/90 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
           <div className="mx-auto flex max-w-5xl items-center gap-4">
             <div className="min-w-0 flex-1 pl-2">
