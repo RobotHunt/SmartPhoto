@@ -3,6 +3,9 @@ import type {
   PromptPreviewItem,
   SessionResultAsset,
   StrategyOverrideItem,
+  VisibleCopySlot,
+  DetailCopyBlocks,
+  TextElement,
 } from "@/lib/api";
 
 export const EMPTY_MAIN_GALLERY_COPY_BLOCKS: MainGalleryCopyBlocks = {
@@ -11,6 +14,112 @@ export const EMPTY_MAIN_GALLERY_COPY_BLOCKS: MainGalleryCopyBlocks = {
   proof_lines: [],
   matrix_lines: [],
 };
+
+// ────────────────────────────────────────────────────────────
+//  v2.2.0 unified edit field system
+// ────────────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  headline: "主标题",
+  supporting: "副标题",
+  label: "标签",
+};
+
+export function fieldRoleLabel(role: string): string {
+  return ROLE_LABELS[role] || role;
+}
+
+function visibleCopySlotsToEditFields(slots: VisibleCopySlot[]): TextElement[] {
+  return slots.map((s) => {
+    const slot = s.slot;
+    if (slot === "headline") return { id: "headline", role: "headline", text: s.text };
+    if (slot === "supporting") return { id: "supporting", role: "supporting", text: s.text };
+    const labelMatch = slot.match(/^label_(.+)$/);
+    if (labelMatch) return { id: labelMatch[1], role: "label", text: s.text };
+    return { id: slot, role: "label", text: s.text };
+  });
+}
+
+function copyBlocksToEditFields(cb: MainGalleryCopyBlocks | null | undefined): TextElement[] {
+  const fields: TextElement[] = [];
+  const blocks = cb || EMPTY_MAIN_GALLERY_COPY_BLOCKS;
+  if (blocks.headline) fields.push({ id: "h", role: "headline", text: blocks.headline });
+  if (blocks.supporting) fields.push({ id: "s", role: "supporting", text: blocks.supporting });
+  (blocks.proof_lines || []).forEach((t, i) => {
+    if (t) fields.push({ id: `p${i}`, role: "label", text: t });
+  });
+  (blocks.matrix_lines || []).forEach((t, i) => {
+    if (t) fields.push({ id: `m${i}`, role: "label", text: t });
+  });
+  return fields;
+}
+
+function detailCopyBlocksToEditFields(cb: DetailCopyBlocks | null | undefined): TextElement[] {
+  const fields: TextElement[] = [];
+  if (!cb) return fields;
+  if (cb.headline) fields.push({ id: "h", role: "headline", text: cb.headline });
+  if (cb.supporting) fields.push({ id: "s", role: "supporting", text: cb.supporting });
+  (cb.bullet_points || []).forEach((t, i) => {
+    if (t) fields.push({ id: `b${i}`, role: "label", text: t });
+  });
+  (cb.proof_lines || []).forEach((t, i) => {
+    if (t) fields.push({ id: `p${i}`, role: "label", text: t });
+  });
+  (cb.matrix_lines || []).forEach((t, i) => {
+    if (t) fields.push({ id: `m${i}`, role: "label", text: t });
+  });
+  if (cb.cta_line) fields.push({ id: "cta", role: "label", text: cb.cta_line });
+  return fields;
+}
+
+export function getEditFields(asset: {
+  text_elements?: TextElement[] | null;
+  visible_copy_slots?: VisibleCopySlot[] | null;
+  copy_blocks?: MainGalleryCopyBlocks | null;
+}): TextElement[] {
+  if (asset.text_elements?.length) return asset.text_elements;
+  if (asset.visible_copy_slots?.length) return visibleCopySlotsToEditFields(asset.visible_copy_slots);
+  return copyBlocksToEditFields(asset.copy_blocks);
+}
+
+export function getDetailEditFields(asset: {
+  text_elements?: TextElement[] | null;
+  visible_copy_slots?: VisibleCopySlot[] | null;
+  copy_blocks?: DetailCopyBlocks | null;
+}): TextElement[] {
+  if (asset.text_elements?.length) return asset.text_elements;
+  if (asset.visible_copy_slots?.length) return visibleCopySlotsToEditFields(asset.visible_copy_slots);
+  return detailCopyBlocksToEditFields(asset.copy_blocks);
+}
+
+export function fieldsToCopyBlocks(fields: TextElement[]): MainGalleryCopyBlocks {
+  return {
+    headline: fields.find((f) => f.role === "headline")?.text || "",
+    supporting: fields.find((f) => f.role === "supporting")?.text || "",
+    proof_lines: fields.filter((f) => f.role === "label").map((f) => f.text),
+    matrix_lines: [],
+  };
+}
+
+export function fieldsToDetailCopyBlocks(fields: TextElement[]): DetailCopyBlocks | null {
+  if (!fields.length) return null;
+  return {
+    headline: fields.find((f) => f.role === "headline")?.text || "",
+    supporting: fields.find((f) => f.role === "supporting")?.text || "",
+    bullet_points: [],
+    proof_lines: fields.filter((f) => f.role === "label").map((f) => f.text),
+    matrix_lines: [],
+    cta_line: "",
+  };
+}
+
+export function updateFieldById(fields: TextElement[], id: string, text: string): TextElement[] {
+  return fields.map((f) => (f.id === id ? { ...f, text } : f));
+}
+
+export function fieldsTotalLength(fields: TextElement[]): number {
+  return fields.reduce((sum, f) => sum + (f.text?.length || 0), 0);
+}
 
 function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -35,6 +144,102 @@ export function normalizeMainGalleryCopyBlocks(value: unknown): MainGalleryCopyB
     proof_lines: normalizeTextList(raw.proof_lines),
     matrix_lines: normalizeTextList(raw.matrix_lines),
   };
+}
+
+export function visibleCopySlotsToDetailCopyBlocks(slots: VisibleCopySlot[] | null | undefined): DetailCopyBlocks | null {
+  if (!slots || slots.length === 0) return null;
+
+  return {
+    headline: slots[0]?.text || "",
+    supporting: slots[1]?.text || "",
+    bullet_points: [],
+    proof_lines: [],
+    matrix_lines: slots.slice(2).map((s) => s.text).filter(Boolean),
+    cta_line: "",
+  };
+}
+
+export function visibleCopySlotsToCopyBlocks(slots: VisibleCopySlot[] | null | undefined): MainGalleryCopyBlocks {
+  if (!slots || slots.length === 0) {
+    return { ...EMPTY_MAIN_GALLERY_COPY_BLOCKS };
+  }
+
+  const headline = slots[0]?.text || "";
+  const supporting = slots[1]?.text || "";
+  const matrixLines = slots.slice(2).map((s) => s.text).filter(Boolean);
+
+  return {
+    headline,
+    supporting,
+    proof_lines: [],
+    matrix_lines: matrixLines,
+  };
+}
+
+export function copyBlocksToVisibleSlots(copyBlocks: MainGalleryCopyBlocks | null | undefined): VisibleCopySlot[] {
+  const slots: VisibleCopySlot[] = [];
+  const blocks = copyBlocks || EMPTY_MAIN_GALLERY_COPY_BLOCKS;
+  if (blocks.headline) slots.push({ slot: "headline", text: blocks.headline });
+  if (blocks.supporting) slots.push({ slot: "supporting", text: blocks.supporting });
+  for (const line of blocks.proof_lines || []) {
+    if (line) slots.push({ slot: `proof_${slots.length}`, text: line });
+  }
+  for (const line of blocks.matrix_lines || []) {
+    if (line) slots.push({ slot: `matrix_${slots.length}`, text: line });
+  }
+  return slots;
+}
+
+export function detailCopyBlocksToVisibleSlots(copyBlocks: DetailCopyBlocks | null | undefined): VisibleCopySlot[] {
+  const slots: VisibleCopySlot[] = [];
+  if (!copyBlocks) return slots;
+  if (copyBlocks.headline) slots.push({ slot: "headline", text: copyBlocks.headline });
+  if (copyBlocks.supporting) slots.push({ slot: "supporting", text: copyBlocks.supporting });
+  for (const line of copyBlocks.bullet_points || []) {
+    if (line) slots.push({ slot: `bullet_${slots.length}`, text: line });
+  }
+  for (const line of copyBlocks.proof_lines || []) {
+    if (line) slots.push({ slot: `proof_${slots.length}`, text: line });
+  }
+  for (const line of copyBlocks.matrix_lines || []) {
+    if (line) slots.push({ slot: `matrix_${slots.length}`, text: line });
+  }
+  if (copyBlocks.cta_line) slots.push({ slot: "cta_line", text: copyBlocks.cta_line });
+  return slots;
+}
+
+export function ensureVisibleSlots(
+  visibleSlots: VisibleCopySlot[] | null | undefined,
+  copyBlocks: MainGalleryCopyBlocks | null | undefined,
+): VisibleCopySlot[] {
+  if (visibleSlots && visibleSlots.length > 0) return visibleSlots;
+  return copyBlocksToVisibleSlots(copyBlocks);
+}
+
+export function ensureDetailVisibleSlots(
+  visibleSlots: VisibleCopySlot[] | null | undefined,
+  copyBlocks: DetailCopyBlocks | null | undefined,
+): VisibleCopySlot[] {
+  if (visibleSlots && visibleSlots.length > 0) return visibleSlots;
+  return detailCopyBlocksToVisibleSlots(copyBlocks);
+}
+
+export function updateSlotText(
+  slots: VisibleCopySlot[] | null | undefined,
+  index: number,
+  text: string,
+): VisibleCopySlot[] {
+  const list = slots && slots.length > 0 ? [...slots] : [];
+  while (list.length <= index) {
+    list.push({ slot: `slot_${list.length}`, text: "" });
+  }
+  list[index] = { ...list[index], text };
+  return list;
+}
+
+export function getSlotsTotalLength(slots: VisibleCopySlot[] | null | undefined): number {
+  if (!slots) return 0;
+  return slots.reduce((sum, s) => sum + (s.text?.length || 0), 0);
 }
 
 export function copyLinesToTextarea(lines: string[]): string {
@@ -90,7 +295,7 @@ export function findMatchingStrategyOverride(
 }
 
 export function resolveMainGalleryAssetCopy(
-  asset: Pick<SessionResultAsset, "role" | "slot_id" | "display_order">,
+  asset: Pick<SessionResultAsset, "role" | "slot_id" | "display_order" | "visible_copy_slots">,
   prompts: PromptPreviewItem[],
   overrides: StrategyOverrideItem[],
 ): {
@@ -99,6 +304,14 @@ export function resolveMainGalleryAssetCopy(
 } {
   const matchedPrompt = findMatchingPromptPreview(asset, prompts);
   const matchedOverride = findMatchingStrategyOverride(asset, prompts, overrides);
+
+  if (asset.visible_copy_slots && asset.visible_copy_slots.length > 0) {
+    return {
+      slotId: matchedPrompt?.slot_id || asset.slot_id || asset.role || null,
+      copyBlocks: visibleCopySlotsToCopyBlocks(asset.visible_copy_slots),
+    };
+  }
+
   return {
     slotId: matchedPrompt?.slot_id || asset.slot_id || asset.role || null,
     copyBlocks: normalizeMainGalleryCopyBlocks(

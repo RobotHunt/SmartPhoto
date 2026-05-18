@@ -190,7 +190,23 @@
   
   /* Bright Theme Background */
   .aurora-bg {
-    @apply bg-slate-50 relative overflow-hidden min-h-screen text-slate-800;
+    @apply bg-slate-50 relative overflow-hidden text-slate-800;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Mobile safe-area padding utilities */
+  .pb-safe-4 {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+  .pb-safe-5 {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  }
+  .pb-safe-6 {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  .pb-safe-8 {
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom));
   }
 
   /* Scanner Animation */

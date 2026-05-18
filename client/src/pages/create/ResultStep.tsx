@@ -30,11 +30,16 @@ import {
   type SessionResults,
   type StrategyOverrideItem,
   type VersionSummary,
+  type VisibleCopySlot,
+  type TextElement,
 } from "@/lib/api";
 import {
-  copyLinesToTextarea,
+  fieldRoleLabel,
+  fieldsToCopyBlocks,
+  fieldsTotalLength,
+  getEditFields,
   resolveMainGalleryAssetCopy,
-  textareaToCopyLines,
+  updateFieldById,
   upsertStrategyOverride,
 } from "@/lib/mainGalleryCopy";
 import { QualityBadge } from "@/components/QualityBadge";
@@ -53,6 +58,8 @@ type ResultAssetView = {
   isRegenerating: boolean;
   editOpen: boolean;
   copy_blocks: MainGalleryCopyBlocks;
+  visible_copy_slots?: VisibleCopySlot[] | null;
+  editFields: TextElement[];
   carry_forward?: boolean;
   source_version_no?: number | null;
   fidelity_validation_status?: string | null;
@@ -61,6 +68,16 @@ type ResultAssetView = {
   quality_scores?: Record<string, any> | null;
   failure_reason?: string | null;
   brand_memory_trace?: any;
+};
+
+const INSTRUCTION_COPY_MAP: Record<string, Partial<MainGalleryCopyBlocks>> = {
+  "宠物净化": { headline: "宠物家庭专用净化器", supporting: "滤除毛发异味，守护爱宠健康" },
+  "宠物": { headline: "宠物家庭专用净化器", supporting: "滤除毛发异味，守护爱宠健康" },
+  "除甲醛": { headline: "高效除甲醛", supporting: "新居必备，净化甲醛无死角" },
+  "除菌": { headline: "除菌除螨", supporting: "深层净化，守护家人健康" },
+  "静音": { headline: "静音睡眠模式", supporting: "低噪运行，安睡一整晚" },
+  "CADR": { headline: "高CADR值快速净化", supporting: "大空间适用，高效换气" },
+  "滤芯": { headline: "高效复合滤芯", supporting: "多层过滤，持久耐用" },
 };
 
 function normalizeGenerationError(error: any) {
@@ -119,30 +136,34 @@ function buildViewAssets(
   prompts: PromptPreviewItem[],
   overrides: StrategyOverrideItem[],
 ): ResultAssetView[] {
-  return (data.assets || []).map((asset, index) => ({
-    ...(() => {
-      const resolved = resolveMainGalleryAssetCopy(asset, prompts, overrides);
-      return {
-        resolved_slot_id: resolved.slotId,
+  return (data.assets || []).map((asset, index) => {
+    const resolved = resolveMainGalleryAssetCopy(asset, prompts, overrides);
+    return {
+      resolved_slot_id: resolved.slotId,
+      copy_blocks: resolved.copyBlocks,
+      asset_id: asset.asset_id,
+      role: asset.role,
+      image_url: asset.image_url,
+      display_order: asset.display_order ?? index,
+      slot_id: asset.slot_id || "",
+      isRegenerating: false,
+      editOpen: false,
+      visible_copy_slots: asset.visible_copy_slots,
+      editFields: getEditFields({
+        text_elements: asset.text_elements,
+        visible_copy_slots: asset.visible_copy_slots,
         copy_blocks: resolved.copyBlocks,
-      };
-    })(),
-    asset_id: asset.asset_id,
-    role: asset.role,
-    image_url: asset.image_url,
-    display_order: asset.display_order ?? index,
-    slot_id: asset.slot_id || "",
-    isRegenerating: false,
-    editOpen: false,
-    carry_forward: asset.carry_forward,
-    source_version_no: asset.source_version_no,
-    fidelity_validation_status: asset.fidelity_validation_status,
-    status: asset.status,
-    quality_status: asset.quality_status,
-    quality_scores: asset.quality_scores,
-    failure_reason: asset.failure_reason,
-    brand_memory_trace: asset.brand_memory_trace,
-  }));
+      }),
+      carry_forward: asset.carry_forward,
+      source_version_no: asset.source_version_no,
+      fidelity_validation_status: asset.fidelity_validation_status,
+      status: asset.status,
+      quality_status: asset.quality_status,
+      quality_scores: asset.quality_scores,
+      failure_reason: asset.failure_reason,
+      brand_memory_trace: asset.brand_memory_trace,
+    };
+  });
 }
 
 export default function ResultStep() {
@@ -477,6 +498,28 @@ export default function ResultStep() {
     );
 
     try {
+      const asset = assets.find((a) => a.asset_id === assetId);
+      const matchedKey = asset
+        ? Object.keys(INSTRUCTION_COPY_MAP).find((k) => instruction.includes(k))
+        : null;
+
+      if (matchedKey && asset && asset.resolved_slot_id) {
+        const currentBlocks = fieldsToCopyBlocks(asset.editFields);
+        const nextBlocks = {
+          ...currentBlocks,
+          ...INSTRUCTION_COPY_MAP[matchedKey],
+        };
+        const nextOverrides = upsertStrategyOverride(
+          strategyOverrides,
+          asset.resolved_slot_id,
+          nextBlocks,
+        );
+        const saved = await sessionAPI.saveStrategyOverrides(sessionId, {
+          overrides: nextOverrides,
+        });
+        setStrategyOverrides(saved.overrides || nextOverrides);
+      }
+
       const response = await assetAPI.regenerate(assetId, instruction || "重新生成", editConstraints);
       if (response?.job_id) {
         await jobAPI.pollUntilDone(response.job_id);
@@ -582,35 +625,11 @@ export default function ResultStep() {
     );
   };
 
-  const updateAssetText = (
-    assetId: string,
-    field: "headline" | "supporting",
-    value: string,
-  ) => {
+  const updateEditField = (assetId: string, fieldId: string, value: string) => {
     setAssets((prev) =>
       prev.map((a) =>
         a.asset_id === assetId
-          ? { ...a, copy_blocks: { ...a.copy_blocks, [field]: value } }
-          : a,
-      ),
-    );
-  };
-
-  const updateAssetLineText = (
-    assetId: string,
-    field: "proof_lines" | "matrix_lines",
-    value: string,
-  ) => {
-    setAssets((prev) =>
-      prev.map((a) =>
-        a.asset_id === assetId
-          ? {
-              ...a,
-              copy_blocks: {
-                ...a.copy_blocks,
-                [field]: textareaToCopyLines(value),
-              },
-            }
+          ? { ...a, editFields: updateFieldById(a.editFields, fieldId, value) }
           : a,
       ),
     );
@@ -630,6 +649,7 @@ export default function ResultStep() {
       });
       return;
     }
+    const copyBlocks = fieldsToCopyBlocks(asset.editFields);
     setAssets((prev) =>
       prev.map((a) =>
         a.asset_id === assetId ? { ...a, editOpen: false, isRegenerating: true } : a,
@@ -639,14 +659,13 @@ export default function ResultStep() {
       const nextOverrides = upsertStrategyOverride(
         strategyOverrides,
         slotId,
-        asset.copy_blocks,
+        copyBlocks,
       );
       const saved = await sessionAPI.saveStrategyOverrides(sessionId, {
         overrides: nextOverrides,
       });
       setStrategyOverrides(saved.overrides || nextOverrides);
-      // Use edit-text API to preserve composition while only replacing text
-      const response = await assetAPI.editAssetText(assetId, asset.copy_blocks);
+      const response = await assetAPI.editAssetText(assetId, copyBlocks);
       if (response?.job_id) {
         await jobAPI.pollUntilDone(response.job_id);
       }
@@ -682,11 +701,8 @@ export default function ResultStep() {
       return;
     }
 
-    const totalLength =
-      (asset.copy_blocks.headline?.length || 0) +
-      (asset.copy_blocks.supporting?.length || 0) +
-      (asset.copy_blocks.proof_lines?.join("").length || 0) +
-      (asset.copy_blocks.matrix_lines?.join("").length || 0);
+    const copyBlocks = fieldsToCopyBlocks(asset.editFields);
+    const totalLength = fieldsTotalLength(asset.editFields);
 
     setAssets((prev) =>
       prev.map((a) =>
@@ -697,7 +713,7 @@ export default function ResultStep() {
       const nextOverrides = upsertStrategyOverride(
         strategyOverrides,
         slotId,
-        asset.copy_blocks,
+        copyBlocks,
       );
       const saved = await sessionAPI.saveStrategyOverrides(sessionId, {
         overrides: nextOverrides,
@@ -785,7 +801,7 @@ export default function ResultStep() {
     <div className="min-h-screen aurora-bg">
       <StepIndicator currentStep={5} step5Label="生成图片" />
 
-      <div className="mx-auto w-full max-w-7xl px-4 pb-44 pt-4 md:pt-8 relative z-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pb-52 pt-4 md:pt-8 relative z-10">
         {/* --- Top status bar --- */}
         <div className="mb-1 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -982,79 +998,31 @@ export default function ResultStep() {
                 {/* Expandable inline edit panel */}
                 {asset.editOpen && (
                   <div className="border-t border-slate-200 bg-white/80 backdrop-blur-md px-4 pb-4 pt-3">
+                    <div className="mb-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700">
+                      以下文案将用于重新生成图片。当前图片上的文字可能因模型渲染略有差异。
+                    </div>
                     <div className="space-y-3">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
-                          主标题
-                        </label>
-                        <input
-                          type="text"
-                          value={asset.copy_blocks.headline}
-                          onChange={(e) =>
-                            updateAssetText(asset.asset_id, "headline", e.target.value)
-                          }
-                          placeholder="输入主标题..."
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
-                          副标题
-                        </label>
-                        <input
-                          type="text"
-                          value={asset.copy_blocks.supporting}
-                          onChange={(e) =>
-                            updateAssetText(asset.asset_id, "supporting", e.target.value)
-                          }
-                          placeholder="输入副标题..."
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
-                          佐证短句
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={copyLinesToTextarea(asset.copy_blocks.proof_lines)}
-                          onChange={(e) =>
-                            updateAssetLineText(asset.asset_id, "proof_lines", e.target.value)
-                          }
-                          placeholder={"每行一条"}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 resize-y"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
-                          标签短句
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={copyLinesToTextarea(asset.copy_blocks.matrix_lines)}
-                          onChange={(e) =>
-                            updateAssetLineText(asset.asset_id, "matrix_lines", e.target.value)
-                          }
-                          placeholder={"每行一条"}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 resize-y"
-                        />
-                      </div>
-                      {/* 文字长度校验提示 */}
-                      {(() => {
-                        const totalLen =
-                          (asset.copy_blocks.headline?.length || 0) +
-                          (asset.copy_blocks.supporting?.length || 0) +
-                          (asset.copy_blocks.proof_lines?.join("").length || 0) +
-                          (asset.copy_blocks.matrix_lines?.join("").length || 0);
-                        if (totalLen > 80) {
-                          return (
-                            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700">
-                              当前文案共 {totalLen} 字，文字较长。如排版异常，建议使用"智能重排版"。
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                      {asset.editFields.map((f) => (
+                        <div key={f.id}>
+                          <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
+                            {fieldRoleLabel(f.role)}
+                          </label>
+                          <input
+                            type="text"
+                            value={f.text}
+                            onChange={(e) =>
+                              updateEditField(asset.asset_id, f.id, e.target.value)
+                            }
+                            placeholder={`输入${fieldRoleLabel(f.role)}...`}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                          />
+                        </div>
+                      ))}
+                      {fieldsTotalLength(asset.editFields) > 80 && (
+                        <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700">
+                          当前文案共 {fieldsTotalLength(asset.editFields)} 字，文字较长。如排版异常，建议使用"智能重排版"。
+                        </div>
+                      )}
                     </div>
                     <div className="mt-4 flex gap-2">
                       <button
@@ -1073,6 +1041,10 @@ export default function ResultStep() {
                         <Sparkles className="h-4 w-4" />
                         智能重排版
                       </button>
+                    </div>
+                    <div className="mt-2 flex gap-2 text-[10px] text-slate-500">
+                      <span className="flex-1 text-center">保留构图，只换文字</span>
+                      <span className="flex-1 text-center">按新文案重新布局</span>
                     </div>
                   </div>
                 )}
@@ -1096,8 +1068,8 @@ export default function ResultStep() {
       </div>
 
       {/* --- Bottom fixed bar --- */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 pb-[env(safe-area-inset-bottom)]">
-        <div className="border-t border-slate-200 bg-white/90 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+      <div className="fixed bottom-0 left-0 right-0 z-30 flex flex-col">
+        <div className="border-t border-slate-200 bg-white/90 backdrop-blur-xl px-4 pt-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] pb-safe-4">
           <div className="mx-auto flex max-w-5xl items-center gap-4">
             <div className="min-w-0 flex-1 pl-2">
               {selectedCount > 0 ? (
@@ -1158,6 +1130,9 @@ export default function ResultStep() {
                 <X className="h-5 w-5" />
               </button>
             </div>
+            <div className="mb-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700">
+              重新生成将同时调整图片风格和文案内容。如果只想修改文字，请点击图片下方的【修改文案】按钮。
+            </div>
             <p className="mb-3 text-xs text-slate-500">
               请告诉 AI 你希望如何调整这张图片（可选）
             </p>
@@ -1167,7 +1142,7 @@ export default function ResultStep() {
               onChange={(event) => setRegenInstruction(event.target.value)}
               rows={5}
               className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
-              placeholder="例如：背景更干净一些，产品更居中，去掉多余装饰..."
+              placeholder="例如：背景更干净一些，产品更居中，去掉多余装饰，宠物净化方向..."
             />
             <div className="mt-3 flex flex-wrap gap-2">
               {["背景换白色", "产品更突出", "文字更大", "去掉文字", "换横版构图"].map(

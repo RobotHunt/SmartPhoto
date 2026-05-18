@@ -80,6 +80,10 @@ export default function StrategyStep() {
             if (regenerate?.job_id) {
               await jobAPI.pollUntilDone(regenerate.job_id, undefined, 2000, 120000);
             }
+            const generatedCopy = await sessionAPI.getCopy(sessionId).catch(() => null);
+            if (generatedCopy && !isCopyEmpty(generatedCopy)) {
+              await sessionAPI.saveCopy(sessionId, generatedCopy);
+            }
           }
 
           const built = await sessionAPI.buildStrategy(sessionId);

@@ -277,6 +277,7 @@ export default function CopywritingStep() {
       if (!result || isCopyEmpty(result)) {
         throw new Error("生成结果为空，请重试");
       }
+      await sessionAPI.saveCopy(sessionId, result);
       if (mountedRef.current) setCopyData(result);
     } catch (err: any) {
       if (mountedRef.current) {
@@ -312,6 +313,7 @@ export default function CopywritingStep() {
       if (!result || isCopyEmpty(result)) {
         throw new Error("生成结果为空，请重试");
       }
+      await sessionAPI.saveCopy(sessionId, result);
       if (mountedRef.current) {
         setCopyData(result);
         toast({ title: "文案已重新生成" });
@@ -494,8 +496,8 @@ export default function CopywritingStep() {
 
       {/* Button dock */}
       {!loading && !error && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-4 flex justify-center z-50 pb-[env(safe-area-inset-bottom)]">
-          <div className="w-full max-w-4xl flex items-center gap-3">
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 px-6 pt-5 md:pt-6 sm:px-12 flex justify-between items-center gap-2 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] pb-safe-5 md:pb-safe-6">
+          <div className="flex flex-wrap sm:flex-nowrap justify-between gap-2 w-full">
             <Button
               variant="outline"
               onClick={handleModify}

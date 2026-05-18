@@ -1,0 +1,4 @@
+{
+    "build_command": "pnpm install --frozen-lockfile && pnpm build && cp -r dist/public/* dist/ && rm -rf dist/public",
+    "node_version": "20"
+}

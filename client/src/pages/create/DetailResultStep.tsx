@@ -21,7 +21,8 @@ import { Button } from "@/components/ui/button";
 import GenerationWaitingUI from "@/components/GenerationWaitingUI";
 import { useToast } from "@/hooks/use-toast";
 import { getLoginUrl } from "@/const";
-import { assetAPI, jobAPI, sessionAPI, type VersionSummary } from "@/lib/api";
+import { assetAPI, jobAPI, sessionAPI, type VersionSummary, type DetailCopyBlocks, type VisibleCopySlot, type TextElement } from "@/lib/api";
+import { fieldRoleLabel, fieldsToDetailCopyBlocks, fieldsTotalLength, getDetailEditFields, updateFieldById } from "@/lib/mainGalleryCopy";
 import { resolveGenerationStageText } from "@/lib/generationStatus";
 import { updateSessionRecord } from "@/lib/localUser";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +50,9 @@ type DetailPanel = {
   panel_type?: string | null;
   visual_truth_mode?: string | null;
   origin_note?: string | null;
+  copy_blocks?: DetailCopyBlocks | null;
+  visible_copy_slots?: VisibleCopySlot[] | null;
+  text_elements?: TextElement[] | null;
   image_url: string;
   thumbnail_url?: string | null;
   display_order: number;
@@ -88,7 +92,9 @@ interface DetailImage {
   id: string;
   label: string;
   url: string;
-  text?: string;
+  copy_blocks?: DetailCopyBlocks | null;
+  visible_copy_slots?: VisibleCopySlot[] | null;
+  editFields: TextElement[];
   editOpen: boolean;
   isRegenerating: boolean;
   carry_forward?: boolean;
@@ -103,6 +109,25 @@ interface DetailImage {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
+
+function normalizeDetailCopyBlocks(value: unknown): DetailCopyBlocks | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  return {
+    headline: typeof v.headline === "string" ? v.headline : "",
+    supporting: typeof v.supporting === "string" ? v.supporting : "",
+    bullet_points: Array.isArray(v.bullet_points)
+      ? v.bullet_points.filter((x): x is string => typeof x === "string")
+      : [],
+    proof_lines: Array.isArray(v.proof_lines)
+      ? v.proof_lines.filter((x): x is string => typeof x === "string")
+      : [],
+    matrix_lines: Array.isArray(v.matrix_lines)
+      ? v.matrix_lines.filter((x): x is string => typeof x === "string")
+      : [],
+    cta_line: typeof v.cta_line === "string" ? v.cta_line : "",
+  };
+}
 
 function triggerBrowserDownload(url: string, filename: string) {
   const link = document.createElement("a");
@@ -133,6 +158,24 @@ function normalizeDetailResults(data: any): DetailResultsPayload {
       display_module_intent: panel?.display_module_intent ?? null,
       display_tags: Array.isArray(panel?.display_tags) ? panel.display_tags : null,
       origin_note: panel?.origin_note ?? null,
+      copy_blocks: normalizeDetailCopyBlocks(panel?.copy_blocks),
+      visible_copy_slots: Array.isArray(panel?.visible_copy_slots)
+        ? panel.visible_copy_slots
+            .map((slot: any) => ({
+              slot: String(slot?.slot || ""),
+              text: String(slot?.text || ""),
+            }))
+            .filter((s: any) => s.slot)
+        : null,
+      text_elements: Array.isArray(panel?.text_elements)
+        ? panel.text_elements
+            .map((el: any) => ({
+              id: String(el?.id || ""),
+              role: String(el?.role || "label"),
+              text: String(el?.text || ""),
+            }))
+            .filter((el: any) => el.id)
+        : null,
       image_url: String(panel?.image_url || panel?.thumbnail_url || ""),
       thumbnail_url: panel?.thumbnail_url ?? null,
       display_order: Number(panel?.display_order ?? index),
@@ -280,7 +323,13 @@ export default function DetailResultStep() {
         url: panel.image_url,
         editOpen: false,
         isRegenerating: false,
-        text: panel.display_module_title || panel.panel_label || `详情图 ${index + 1}`,
+        copy_blocks: panel.copy_blocks,
+        visible_copy_slots: panel.visible_copy_slots,
+        editFields: getDetailEditFields({
+          text_elements: panel.text_elements,
+          visible_copy_slots: panel.visible_copy_slots,
+          copy_blocks: panel.copy_blocks,
+        }),
         carry_forward: panel.carry_forward,
         source_version_no: panel.source_version_no,
         fidelity_validation_status: panel.fidelity_validation_status,
@@ -473,13 +522,39 @@ export default function DetailResultStep() {
     );
   };
 
-  const updateText = (id: string, value: string) => {
-    setImages((prev) => prev.map((img) => (img.id === id ? { ...img, text: value } : img)));
+  const updateEditField = (id: string, fieldId: string, value: string) => {
+    setImages((prev) =>
+      prev.map((img) =>
+        img.id === id
+          ? { ...img, editFields: updateFieldById(img.editFields, fieldId, value) }
+          : img,
+      ),
+    );
   };
 
-  const saveText = (id: string) => {
-    setImages((prev) => prev.map((img) => (img.id === id ? { ...img, editOpen: false } : img)));
-    toast({ title: "文字已保存" });
+  const saveText = async (id: string) => {
+    const img = images.find((item) => item.id === id);
+    if (!img) return;
+
+    const copyBlocks = fieldsToDetailCopyBlocks(img.editFields);
+    if (!copyBlocks) return;
+
+    setImages((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, editOpen: false, isRegenerating: true } : item)),
+    );
+
+    try {
+      const response = await assetAPI.editDetailAssetText(id, copyBlocks);
+      if (response?.job_id) {
+        await jobAPI.pollUntilDone(response.job_id);
+      }
+      await fetchDetailResults(currentVersion);
+      toast({ title: "文案修改已生效", description: "图片已按新文案重新渲染" });
+    } catch (err: any) {
+      toast({ title: "保存失败", description: err?.message || "请稍后重试", variant: "destructive" });
+    } finally {
+      setImages((prev) => prev.map((item) => (item.id === id ? { ...item, isRegenerating: false } : item)));
+    }
   };
 
   const handleAssetRegenerate = async (id: string) => {
@@ -643,7 +718,7 @@ export default function DetailResultStep() {
           </div>
 
           {/* image list */}
-          <div className="flex-1 pb-36 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 relative z-10">
+          <div className="flex-1 pb-52 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 relative z-10">
             {images.map((img) => {
               if (!img.url && img.status === "failed") {
                 return (
@@ -757,20 +832,28 @@ export default function DetailResultStep() {
                 {/* edit panel */}
                 {img.editOpen && (
                   <div className="border-t border-slate-200 px-4 pb-4 pt-3 bg-white/80 backdrop-blur-md">
+                    <div className="mb-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700">
+                      以下文案来自图片实际渲染文字，修改后仅替换文字区域，保持原图构图不变。
+                    </div>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-bold tracking-widest text-slate-500 w-14 shrink-0">标注文字</span>
-                        <input
-                          value={img.text}
-                          onChange={(e) => updateText(img.id, e.target.value)}
-                          className="flex-1 text-sm bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
-                          placeholder="输入标注文字"
-                        />
-                      </div>
+                      {img.editFields.map((f) => (
+                        <div key={f.id}>
+                          <label className="mb-1.5 block text-xs font-bold tracking-widest text-slate-500">
+                            {fieldRoleLabel(f.role)}
+                          </label>
+                          <input
+                            type="text"
+                            value={f.text}
+                            onChange={(e) => updateEditField(img.id, f.id, e.target.value)}
+                            placeholder={`输入${fieldRoleLabel(f.role)}...`}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                          />
+                        </div>
+                      ))}
                     </div>
                     <button
                       onClick={() => saveText(img.id)}
-                      className="mt-4 w-full flex items-center justify-center gap-1.5 text-sm font-bold tracking-widest text-slate-900 bg-blue-600 hover:bg-blue-500 rounded-xl py-2.5 transition-all shadow-sm"
+                      className="mt-4 w-full flex items-center justify-center gap-1.5 text-sm font-bold tracking-widest text-white bg-blue-600 hover:bg-blue-500 rounded-xl py-2.5 transition-all shadow-sm"
                     >
                       <Check className="w-4 h-4" />
                       保存修改
@@ -804,7 +887,7 @@ export default function DetailResultStep() {
               </div>
             )}
             {/* action buttons */}
-            <div className="border-t border-slate-200 bg-white/90 backdrop-blur-xl px-4 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+            <div className="border-t border-slate-200 bg-white/90 backdrop-blur-xl px-4 pt-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] pb-safe-4">
               <div className="max-w-5xl w-full mx-auto flex gap-3">
                 {isPreviewMode ? (
                   <>

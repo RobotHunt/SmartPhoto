@@ -102,6 +102,17 @@ export interface VersionSummary {
   missing_panel_ids?: string[];
 }
 
+export interface VisibleCopySlot {
+  slot: string;
+  text: string;
+}
+
+export interface TextElement {
+  id: string;
+  role: string;
+  text: string;
+}
+
 export interface SessionResultAsset {
   asset_id: string;
   role: string;
@@ -123,6 +134,8 @@ export interface SessionResultAsset {
   quality_review_job_id?: string | null;
   failure_reason?: string | null;
   brand_memory_trace?: any;
+  visible_copy_slots?: VisibleCopySlot[] | null;
+  text_elements?: TextElement[] | null;
 }
 
 export interface SessionResults {
@@ -145,6 +158,15 @@ export interface MainGalleryCopyBlocks {
   supporting: string;
   proof_lines: string[];
   matrix_lines: string[];
+}
+
+export interface DetailCopyBlocks {
+  headline: string;
+  supporting: string;
+  bullet_points: string[];
+  proof_lines: string[];
+  matrix_lines: string[];
+  cta_line: string;
 }
 
 export interface PromptPreviewItem {
@@ -274,6 +296,15 @@ function normalizeSessionResults(data: any): SessionResults {
     quality_review_job_id: item?.quality_review_job_id ?? null,
     failure_reason: item?.failure_reason ?? null,
     brand_memory_trace: item?.brand_memory_trace ?? null,
+    visible_copy_slots: asArray<VisibleCopySlot>(item?.visible_copy_slots).map((slot: any) => ({
+      slot: String(slot?.slot || ''),
+      text: String(slot?.text || ''),
+    })).filter((s) => s.slot) || null,
+    text_elements: asArray<TextElement>(item?.text_elements).map((el: any) => ({
+      id: String(el?.id || ''),
+      role: String(el?.role || 'label'),
+      text: String(el?.text || ''),
+    })).filter((el) => el.id) || null,
   }));
 
   return {
@@ -779,6 +810,19 @@ export const assetAPI = {
   editAssetText(
     assetId: string,
     copyBlocks: Partial<MainGalleryCopyBlocks>,
+    instruction?: string | null,
+  ) {
+    return apiFetch(`/assets/${assetId}/edit-text`, {
+      method: 'POST',
+      body: JSON.stringify({
+        copy_blocks: copyBlocks,
+        instruction: instruction ?? null,
+      }),
+    });
+  },
+  editDetailAssetText(
+    assetId: string,
+    copyBlocks: Partial<DetailCopyBlocks>,
     instruction?: string | null,
   ) {
     return apiFetch(`/assets/${assetId}/edit-text`, {

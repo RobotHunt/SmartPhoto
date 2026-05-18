@@ -32,11 +32,16 @@ import {
   type PromptPreviewItem,
   type SessionResults,
   type StrategyOverrideItem,
+  type VisibleCopySlot,
+  type TextElement,
 } from "@/lib/api";
 import {
-  copyLinesToTextarea,
+  fieldRoleLabel,
+  fieldsToCopyBlocks,
+  fieldsTotalLength,
+  getEditFields,
   resolveMainGalleryAssetCopy,
-  textareaToCopyLines,
+  updateFieldById,
   upsertStrategyOverride,
 } from "@/lib/mainGalleryCopy";
 import { updateSessionRecord } from "@/lib/localUser";
@@ -58,6 +63,8 @@ type PreviewImage = {
   isRegenerating: boolean;
   resolved_slot_id: string | null;
   copy_blocks: MainGalleryCopyBlocks;
+  visible_copy_slots?: VisibleCopySlot[] | null;
+  editFields: TextElement[];
   carry_forward?: boolean;
   source_version_no?: number | null;
   fidelity_validation_status?: string | null;
@@ -90,6 +97,12 @@ function buildPreviewImages(
       isRegenerating: false,
       resolved_slot_id: resolved.slotId,
       copy_blocks: resolved.copyBlocks,
+      visible_copy_slots: asset.visible_copy_slots,
+      editFields: getEditFields({
+        text_elements: asset.text_elements,
+        visible_copy_slots: asset.visible_copy_slots,
+        copy_blocks: resolved.copyBlocks,
+      }),
       carry_forward: asset.carry_forward,
       source_version_no: asset.source_version_no,
       fidelity_validation_status: asset.fidelity_validation_status,
@@ -282,31 +295,11 @@ export default function HDResultStep() {
     );
   };
 
-  const updateText = (id: string, field: "headline" | "supporting", value: string) => {
+  const updateEditField = (id: string, fieldId: string, value: string) => {
     setImages((prev) =>
       prev.map((img) =>
         img.id === id
-          ? { ...img, copy_blocks: { ...img.copy_blocks, [field]: value } }
-          : img,
-      ),
-    );
-  };
-
-  const updateLineText = (
-    id: string,
-    field: "proof_lines" | "matrix_lines",
-    value: string,
-  ) => {
-    setImages((prev) =>
-      prev.map((img) =>
-        img.id === id
-          ? {
-              ...img,
-              copy_blocks: {
-                ...img.copy_blocks,
-                [field]: textareaToCopyLines(value),
-              },
-            }
+          ? { ...img, editFields: updateFieldById(img.editFields, fieldId, value) }
           : img,
       ),
     );
@@ -368,18 +361,19 @@ export default function HDResultStep() {
       return;
     }
 
+    const copyBlocks = fieldsToCopyBlocks(img.editFields);
+
     setImages((prev) =>
       prev.map((item) => (item.id === id ? { ...item, editOpen: false, isRegenerating: true } : item)),
     );
 
     try {
-      const nextOverrides = upsertStrategyOverride(strategyOverrides, slotId, img.copy_blocks);
+      const nextOverrides = upsertStrategyOverride(strategyOverrides, slotId, copyBlocks);
       const saved = await sessionAPI.saveStrategyOverrides(sessionId, {
         overrides: nextOverrides,
       });
       setStrategyOverrides(saved.overrides || nextOverrides);
-      // Use edit-text API to preserve composition while only replacing text
-      const response = await assetAPI.editAssetText(id, img.copy_blocks);
+      const response = await assetAPI.editAssetText(id, copyBlocks);
       if (response?.job_id) {
         await jobAPI.pollUntilDone(response.job_id);
       }
@@ -395,18 +389,15 @@ export default function HDResultStep() {
     if (!img || !sessionId) return;
     const slotId = img.slot_id || img.id;
 
-    const totalLength =
-      (img.copy_blocks.headline?.length || 0) +
-      (img.copy_blocks.supporting?.length || 0) +
-      (img.copy_blocks.proof_lines?.join("").length || 0) +
-      (img.copy_blocks.matrix_lines?.join("").length || 0);
+    const copyBlocks = fieldsToCopyBlocks(img.editFields);
+    const totalLength = fieldsTotalLength(img.editFields);
 
     setImages((prev) =>
       prev.map((item) => (item.id === id ? { ...item, editOpen: false, isRegenerating: true } : item)),
     );
 
     try {
-      const nextOverrides = upsertStrategyOverride(strategyOverrides, slotId, img.copy_blocks);
+      const nextOverrides = upsertStrategyOverride(strategyOverrides, slotId, copyBlocks);
       const saved = await sessionAPI.saveStrategyOverrides(sessionId, {
         overrides: nextOverrides,
       });
@@ -425,52 +416,21 @@ export default function HDResultStep() {
   };
 
   const renderCopyEditor = (img: PreviewImage) => {
-    const totalLen =
-      (img.copy_blocks.headline?.length || 0) +
-      (img.copy_blocks.supporting?.length || 0) +
-      (img.copy_blocks.proof_lines?.join("").length || 0) +
-      (img.copy_blocks.matrix_lines?.join("").length || 0);
+    const totalLen = fieldsTotalLength(img.editFields);
     return (
       <div className="border-t border-slate-200 p-5 bg-white/80">
         <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">主标题</span>
-            <input
-              value={img.copy_blocks.headline}
-              onChange={(e) => updateText(img.id, "headline", e.target.value)}
-              className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
-              placeholder="输入主标题..."
-            />
-          </div>
-          <div className="flex items-start gap-3">
-            <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">副标题</span>
-            <input
-              value={img.copy_blocks.supporting}
-              onChange={(e) => updateText(img.id, "supporting", e.target.value)}
-              className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
-              placeholder="输入副标题..."
-            />
-          </div>
-          <div className="flex items-start gap-3">
-            <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">佐证短句</span>
-            <textarea
-              rows={3}
-              value={copyLinesToTextarea(img.copy_blocks.proof_lines)}
-              onChange={(e) => updateLineText(img.id, "proof_lines", e.target.value)}
-              className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
-              placeholder={"每行一条，例如：\n通过质检认证\n核心参数可视化"}
-            />
-          </div>
-          <div className="flex items-start gap-3">
-            <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">标签短句</span>
-            <textarea
-              rows={3}
-              value={copyLinesToTextarea(img.copy_blocks.matrix_lines)}
-              onChange={(e) => updateLineText(img.id, "matrix_lines", e.target.value)}
-              className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
-              placeholder={"每行一条，例如：\n净化除湿二合一\n低噪运行"}
-            />
-          </div>
+          {img.editFields.map((f) => (
+            <div key={f.id} className="flex items-start gap-3">
+              <span className="text-xs font-bold tracking-widest text-slate-500 w-16 shrink-0 pt-2.5">{fieldRoleLabel(f.role)}</span>
+              <input
+                value={f.text}
+                onChange={(e) => updateEditField(img.id, f.id, e.target.value)}
+                className="flex-1 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium placeholder-slate-600 shadow-inner"
+                placeholder={`输入${fieldRoleLabel(f.role)}...`}
+              />
+            </div>
+          ))}
           {totalLen > 80 && (
             <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700">
               当前文案共 {totalLen} 字，文字较长。如排版异常，建议使用"智能重排版"。
@@ -492,6 +452,10 @@ export default function HDResultStep() {
             <Sparkles className="w-4 h-4" />
             智能重排版
           </button>
+        </div>
+        <div className="mt-2 flex gap-2 text-[10px] text-slate-500">
+          <span className="flex-1 text-center">保留构图，只换文字</span>
+          <span className="flex-1 text-center">按新文案重新布局</span>
         </div>
       </div>
     );
@@ -694,7 +658,7 @@ export default function HDResultStep() {
       <div className="min-h-screen aurora-bg flex flex-col pt-8">
         <StepIndicator currentStep={5} />
 
-        <div className="w-full max-w-7xl mx-auto px-4 relative z-10 pb-36">
+        <div className="w-full max-w-7xl mx-auto px-4 relative z-10 pb-48">
           <div className="flex items-center justify-between gap-3 mb-6 bg-white/80 backdrop-blur-md border border-slate-200 p-4 rounded-2xl">
             <div className="flex flex-col">
               <span className="text-sm font-bold tracking-widest text-slate-900 mb-1">
@@ -847,7 +811,7 @@ export default function HDResultStep() {
             )})}
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 px-4 py-4 md:py-6 sm:px-12 flex justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200 px-4 pt-4 md:pt-6 sm:px-12 flex justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] pb-safe-4 md:pb-safe-6">
             <div className="w-full max-w-4xl flex flex-col items-center">
               <button
                 onClick={goToPayment}
@@ -882,7 +846,7 @@ export default function HDResultStep() {
     <div className="min-h-screen aurora-bg flex flex-col pt-8">
       <StepIndicator currentStep={5} />
 
-      <div className="w-full max-w-7xl mx-auto px-4 relative z-10 pb-44">
+      <div className="w-full max-w-7xl mx-auto px-4 relative z-10 pb-52">
         {/* State Banner */}
         <div className="glass-panel border-blue-300 bg-blue-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 rounded-2xl shadow-md">
           <div className="flex items-center gap-3">
@@ -1038,7 +1002,7 @@ export default function HDResultStep() {
             </div>
           )}
           
-          <div className="bg-white/90 backdrop-blur-xl border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-4 py-4 md:py-6 flex justify-center w-full z-10">
+          <div className="bg-white/90 backdrop-blur-xl border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-4 pt-4 md:pt-6 flex justify-center w-full z-10 pb-safe-4 md:pb-safe-6">
             <div className="w-full max-w-5xl flex flex-col md:flex-row items-center justify-between gap-3">
               <div className="flex w-full md:w-auto items-center gap-3">
                 <button
